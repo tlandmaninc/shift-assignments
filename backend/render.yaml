@@ -1,0 +1,44 @@
+# Render Blueprint for ECT Backend
+# Deploy to Render: https://dashboard.render.com/blueprints
+# Documentation: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: ect-backend
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Required: Generate a secure key
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Frontend URL for CORS (update after deploying frontend)
+      - key: FRONTEND_URL
+        value: https://your-frontend.vercel.app
+
+      # Environment
+      - key: ENVIRONMENT
+        value: production
+
+      # AI Provider (gemini recommended for free deployment)
+      - key: AI_PROVIDER
+        value: gemini
+
+      # Gemini API Key (get free at https://aistudio.google.com/app/apikey)
+      - key: GEMINI_API_KEY
+        sync: false
+
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+
+      # Google OAuth (optional)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false

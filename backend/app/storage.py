@@ -1,0 +1,796 @@
+"""JSON-based storage service for all application data."""
+
+import json
+import re
+from datetime import date, datetime
+from pathlib import Path
+from typing import Optional
+from .config import settings
+from .utils.name_translator import (
+    is_hebrew,
+    translate_hebrew_to_english,
+    normalize_name,
+)
+
+
+def validate_month_year(month_year: str) -> tuple[str, str]:
+    """
+    Validate month_year format and return (year, month) tuple.
+
+    Raises ValueError if format is invalid or values are out of range.
+    Prevents path traversal attacks.
+    """
+    if not re.match(r'^\d{4}-\d{2}$', month_year):
+        raise ValueError("Invalid month_year format. Expected YYYY-MM")
+
+    year, month = month_year.split("-")
+    year_int = int(year)
+    month_int = int(month)
+
+    if not (2000 <= year_int <= 2100):
+        raise ValueError("Year out of valid range (2000-2100)")
+    if not (1 <= month_int <= 12):
+        raise ValueError("Month out of valid range (1-12)")
+
+    return year, month
+
+
+def validate_path_within_directory(path: Path, base_dir: Path) -> None:
+    """
+    Ensure the resolved path is within the base directory.
+
+    Raises ValueError if path traversal is detected.
+    """
+    try:
+        path.resolve().relative_to(base_dir.resolve())
+    except ValueError:
+        raise ValueError("Invalid path: directory traversal detected")
+
+
+class JSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for dates and datetimes."""
+
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+class Storage:
+    """JSON file-based storage for all application data."""
+
+    def __init__(self):
+        self._ensure_data_dir()
+
+    def _ensure_data_dir(self):
+        """Ensure data directories exist."""
+        settings.data_dir.mkdir(parents=True, exist_ok=True)
+        settings.assignments_dir.mkdir(parents=True, exist_ok=True)
+
+    def _load_json(self, path: Path) -> dict | list:
+        """Load JSON from file, return empty dict/list if not exists."""
+        if not path.exists():
+            return {}
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _save_json(self, path: Path, data: dict | list):
+        """Save data to JSON file."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, cls=JSONEncoder)
+
+    # ==================== Employees ====================
+
+    def get_employees(self) -> list[dict]:
+        """Get all employees."""
+        data = self._load_json(settings.employees_file)
+        return data.get("employees", [])
+
+    def get_employee(self, employee_id: int) -> Optional[dict]:
+        """Get employee by ID."""
+        employees = self.get_employees()
+        for emp in employees:
+            if emp.get("id") == employee_id:
+                return emp
+        return None
+
+    def get_employee_by_name(self, name: str) -> Optional[dict]:
+        """Get employee by name."""
+        employees = self.get_employees()
+        for emp in employees:
+            if emp.get("name", "").lower() == name.lower():
+                return emp
+        return None
+
+    def save_employee(self, employee: dict) -> dict:
+        """Save or update an employee."""
+        employees = self.get_employees()
+
+        if "id" not in employee or employee["id"] is None:
+            # New employee - assign ID
+            max_id = max((e.get("id", 0) for e in employees), default=0)
+            employee["id"] = max_id + 1
+            employee["created_at"] = datetime.now().isoformat()
+            employees.append(employee)
+        else:
+            # Update existing
+            for i, emp in enumerate(employees):
+                if emp.get("id") == employee["id"]:
+                    employee["updated_at"] = datetime.now().isoformat()
+                    employees[i] = employee
+                    break
+
+        self._save_json(settings.employees_file, {"employees": employees})
+        return employee
+
+    def delete_employee(self, employee_id: int) -> bool:
+        """Delete an employee (soft delete - set inactive)."""
+        employees = self.get_employees()
+        for emp in employees:
+            if emp.get("id") == employee_id:
+                emp["is_active"] = False
+                emp["updated_at"] = datetime.now().isoformat()
+                self._save_json(settings.employees_file, {"employees": employees})
+                return True
+        return False
+
+    def find_duplicate_employees(self) -> list[dict]:
+        """
+        Find potential duplicate employees (Hebrew/English pairs).
+
+        Returns a list of dicts with:
+        - hebrew_employee: the Hebrew name employee
+        - english_employee: the English name employee
+        - hebrew_name: Hebrew name string
+        - english_name: English name string
+        """
+        employees = self.get_employees()
+        duplicates = []
+        processed_ids = set()
+
+        for emp in employees:
+            if emp.get("id") in processed_ids:
+                continue
+
+            name = emp.get("name", "")
+            if not is_hebrew(name):
+                continue
+
+            # Try to translate Hebrew name to English
+            english_name = translate_hebrew_to_english(name)
+            if not english_name:
+                continue
+
+            # Look for an existing employee with the English name
+            for other_emp in employees:
+                if other_emp.get("id") == emp.get("id"):
+                    continue
+                if other_emp.get("id") in processed_ids:
+                    continue
+
+                other_name = other_emp.get("name", "")
+                if normalize_name(other_name) == normalize_name(english_name):
+                    duplicates.append({
+                        "hebrew_employee": emp,
+                        "english_employee": other_emp,
+                        "hebrew_name": name,
+                        "english_name": english_name,
+                    })
+                    processed_ids.add(emp.get("id"))
+                    processed_ids.add(other_emp.get("id"))
+                    break
+
+        return duplicates
+
+    def merge_employees(
+        self,
+        source_id: int,
+        target_id: int,
+        keep_target_name: bool = True
+    ) -> dict:
+        """
+        Merge source employee into target employee.
+
+        - Transfers all assignments from source to target
+        - Updates history records
+        - Deactivates (soft-deletes) the source employee
+        - Optionally updates the target name
+
+        Args:
+            source_id: ID of employee to merge FROM (will be deactivated)
+            target_id: ID of employee to merge INTO (will remain active)
+            keep_target_name: If True, keep target's name. If False, may use source's name.
+
+        Returns:
+            Dict with merge results
+        """
+        source = self.get_employee(source_id)
+        target = self.get_employee(target_id)
+
+        if not source:
+            raise ValueError(f"Source employee with ID {source_id} not found")
+        if not target:
+            raise ValueError(f"Target employee with ID {target_id} not found")
+
+        source_name = source.get("name", "")
+        target_name = target.get("name", "")
+
+        # Update all history/assignment records from source name to target name
+        history = self._load_json(settings.history_file)
+        all_assignments = history.get("assignments", [])
+        updated_count = 0
+
+        for assignment in all_assignments:
+            if assignment.get("employee_name") == source_name:
+                assignment["employee_name"] = target_name
+                assignment["merged_from"] = source_name
+                assignment["merged_at"] = datetime.now().isoformat()
+                updated_count += 1
+
+        history["assignments"] = all_assignments
+        self._save_json(settings.history_file, history)
+
+        # Update monthly assignment files
+        self._update_monthly_assignments(source_name, target_name)
+
+        # Merge employee data - keep earliest created_at, combine emails
+        if source.get("created_at") and target.get("created_at"):
+            if source["created_at"] < target["created_at"]:
+                target["created_at"] = source["created_at"]
+
+        # If target has no email but source does, use source's email
+        if not target.get("email") and source.get("email"):
+            target["email"] = source["email"]
+
+        # If source is not new but target is, update target
+        if not source.get("is_new", True) and target.get("is_new", True):
+            target["is_new"] = False
+
+        # Save updated target
+        target["updated_at"] = datetime.now().isoformat()
+        target["merged_from_id"] = source_id
+        target["merged_from_name"] = source_name
+        self.save_employee(target)
+
+        # Deactivate source employee
+        self.delete_employee(source_id)
+
+        return {
+            "success": True,
+            "source_id": source_id,
+            "target_id": target_id,
+            "source_name": source_name,
+            "target_name": target_name,
+            "assignments_updated": updated_count,
+            "message": f"Merged '{source_name}' into '{target_name}'. {updated_count} assignments updated.",
+        }
+
+    def _update_monthly_assignments(self, old_name: str, new_name: str):
+        """Update all monthly assignment files to replace old_name with new_name."""
+        assignments_dir = settings.assignments_dir
+        if not assignments_dir.exists():
+            return
+
+        for year_dir in assignments_dir.iterdir():
+            if not year_dir.is_dir():
+                continue
+            for month_dir in year_dir.iterdir():
+                if not month_dir.is_dir():
+                    continue
+
+                assignment_file = month_dir / "assignment.json"
+                if not assignment_file.exists():
+                    continue
+
+                data = self._load_json(assignment_file)
+                modified = False
+
+                # Update assignments dict
+                if "assignments" in data:
+                    for date_str, emp_name in list(data["assignments"].items()):
+                        if emp_name == old_name:
+                            data["assignments"][date_str] = new_name
+                            modified = True
+
+                # Update shift_counts dict
+                if "shift_counts" in data:
+                    if old_name in data["shift_counts"]:
+                        old_count = data["shift_counts"].pop(old_name)
+                        data["shift_counts"][new_name] = (
+                            data["shift_counts"].get(new_name, 0) + old_count
+                        )
+                        modified = True
+
+                # Update employees list
+                if "employees" in data:
+                    source_emp = None
+                    target_emp = None
+                    for emp in data["employees"]:
+                        if emp.get("name") == old_name:
+                            source_emp = emp
+                        elif emp.get("name") == new_name:
+                            target_emp = emp
+
+                    if source_emp:
+                        if target_emp:
+                            # Merge shift counts
+                            target_emp["shifts"] = (
+                                target_emp.get("shifts", 0) + source_emp.get("shifts", 0)
+                            )
+                            data["employees"].remove(source_emp)
+                        else:
+                            # Just rename
+                            source_emp["name"] = new_name
+                        modified = True
+
+                if modified:
+                    self._save_json(assignment_file, data)
+
+    def translate_and_merge_hebrew_employees(self) -> dict:
+        """
+        Find all Hebrew employees with English equivalents and merge them.
+
+        Returns summary of all merges performed.
+        """
+        duplicates = self.find_duplicate_employees()
+        results = []
+
+        for dup in duplicates:
+            hebrew_emp = dup["hebrew_employee"]
+            english_emp = dup["english_employee"]
+
+            # Merge Hebrew into English (keep English name)
+            try:
+                result = self.merge_employees(
+                    source_id=hebrew_emp["id"],
+                    target_id=english_emp["id"],
+                    keep_target_name=True
+                )
+                results.append(result)
+            except Exception as e:
+                results.append({
+                    "success": False,
+                    "source_name": dup["hebrew_name"],
+                    "target_name": dup["english_name"],
+                    "error": str(e),
+                })
+
+        return {
+            "total_duplicates_found": len(duplicates),
+            "merges_performed": len([r for r in results if r.get("success")]),
+            "results": results,
+        }
+
+    def translate_all_hebrew_to_english(self) -> dict:
+        """
+        Translate ALL Hebrew names to English in the entire system.
+
+        This function:
+        1. Translates all Hebrew names in history.json
+        2. Updates all monthly assignment files
+        3. Renames Hebrew employee records to English
+        4. Merges duplicates if English version already exists
+
+        Returns summary of all translations performed.
+        """
+        translations = []
+        errors = []
+
+        # First, merge any duplicates (Hebrew employees with existing English counterparts)
+        merge_result = self.translate_and_merge_hebrew_employees()
+        translations.extend([
+            {"type": "merge", **r} for r in merge_result.get("results", [])
+        ])
+
+        # Now translate remaining Hebrew employee names
+        employees = self.get_employees()
+        for emp in employees:
+            if not emp.get("is_active", True):
+                continue
+
+            name = emp.get("name", "")
+            if not is_hebrew(name):
+                continue
+
+            # Try to translate
+            english_name = translate_hebrew_to_english(name)
+            if not english_name:
+                errors.append({
+                    "hebrew_name": name,
+                    "error": "No translation found in dictionary",
+                })
+                continue
+
+            # Check if English name already exists (shouldn't after merge, but check anyway)
+            existing_english = self.get_employee_by_name(english_name)
+            if existing_english and existing_english.get("id") != emp.get("id"):
+                # Merge into existing English employee
+                try:
+                    result = self.merge_employees(
+                        source_id=emp["id"],
+                        target_id=existing_english["id"],
+                        keep_target_name=True
+                    )
+                    translations.append({"type": "merge", **result})
+                except Exception as e:
+                    errors.append({
+                        "hebrew_name": name,
+                        "english_name": english_name,
+                        "error": str(e),
+                    })
+            else:
+                # Rename the employee to English
+                old_name = emp["name"]
+                emp["name"] = english_name
+                emp["original_hebrew_name"] = old_name
+                emp["updated_at"] = datetime.now().isoformat()
+                self.save_employee(emp)
+
+                # Update all history records with this name
+                updated_count = self._update_history_name(old_name, english_name)
+
+                translations.append({
+                    "type": "rename",
+                    "success": True,
+                    "source_name": old_name,
+                    "target_name": english_name,
+                    "assignments_updated": updated_count,
+                })
+
+        return {
+            "total_translations": len(translations),
+            "successful": len([t for t in translations if t.get("success")]),
+            "errors": errors,
+            "translations": translations,
+        }
+
+    def _update_history_name(self, old_name: str, new_name: str) -> int:
+        """
+        Update all occurrences of old_name to new_name in history and assignments.
+
+        Returns the count of updated records.
+        """
+        updated_count = 0
+
+        # Update history.json
+        history = self._load_json(settings.history_file)
+        all_assignments = history.get("assignments", [])
+
+        for assignment in all_assignments:
+            if assignment.get("employee_name") == old_name:
+                assignment["employee_name"] = new_name
+                assignment["translated_from"] = old_name
+                assignment["translated_at"] = datetime.now().isoformat()
+                updated_count += 1
+
+        history["assignments"] = all_assignments
+        self._save_json(settings.history_file, history)
+
+        # Update monthly assignment files
+        self._update_monthly_assignments(old_name, new_name)
+
+        return updated_count
+
+    # ==================== Forms ====================
+
+    def get_forms(self) -> list[dict]:
+        """Get all forms."""
+        data = self._load_json(settings.forms_file)
+        return data.get("forms", [])
+
+    def get_form(self, form_id: int) -> Optional[dict]:
+        """Get form by ID."""
+        forms = self.get_forms()
+        for form in forms:
+            if form.get("id") == form_id:
+                return form
+        return None
+
+    def get_form_by_month(self, month_year: str) -> Optional[dict]:
+        """Get form by month-year."""
+        forms = self.get_forms()
+        for form in forms:
+            if form.get("month_year") == month_year:
+                return form
+        return None
+
+    def save_form(self, form: dict) -> dict:
+        """Save or update a form."""
+        forms = self.get_forms()
+
+        if "id" not in form or form["id"] is None:
+            # New form
+            max_id = max((f.get("id", 0) for f in forms), default=0)
+            form["id"] = max_id + 1
+            form["created_at"] = datetime.now().isoformat()
+            forms.append(form)
+        else:
+            # Update existing
+            for i, f in enumerate(forms):
+                if f.get("id") == form["id"]:
+                    form["updated_at"] = datetime.now().isoformat()
+                    forms[i] = form
+                    break
+
+        self._save_json(settings.forms_file, {"forms": forms})
+        return form
+
+    def delete_form(self, form_id: int) -> bool:
+        """Delete a form by ID."""
+        forms = self.get_forms()
+        original_len = len(forms)
+        forms = [f for f in forms if f.get("id") != form_id]
+
+        if len(forms) < original_len:
+            self._save_json(settings.forms_file, {"forms": forms})
+            return True
+        return False
+
+    # ==================== Assignments ====================
+
+    def get_assignments(self, month_year: Optional[str] = None) -> list[dict]:
+        """Get all assignments, optionally filtered by month."""
+        history = self._load_json(settings.history_file)
+        assignments = history.get("assignments", [])
+
+        if month_year:
+            assignments = [a for a in assignments if a.get("month_year") == month_year]
+
+        return assignments
+
+    def save_assignments(
+        self,
+        month_year: str,
+        assignments: dict[str, str],  # date_iso -> employee_name
+        month_count: dict[str, int],  # employee_name -> shift_count
+    ) -> dict:
+        """Save assignments for a month with path traversal protection."""
+        # Validate month_year format to prevent path traversal
+        year, month = validate_month_year(month_year)
+
+        # Load existing history
+        history = self._load_json(settings.history_file)
+        all_assignments = history.get("assignments", [])
+
+        # Remove existing assignments for this month
+        all_assignments = [a for a in all_assignments if a.get("month_year") != month_year]
+
+        # Add new assignments
+        for date_str, employee_name in assignments.items():
+            all_assignments.append({
+                "date": date_str,
+                "employee_name": employee_name,
+                "month_year": month_year,
+                "created_at": datetime.now().isoformat(),
+            })
+
+        history["assignments"] = all_assignments
+        self._save_json(settings.history_file, history)
+
+        # Also save to YYYY/MM directory
+        output_dir = settings.assignments_dir / year / month
+
+        # Ensure path is within assignments directory
+        validate_path_within_directory(output_dir, settings.assignments_dir)
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        assignment_data = {
+            "month_year": month_year,
+            "assignments": assignments,
+            "shift_counts": month_count,
+            "created_at": datetime.now().isoformat(),
+        }
+
+        self._save_json(output_dir / "assignment.json", assignment_data)
+
+        return assignment_data
+
+    def get_month_assignment(self, month_year: str) -> Optional[dict]:
+        """Get assignment data for a specific month with path traversal protection."""
+        year, month = validate_month_year(month_year)
+        path = settings.assignments_dir / year / month / "assignment.json"
+
+        # Ensure path is within assignments directory
+        validate_path_within_directory(path, settings.assignments_dir)
+
+        if not path.exists():
+            return None
+
+        return self._load_json(path)
+
+    # ==================== History & Stats ====================
+
+    def _build_name_mapping(self) -> dict[str, str]:
+        """
+        Build a mapping of all employee names (including Hebrew aliases) to canonical names.
+
+        Returns dict where key is any name variant and value is the canonical (current) name.
+        """
+        employees = self.get_employees()
+        name_map = {}
+
+        for emp in employees:
+            canonical_name = emp.get("name", "")
+
+            # Map the canonical name to itself
+            name_map[canonical_name] = canonical_name
+
+            # Map merged_from_name (Hebrew name that was merged)
+            if emp.get("merged_from_name"):
+                name_map[emp["merged_from_name"]] = canonical_name
+
+            # Map original_hebrew_name (if employee was renamed)
+            if emp.get("original_hebrew_name"):
+                name_map[emp["original_hebrew_name"]] = canonical_name
+
+        return name_map
+
+    def get_employee_shift_counts(self) -> dict[str, int]:
+        """
+        Get total shift counts per employee (for fairness).
+
+        Aggregates counts for merged/renamed employees by mapping all name variants
+        to the canonical employee name.
+        """
+        assignments = self.get_assignments()
+        name_map = self._build_name_mapping()
+        counts = {}
+
+        for a in assignments:
+            name = a.get("employee_name", "")
+            # Map to canonical name if mapping exists
+            canonical_name = name_map.get(name, name)
+            counts[canonical_name] = counts.get(canonical_name, 0) + 1
+
+        return counts
+
+    def get_employee_stats(self, active_only: bool = True) -> list[dict]:
+        """
+        Get statistics for employees.
+
+        Properly aggregates data for merged employees by considering all name variants.
+
+        Args:
+            active_only: If True, only return stats for active employees (default True).
+                         This excludes merged/deactivated Hebrew name entries.
+        """
+        employees = self.get_employees()
+        all_assignments = self.get_assignments()
+        name_map = self._build_name_mapping()
+
+        # Pre-compute shift counts using canonical names
+        shift_counts = self.get_employee_shift_counts()
+
+        stats = []
+        for emp in employees:
+            # Skip inactive employees if active_only is True
+            if active_only and not emp.get("is_active", True):
+                continue
+
+            name = emp.get("name", "")
+
+            # Get all name variants for this employee
+            name_variants = {name}
+            if emp.get("merged_from_name"):
+                name_variants.add(emp["merged_from_name"])
+            if emp.get("original_hebrew_name"):
+                name_variants.add(emp["original_hebrew_name"])
+
+            # Find all assignments for any of this employee's name variants
+            emp_assignments = [
+                a for a in all_assignments
+                if a.get("employee_name") in name_variants
+            ]
+
+            # Find last shift date
+            last_shift = None
+            if emp_assignments:
+                dates = [a.get("date") for a in emp_assignments]
+                last_shift = max(dates)
+
+            # Count unique months
+            months = set(a.get("month_year") for a in emp_assignments)
+
+            stats.append({
+                "id": emp.get("id"),
+                "name": name,
+                "is_active": emp.get("is_active", True),
+                "is_new": emp.get("is_new", True),
+                "total_shifts": shift_counts.get(name, 0),
+                "months_active": len(months),
+                "last_shift_date": last_shift,
+            })
+
+        return stats
+
+    def get_monthly_summaries(self) -> list[dict]:
+        """
+        Get summary of shifts per month.
+
+        Uses canonical employee names to properly count unique employees.
+        """
+        assignments = self.get_assignments()
+        name_map = self._build_name_mapping()
+
+        # Group by month
+        monthly = {}
+        for a in assignments:
+            my = a.get("month_year", "")
+            if my not in monthly:
+                monthly[my] = {"month_year": my, "total_shifts": 0, "employees": set()}
+            monthly[my]["total_shifts"] += 1
+            # Use canonical name for counting unique employees
+            name = a.get("employee_name", "")
+            canonical_name = name_map.get(name, name)
+            monthly[my]["employees"].add(canonical_name)
+
+        # Convert to list
+        result = []
+        for my, data in sorted(monthly.items(), reverse=True):
+            result.append({
+                "month_year": my,
+                "total_shifts": data["total_shifts"],
+                "employees_count": len(data["employees"]),
+            })
+
+        return result
+
+
+    # ==================== Auth Users ====================
+
+    def get_auth_users(self) -> list[dict]:
+        """Get all authenticated users."""
+        data = self._load_json(settings.users_file)
+        return data.get("users", [])
+
+    def get_auth_user(self, user_id: str) -> Optional[dict]:
+        """Get authenticated user by Google ID."""
+        users = self.get_auth_users()
+        for user in users:
+            if user.get("id") == user_id:
+                return user
+        return None
+
+    def get_auth_user_by_email(self, email: str) -> Optional[dict]:
+        """Get authenticated user by email."""
+        users = self.get_auth_users()
+        for user in users:
+            if user.get("email", "").lower() == email.lower():
+                return user
+        return None
+
+    def save_auth_user(self, user: dict) -> dict:
+        """Save or update an authenticated user."""
+        users = self.get_auth_users()
+
+        existing_idx = None
+        for i, u in enumerate(users):
+            if u.get("id") == user["id"]:
+                existing_idx = i
+                break
+
+        if existing_idx is not None:
+            # Update existing user
+            user["updated_at"] = datetime.now().isoformat()
+            users[existing_idx] = user
+        else:
+            # New user
+            user["created_at"] = datetime.now().isoformat()
+            users.append(user)
+
+        self._save_json(settings.users_file, {"users": users})
+        return user
+
+    def update_auth_user_last_login(self, user_id: str) -> Optional[dict]:
+        """Update authenticated user's last login timestamp."""
+        user = self.get_auth_user(user_id)
+        if user:
+            user["last_login"] = datetime.now().isoformat()
+            return self.save_auth_user(user)
+        return None
+
+
+# Global storage instance
+storage = Storage()

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.env
+
+# Node.js
+node_modules/
+.next/
+out/
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (remove these lines if you want to include sample data)
+backend/data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+nul
+*.tsbuildinfo
+
+# Claude Code
+.claude/

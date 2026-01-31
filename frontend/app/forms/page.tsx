@@ -1,0 +1,682 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Calendar as CalendarIcon,
+  Check,
+  X,
+  Copy,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ToggleLeft,
+  ToggleRight,
+  ExternalLink,
+  Loader2,
+  Link2,
+  Unlink,
+  Trash2,
+} from 'lucide-react';
+import { Card, CardHeader, Button, Badge } from '@/components/ui';
+import { formsApi, googleApi } from '@/lib/api';
+import { formatMonthYear, getMonthYearString } from '@/lib/utils';
+import toast from 'react-hot-toast';
+import { useSearchParams } from 'next/navigation';
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const formatDateQuestion = (dateStr: string) => {
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  const dayName = DAYS_FULL[d.getDay()];
+  return `Availability on ${day} (${dayName})`;
+};
+
+export default function FormsPage() {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [includeTuesdays, setIncludeTuesdays] = useState(false);
+  const [excludedDates, setExcludedDates] = useState<string[]>([]);
+  const [includedDates, setIncludedDates] = useState<string[]>([]);
+  const [generatedDates, setGeneratedDates] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [createdForm, setCreatedForm] = useState<any>(null);
+  const [forms, setForms] = useState<any[]>([]);
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  // Google Forms integration
+  const searchParams = useSearchParams();
+  const [googleAuth, setGoogleAuth] = useState<{
+    authenticated: boolean;
+    configured: boolean;
+    message: string;
+  } | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [createdGoogleForm, setCreatedGoogleForm] = useState<{
+    edit_url: string;
+    responder_url: string;
+  } | null>(null);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard!');
+  };
+
+  const generateFormQuestions = () => {
+    if (!createdForm) return [];
+    const questions = [
+      { type: 'Short answer', question: 'Employee Name', required: true },
+      { type: 'Multiple choice', question: 'Is this your first month doing ECT in Psychiatrics?', options: ['Yes', 'No'], required: true },
+    ];
+    createdForm.included_dates?.forEach((dateStr: string) => {
+      questions.push({
+        type: 'Multiple choice',
+        question: formatDateQuestion(dateStr),
+        options: ['Available', 'Not Available'],
+        required: true,
+      });
+    });
+    return questions;
+  };
+
+  // Load existing forms
+  useEffect(() => {
+    formsApi.list().then(setForms).catch(console.error);
+  }, []);
+
+  // Check Google auth status
+  useEffect(() => {
+    googleApi.getStatus().then(setGoogleAuth).catch(console.error);
+  }, []);
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const authResult = searchParams.get('google_auth');
+    if (authResult === 'success') {
+      toast.success('Connected to Google successfully!');
+      googleApi.getStatus().then(setGoogleAuth).catch(console.error);
+      // Clear URL params
+      window.history.replaceState({}, '', '/forms');
+    } else if (authResult === 'error') {
+      const message = searchParams.get('message') || 'Failed to connect to Google';
+      toast.error(message);
+      window.history.replaceState({}, '', '/forms');
+    }
+  }, [searchParams]);
+
+  // Generate dates when settings change
+  useEffect(() => {
+    generateDates();
+  }, [year, month, includeTuesdays, excludedDates, includedDates]);
+
+  const generateDates = async () => {
+    try {
+      const result = await formsApi.generateDates({
+        year,
+        month,
+        include_tuesdays: includeTuesdays,
+        excluded_dates: excludedDates,
+        included_dates: includedDates,
+      });
+      setGeneratedDates(result.included_dates);
+    } catch (error) {
+      console.error('Failed to generate dates:', error);
+    }
+  };
+
+  const handleConnectGoogle = async () => {
+    setGoogleLoading(true);
+    try {
+      const { authorization_url } = await googleApi.getAuthUrl();
+      window.location.href = authorization_url;
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to start Google authorization');
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      await googleApi.disconnect();
+      setGoogleAuth({ authenticated: false, configured: true, message: 'Disconnected' });
+      toast.success('Disconnected from Google');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to disconnect from Google');
+    }
+  };
+
+  const handleCreateGoogleForm = async () => {
+    if (!createdForm) return;
+
+    setGoogleLoading(true);
+    try {
+      const result = await googleApi.createForm({
+        form_id: createdForm.id,
+        title: createdForm.title,
+        included_dates: createdForm.included_dates,
+      });
+      setCreatedGoogleForm({
+        edit_url: result.edit_url,
+        responder_url: result.responder_url,
+      });
+      toast.success('Google Form created successfully!');
+      // Open the form in a new tab
+      window.open(result.edit_url, '_blank');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create Google Form');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleDeleteForm = async (formId: number, formTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${formTitle}"?`)) {
+      return;
+    }
+
+    try {
+      await formsApi.delete(formId);
+      setForms((prev) => prev.filter((f) => f.id !== formId));
+      toast.success('Form deleted successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete form');
+    }
+  };
+
+  const handleCreateForm = async () => {
+    // Check if form already exists for this month
+    const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
+    const existingForm = forms.find((f) => f.month_year === monthYear);
+    if (existingForm) {
+      toast.error(`A form already exists for ${MONTHS[month - 1]} ${year}. Please select a different month.`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await formsApi.create({
+        year,
+        month,
+        include_tuesdays: includeTuesdays,
+        excluded_dates: excludedDates,
+        included_dates: includedDates,
+      });
+      setCreatedForm(result);
+      setForms((prev) => [result, ...prev]);
+      toast.success('Form configuration created successfully!');
+    } catch (error: any) {
+      const message = error.message || 'Failed to create form';
+      // Make error messages more user-friendly
+      if (message.includes('already exists')) {
+        toast.error(`A form already exists for ${MONTHS[month - 1]} ${year}. Please select a different month.`);
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month - 1, 1).getDay();
+  };
+
+  const isDateExcluded = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const day = d.getDay();
+    // Friday (5) and Saturday (6) always excluded
+    if (day === 5 || day === 6) return true;
+    // Tuesday (2) excluded unless includeTuesdays
+    if (day === 2 && !includeTuesdays) return true;
+    // Manually excluded
+    if (excludedDates.includes(dateStr)) return true;
+    return false;
+  };
+
+  const isDateIncluded = (dateStr: string) => {
+    return generatedDates.includes(dateStr);
+  };
+
+  const toggleDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const day = d.getDay();
+
+    // Can't toggle Friday/Saturday
+    if (day === 5 || day === 6) return;
+
+    if (isDateIncluded(dateStr)) {
+      // Remove from included by adding to excluded
+      if (!excludedDates.includes(dateStr)) {
+        setExcludedDates([...excludedDates, dateStr]);
+      }
+      setIncludedDates(includedDates.filter((d) => d !== dateStr));
+    } else {
+      // Add to included
+      setIncludedDates([...includedDates, dateStr]);
+      setExcludedDates(excludedDates.filter((d) => d !== dateStr));
+    }
+  };
+
+  const prevMonth = () => {
+    if (month === 1) {
+      setMonth(12);
+      setYear(year - 1);
+    } else {
+      setMonth(month - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (month === 12) {
+      setMonth(1);
+      setYear(year + 1);
+    } else {
+      setMonth(month + 1);
+    }
+  };
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const blanks = Array.from({ length: firstDay }, (_, i) => null);
+
+  return (
+    <div className="space-y-6">
+      {/* Page Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          Form Generation
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+          Configure and create availability forms for Psychiatrics staff
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Calendar Picker */}
+        <Card className="lg:col-span-2">
+          <CardHeader
+            title="Select Dates"
+            description="Click on dates to include/exclude them from the form"
+          />
+
+          {/* Month Navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="ghost" size="sm" onClick={prevMonth}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <h3 className="text-lg font-semibold">
+              {MONTHS[month - 1]} {year}
+            </h3>
+            <Button variant="ghost" size="sm" onClick={nextMonth}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {DAYS.map((day) => (
+              <div
+                key={day}
+                className="text-center text-sm font-medium text-slate-500 py-2"
+              >
+                {day}
+              </div>
+            ))}
+            {blanks.map((_, i) => (
+              <div key={`blank-${i}`} className="h-12" />
+            ))}
+            {days.map((day) => {
+              const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day
+                .toString()
+                .padStart(2, '0')}`;
+              const d = new Date(dateStr);
+              const dayOfWeek = d.getDay();
+              const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+              const isTuesday = dayOfWeek === 2;
+              const included = isDateIncluded(dateStr);
+
+              return (
+                <motion.button
+                  key={day}
+                  whileHover={{ scale: isWeekend ? 1 : 1.05 }}
+                  whileTap={{ scale: isWeekend ? 1 : 0.95 }}
+                  onClick={() => toggleDate(dateStr)}
+                  disabled={isWeekend}
+                  className={`h-12 rounded-lg flex flex-col items-center justify-center text-sm transition-colors ${
+                    isWeekend
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                      : included
+                      ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border-2 border-primary-500'
+                      : isTuesday && !includeTuesdays
+                      ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border border-amber-300 dark:border-amber-700'
+                      : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <span className="font-medium">{day}</span>
+                  {included && <Check className="w-3 h-3" />}
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap gap-4 mt-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-primary-100 dark:bg-primary-900/30 border-2 border-primary-500" />
+              <span>Included</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800" />
+              <span>Weekend (excluded)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-300" />
+              <span>Tuesday (default excluded)</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Settings Panel */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Settings" />
+
+            {/* Google Connection Status */}
+            {googleAuth?.configured && (
+              <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${googleAuth.authenticated ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                    <span className="text-sm font-medium">
+                      {googleAuth.authenticated ? 'Google Connected' : 'Google Not Connected'}
+                    </span>
+                  </div>
+                  {googleAuth.authenticated ? (
+                    <button
+                      onClick={handleDisconnectGoogle}
+                      className="text-xs text-slate-500 hover:text-red-500 flex items-center gap-1"
+                    >
+                      <Unlink className="w-3 h-3" />
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleConnectGoogle}
+                      disabled={googleLoading}
+                      className="text-xs text-primary-500 hover:text-primary-600 flex items-center gap-1"
+                    >
+                      {googleLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                      Connect
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {googleAuth.authenticated
+                    ? 'Forms can be created automatically'
+                    : 'Connect to auto-create Google Forms'}
+                </p>
+              </div>
+            )}
+
+            {/* Include Tuesdays Toggle */}
+            <button
+              onClick={() => setIncludeTuesdays(!includeTuesdays)}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <div>
+                <p className="font-medium text-slate-900 dark:text-white">
+                  Include Tuesdays
+                </p>
+                <p className="text-xs text-slate-500">
+                  {includeTuesdays ? 'Tuesdays will be included' : 'Tuesdays are excluded'}
+                </p>
+              </div>
+              {includeTuesdays ? (
+                <ToggleRight className="w-8 h-8 text-primary-500" />
+              ) : (
+                <ToggleLeft className="w-8 h-8 text-slate-400" />
+              )}
+            </button>
+
+            {/* Summary */}
+            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800">
+              <p className="text-sm text-slate-500">Dates to include:</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                {generatedDates.length}
+              </p>
+            </div>
+          </Card>
+
+          {/* Existing Form Warning */}
+          {forms.some((f) => f.month_year === `${year}-${month.toString().padStart(2, '0')}`) && (
+            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-2">
+                <X className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  A form already exists for {MONTHS[month - 1]} {year}. Select a different month.
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {/* Create Form Button */}
+          <Button
+            onClick={handleCreateForm}
+            loading={loading}
+            className="w-full"
+            disabled={generatedDates.length === 0 || forms.some((f) => f.month_year === `${year}-${month.toString().padStart(2, '0')}`)}
+          >
+            <FileText className="w-4 h-4" />
+            Create Form Configuration
+          </Button>
+
+          {/* Created Form Info */}
+          {createdForm && (
+            <Card className="bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-start gap-3">
+                <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                    Form Created!
+                  </p>
+
+                  {/* Form Title with Copy */}
+                  <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Form Title:</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                        {createdForm.title}
+                      </p>
+                      <button
+                        onClick={() => copyToClipboard(createdForm.title)}
+                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-slate-500" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-emerald-600 mt-2">
+                    {createdForm.included_dates?.length + 2} questions to create
+                  </p>
+
+                  <div className="flex flex-col gap-2 mt-3">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowInstructions(!showInstructions)}
+                      className="w-full justify-center"
+                    >
+                      <FileText className="w-4 h-4" />
+                      {showInstructions ? 'Hide' : 'View'} Questions
+                    </Button>
+
+                    {/* Google Form Creation */}
+                    {createdGoogleForm ? (
+                      <div className="space-y-2">
+                        <a
+                          href={createdGoogleForm.edit_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Edit Google Form
+                        </a>
+                        <a
+                          href={createdGoogleForm.responder_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 rounded-lg transition-colors"
+                        >
+                          <Link2 className="w-4 h-4" />
+                          Share Form Link
+                        </a>
+                      </div>
+                    ) : googleAuth?.authenticated ? (
+                      <Button
+                        onClick={handleCreateGoogleForm}
+                        loading={googleLoading}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Create Google Form Automatically
+                      </Button>
+                    ) : googleAuth?.configured ? (
+                      <Button
+                        onClick={handleConnectGoogle}
+                        loading={googleLoading}
+                        variant="secondary"
+                        className="w-full"
+                      >
+                        <Link2 className="w-4 h-4" />
+                        Connect Google to Auto-Create
+                      </Button>
+                    ) : (
+                      <a
+                        href="https://forms.google.com/create"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Create Google Form Manually
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Form Instructions */}
+          {createdForm && showInstructions && (
+            <Card>
+              <CardHeader
+                title="Google Form Questions"
+                description="Create these questions in Google Forms"
+              />
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {generateFormQuestions().map((q, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-sm"
+                  >
+                    <span className="text-slate-400 font-mono text-xs mt-0.5">
+                      {i + 1}.
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 dark:text-white truncate">
+                        {q.question}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {q.type}{q.options ? `: ${q.options.join(' / ')}` : ''} {q.required && '(Required)'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(q.question)}
+                      className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded flex-shrink-0"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full mt-3"
+                onClick={() => {
+                  const allQuestions = generateFormQuestions()
+                    .map((q, i) => `${i + 1}. ${q.question} (${q.type}${q.options ? ': ' + q.options.join('/') : ''})`)
+                    .join('\n');
+                  copyToClipboard(allQuestions);
+                }}
+              >
+                <Copy className="w-4 h-4" />
+                Copy All Questions
+              </Button>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Existing Forms */}
+      {forms.length > 0 && (
+        <Card>
+          <CardHeader title="Existing Forms" description="Previously created form configurations" />
+          <div className="space-y-3">
+            {forms.map((form) => (
+              <div
+                key={form.id}
+                className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800"
+              >
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">{form.title}</p>
+                  <p className="text-sm text-slate-500">
+                    {form.included_dates?.length || 0} dates
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={
+                      form.status === 'processed'
+                        ? 'success'
+                        : form.status === 'active'
+                        ? 'warning'
+                        : 'default'
+                    }
+                  >
+                    {form.status}
+                  </Badge>
+                  <button
+                    onClick={() => handleDeleteForm(form.id, form.title)}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    title="Delete form"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
