@@ -250,6 +250,67 @@ async def disconnect():
     return {"message": "Disconnected from Google"}
 
 
+def get_banner_image_url(creds) -> Optional[str]:
+    """Upload banner image to Google Drive and return a public URL for Forms API."""
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+
+    # Path to banner image
+    banner_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "ect_banner.png"
+    )
+
+    if not os.path.exists(banner_path):
+        logger.warning(f"Banner image not found at {banner_path}")
+        return None
+
+    try:
+        drive_service = build("drive", "v3", credentials=creds)
+
+        # Check if banner already exists in Drive
+        results = drive_service.files().list(
+            q="name='ect_form_banner.png' and trashed=false",
+            spaces="drive",
+            fields="files(id, name, webContentLink)"
+        ).execute()
+
+        files = results.get("files", [])
+        if files:
+            # Banner already uploaded, get its web content link
+            file_id = files[0]["id"]
+            logger.info(f"Using existing banner image from Drive: {file_id}")
+            # Return direct download URL
+            return f"https://drive.google.com/uc?export=view&id={file_id}"
+
+        # Upload the banner image
+        file_metadata = {
+            "name": "ect_form_banner.png",
+            "mimeType": "image/png"
+        }
+        media = MediaFileUpload(banner_path, mimetype="image/png")
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id,webContentLink"
+        ).execute()
+
+        file_id = file.get("id")
+
+        # Make the file publicly readable (required for Forms API)
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"}
+        ).execute()
+
+        logger.info(f"Uploaded banner image to Drive: {file_id}")
+        # Return direct view URL
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
+
+    except Exception as e:
+        logger.error(f"Failed to upload/get banner image: {e}")
+        return None
+
+
 @router.post("/create-form")
 @limiter.limit("10/minute")
 async def create_google_form(request: Request, form_request: FormCreateRequest):
@@ -267,6 +328,9 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         # Build the Forms API service
         service = build("forms", "v1", credentials=creds)
 
+        # Get or upload banner image to Drive and get public URL
+        banner_url = get_banner_image_url(creds)
+
         # Create the form
         form = {
             "info": {
@@ -280,6 +344,25 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
 
         # Build the questions
         requests_list = []
+        current_index = 0
+
+        # Add banner image as header if available
+        if banner_url:
+            requests_list.append({
+                "createItem": {
+                    "item": {
+                        "title": "",
+                        "imageItem": {
+                            "image": {
+                                "sourceUri": banner_url,
+                                "altText": "ECT Shifts Management Banner"
+                            }
+                        }
+                    },
+                    "location": {"index": current_index}
+                }
+            })
+            current_index += 1
 
         # Question 1: Employee Name (Text)
         requests_list.append({
@@ -295,9 +378,10 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
                         }
                     }
                 },
-                "location": {"index": 0}
+                "location": {"index": current_index}
             }
         })
+        current_index += 1
 
         # Question 2: First month question (Multiple Choice)
         requests_list.append({
@@ -317,9 +401,10 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
                         }
                     }
                 },
-                "location": {"index": 1}
+                "location": {"index": current_index}
             }
         })
+        current_index += 1
 
         # Date availability questions
         # Python weekday(): Monday=0, Tuesday=1, ..., Sunday=6
@@ -347,7 +432,7 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
                             }
                         }
                     },
-                    "location": {"index": i + 2}
+                    "location": {"index": current_index + i}
                 }
             })
 
