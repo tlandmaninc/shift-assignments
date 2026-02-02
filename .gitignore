@@ -37,3 +37,10 @@ nul
 
 # Claude Code
 .claude/
+
+#Venv
+venv-wsl/
+venv/
+.venv/
+.venv-wsl/
+.venv-wsl/
