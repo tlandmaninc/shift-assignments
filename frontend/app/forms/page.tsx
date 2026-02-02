@@ -34,8 +34,9 @@ const MONTHS = [
 const formatDateQuestion = (dateStr: string) => {
   const d = new Date(dateStr);
   const day = d.getDate();
+  const month = MONTHS[d.getMonth()];
   const dayName = DAYS_FULL[d.getDay()];
-  return `Availability on ${day} (${dayName})`;
+  return `Availability on ${month} ${day} (${dayName})`;
 };
 
 export default function FormsPage() {

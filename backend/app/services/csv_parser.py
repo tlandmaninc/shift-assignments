@@ -12,21 +12,17 @@ MAX_ROWS = 1000
 MAX_COLUMNS = 100
 
 
-def parse_date_from_header(header: str) -> Optional[str]:
+def parse_date_from_header(header: str, included_dates: Optional[list[str]] = None) -> Optional[str]:
     """
-    Extract date from a header like 'Availability on February 1, 2026 (Sunday)'.
+    Extract date from a header like 'Availability on February 1 (Sunday)' or
+    'Availability on February 1, 2026 (Sunday)'.
 
     Returns ISO format date string (YYYY-MM-DD) or None if not parseable.
+
+    Args:
+        header: The column header string
+        included_dates: Optional list of ISO dates to match against when year is missing
     """
-    # Pattern: "Availability on Month Day, Year (DayName)"
-    pattern = r"Availability on\s+(\w+)\s+(\d+),?\s+(\d{4})"
-    match = re.search(pattern, header, re.IGNORECASE)
-
-    if not match:
-        return None
-
-    month_name, day, year = match.groups()
-
     # Convert month name to number
     months = {
         "january": 1, "february": 2, "march": 3, "april": 4,
@@ -34,15 +30,51 @@ def parse_date_from_header(header: str) -> Optional[str]:
         "september": 9, "october": 10, "november": 11, "december": 12
     }
 
-    month_num = months.get(month_name.lower())
-    if not month_num:
-        return None
+    # Pattern 1: "Availability on Month Day, Year (DayName)" - with year
+    pattern_with_year = r"Availability on\s+(\w+)\s+(\d+),?\s+(\d{4})"
+    match = re.search(pattern_with_year, header, re.IGNORECASE)
 
-    try:
-        d = date(int(year), month_num, int(day))
-        return d.isoformat()
-    except ValueError:
-        return None
+    if match:
+        month_name, day, year = match.groups()
+        month_num = months.get(month_name.lower())
+        if not month_num:
+            return None
+        try:
+            d = date(int(year), month_num, int(day))
+            return d.isoformat()
+        except ValueError:
+            return None
+
+    # Pattern 2: "Availability on Month Day (DayName)" - without year
+    pattern_without_year = r"Availability on\s+(\w+)\s+(\d+)\s*\("
+    match = re.search(pattern_without_year, header, re.IGNORECASE)
+
+    if match:
+        month_name, day = match.groups()
+        month_num = months.get(month_name.lower())
+        if not month_num:
+            return None
+
+        day_int = int(day)
+
+        # Try to match against included_dates if provided
+        if included_dates:
+            for date_iso in included_dates:
+                try:
+                    d = date.fromisoformat(date_iso)
+                    if d.month == month_num and d.day == day_int:
+                        return date_iso
+                except ValueError:
+                    continue
+
+        # Fallback: use current year
+        try:
+            d = date(date.today().year, month_num, day_int)
+            return d.isoformat()
+        except ValueError:
+            return None
+
+    return None
 
 
 def parse_csv_responses(
@@ -110,7 +142,7 @@ def parse_csv_responses(
     for idx, header in enumerate(headers):
         if idx < 3:  # Skip Timestamp, Name, Is New columns
             continue
-        date_iso = parse_date_from_header(header)
+        date_iso = parse_date_from_header(header, included_dates)
         if date_iso:
             date_columns[idx] = date_iso
 

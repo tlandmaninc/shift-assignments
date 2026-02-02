@@ -167,7 +167,7 @@ async def get_form_template(form_id: int):
     for idx, date_str in enumerate(included_dates):
         d = date.fromisoformat(date_str)
         day_name = d.strftime("%A")
-        date_display = d.strftime("%B %d, %Y").replace(" 0", " ")
+        date_display = d.strftime("%B ") + str(d.day)
 
         questions.append({
             "order": idx + 3,

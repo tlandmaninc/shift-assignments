@@ -420,12 +420,13 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         for i, date_str in enumerate(form_request.included_dates):
             date_obj = datetime.strptime(date_str, "%Y-%m-%d")
             day_name = days_full[date_obj.weekday()]
+            month_name = date_obj.strftime("%B")
             day_num = date_obj.day
 
             requests_list.append({
                 "createItem": {
                     "item": {
-                        "title": f"Availability on {day_num} ({day_name})",
+                        "title": f"Availability on {month_name} {day_num} ({day_name})",
                         "questionItem": {
                             "question": {
                                 "required": True,
