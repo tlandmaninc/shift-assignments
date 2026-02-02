@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/google/callback"
 
+    # Google Form Template (optional)
+    # Create a template form in Google Forms with the header image configured,
+    # then set this to the form ID (from the URL: docs.google.com/forms/d/{FORM_ID}/edit)
+    google_form_template_id: str = ""
+
     # AI Provider Configuration
     # Supported: gemini (recommended), ollama, groq, together, openrouter, openai
     ai_provider: str = "gemini"

@@ -86,9 +86,29 @@ export default function FormsPage() {
     return questions;
   };
 
+  // Helper to get existing form for current month/year selection
+  const getExistingFormForSelectedMonth = () => {
+    const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
+    return forms.find((f) => f?.month_year === monthYear);
+  };
+
+  const existingFormForMonth = getExistingFormForSelectedMonth();
+
   // Load existing forms
+  const loadForms = async (): Promise<any[]> => {
+    try {
+      const data = await formsApi.list();
+      console.log('Loaded forms:', data.map((f: any) => f.month_year));
+      setForms(data);
+      return data;
+    } catch (error) {
+      console.error('Failed to load forms:', error);
+      return [];
+    }
+  };
+
   useEffect(() => {
-    formsApi.list().then(setForms).catch(console.error);
+    loadForms();
   }, []);
 
   // Check Google auth status
@@ -115,6 +135,11 @@ export default function FormsPage() {
   useEffect(() => {
     generateDates();
   }, [year, month, includeTuesdays, excludedDates, includedDates]);
+
+  // Refresh forms when month/year changes to ensure existence check is accurate
+  useEffect(() => {
+    loadForms();
+  }, [year, month]);
 
   const generateDates = async () => {
     try {
@@ -183,19 +208,30 @@ export default function FormsPage() {
 
     try {
       await formsApi.delete(formId);
-      setForms((prev) => prev.filter((f) => f.id !== formId));
+      // Refresh forms from server to ensure state is synchronized
+      await loadForms();
       toast.success('Form deleted successfully');
     } catch (error: any) {
+      console.error('Delete form error:', error);
       toast.error(error.message || 'Failed to delete form');
+      // Refresh forms to ensure UI is in sync with server state
+      await loadForms();
     }
   };
 
   const handleCreateForm = async () => {
+    // Refresh forms from server before checking to ensure we have latest data
+    const freshForms = await loadForms();
+
     // Check if form already exists for this month
     const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
-    const existingForm = forms.find((f) => f.month_year === monthYear);
+    const existingForm = freshForms.find((f) => f?.month_year === monthYear);
     if (existingForm) {
-      toast.error(`A form already exists for ${MONTHS[month - 1]} ${year}. Please select a different month.`);
+      console.log('Found existing form:', existingForm);
+      toast.error(
+        `A form already exists for ${MONTHS[month - 1]} ${year}. Delete it first or select a different month.`,
+        { duration: 5000 }
+      );
       return;
     }
 
@@ -209,16 +245,23 @@ export default function FormsPage() {
         included_dates: includedDates,
       });
       setCreatedForm(result);
-      setForms((prev) => [result, ...prev]);
+      // Refresh from server to ensure state is synchronized
+      await loadForms();
       toast.success('Form configuration created successfully!');
     } catch (error: any) {
+      console.error('Create form error:', error);
       const message = error.message || 'Failed to create form';
       // Make error messages more user-friendly
       if (message.includes('already exists')) {
-        toast.error(`A form already exists for ${MONTHS[month - 1]} ${year}. Please select a different month.`);
+        toast.error(
+          `A form already exists for ${MONTHS[month - 1]} ${year}. Delete it first or select a different month.`,
+          { duration: 5000 }
+        );
       } else {
         toast.error(message);
       }
+      // Refresh forms to ensure UI is in sync with server state
+      await loadForms();
     } finally {
       setLoading(false);
     }
@@ -463,13 +506,25 @@ export default function FormsPage() {
           </Card>
 
           {/* Existing Form Warning */}
-          {forms.some((f) => f.month_year === `${year}-${month.toString().padStart(2, '0')}`) && (
+          {existingFormForMonth && (
             <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
               <div className="flex items-start gap-2">
                 <X className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  A form already exists for {MONTHS[month - 1]} {year}. Select a different month.
-                </p>
+                <div className="flex-1">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    A form already exists for {MONTHS[month - 1]} {year}.
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    Delete the existing form below to create a new one.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteForm(existingFormForMonth.id, existingFormForMonth.title)}
+                  className="p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  title="Delete existing form"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </Card>
           )}
@@ -479,7 +534,7 @@ export default function FormsPage() {
             onClick={handleCreateForm}
             loading={loading}
             className="w-full"
-            disabled={generatedDates.length === 0 || forms.some((f) => f.month_year === `${year}-${month.toString().padStart(2, '0')}`)}
+            disabled={generatedDates.length === 0 || !!existingFormForMonth}
           >
             <FileText className="w-4 h-4" />
             Create Form Configuration

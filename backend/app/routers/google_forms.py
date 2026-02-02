@@ -60,11 +60,14 @@ GOOGLE_CLIENT_SECRET = settings.google_client_secret
 GOOGLE_REDIRECT_URI = settings.google_redirect_uri
 SCOPES = [
     "https://www.googleapis.com/auth/forms.body",
-    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive",  # Full drive access needed to copy template forms
 ]
 
 # Token storage (in production, use a database)
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "data", "google_token.json")
+
+# Template form ID (optional - set in .env as GOOGLE_FORM_TEMPLATE_ID)
+GOOGLE_FORM_TEMPLATE_ID = settings.google_form_template_id
 
 
 class FormCreateRequest(BaseModel):
@@ -250,65 +253,67 @@ async def disconnect():
     return {"message": "Disconnected from Google"}
 
 
-def get_banner_image_url(creds) -> Optional[str]:
-    """Upload banner image to Google Drive and return a public URL for Forms API."""
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaFileUpload
+def copy_template_form(creds, new_title: str) -> Optional[str]:
+    """
+    Copy the template form using Google Drive API.
 
-    # Path to banner image
-    banner_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "ect_banner.png"
-    )
-
-    if not os.path.exists(banner_path):
-        logger.warning(f"Banner image not found at {banner_path}")
+    Returns the new form's ID, or None if template is not configured or copy fails.
+    """
+    if not GOOGLE_FORM_TEMPLATE_ID:
         return None
 
     try:
+        from googleapiclient.discovery import build
+
         drive_service = build("drive", "v3", credentials=creds)
 
-        # Check if banner already exists in Drive
-        results = drive_service.files().list(
-            q="name='ect_form_banner.png' and trashed=false",
-            spaces="drive",
-            fields="files(id, name, webContentLink)"
+        # Copy the template form
+        copied_file = drive_service.files().copy(
+            fileId=GOOGLE_FORM_TEMPLATE_ID,
+            body={"name": new_title}
         ).execute()
 
-        files = results.get("files", [])
-        if files:
-            # Banner already uploaded, get its web content link
-            file_id = files[0]["id"]
-            logger.info(f"Using existing banner image from Drive: {file_id}")
-            # Return direct download URL
-            return f"https://drive.google.com/uc?export=view&id={file_id}"
-
-        # Upload the banner image
-        file_metadata = {
-            "name": "ect_form_banner.png",
-            "mimeType": "image/png"
-        }
-        media = MediaFileUpload(banner_path, mimetype="image/png")
-        file = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id,webContentLink"
-        ).execute()
-
-        file_id = file.get("id")
-
-        # Make the file publicly readable (required for Forms API)
-        drive_service.permissions().create(
-            fileId=file_id,
-            body={"type": "anyone", "role": "reader"}
-        ).execute()
-
-        logger.info(f"Uploaded banner image to Drive: {file_id}")
-        # Return direct view URL
-        return f"https://drive.google.com/uc?export=view&id={file_id}"
+        new_form_id = copied_file.get("id")
+        logger.info(f"Copied template form to new form: {new_form_id}")
+        return new_form_id
 
     except Exception as e:
-        logger.error(f"Failed to upload/get banner image: {e}")
+        logger.warning(f"Failed to copy template form: {e}. Creating from scratch.")
         return None
+
+
+def clear_form_items(service, form_id: str) -> None:
+    """
+    Remove all existing items from a form.
+
+    This is used after copying a template to clear any placeholder questions.
+    """
+    try:
+        # Get the current form to find existing items
+        form = service.forms().get(formId=form_id).execute()
+        items = form.get("items", [])
+
+        if not items:
+            return
+
+        # Build delete requests for all items (in reverse order to maintain indices)
+        delete_requests = []
+        for i in range(len(items) - 1, -1, -1):
+            delete_requests.append({
+                "deleteItem": {
+                    "location": {"index": i}
+                }
+            })
+
+        if delete_requests:
+            service.forms().batchUpdate(
+                formId=form_id,
+                body={"requests": delete_requests}
+            ).execute()
+            logger.info(f"Cleared {len(items)} items from form")
+
+    except Exception as e:
+        logger.warning(f"Failed to clear form items: {e}")
 
 
 @router.post("/create-form")
@@ -326,43 +331,45 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         from googleapiclient.discovery import build
 
         # Build the Forms API service
-        service = build("forms", "v1", credentials=creds)
+        forms_service = build("forms", "v1", credentials=creds)
 
-        # Get or upload banner image to Drive and get public URL
-        banner_url = get_banner_image_url(creds)
+        # Try to copy from template (preserves header image)
+        form_id = copy_template_form(creds, form_request.title)
+        used_template = form_id is not None
 
-        # Create the form
-        form = {
-            "info": {
-                "title": form_request.title,
-                "documentTitle": form_request.title,
+        if form_id:
+            # Clear any existing items from the copied template
+            clear_form_items(forms_service, form_id)
+
+            # Update the form title
+            forms_service.forms().batchUpdate(
+                formId=form_id,
+                body={
+                    "requests": [{
+                        "updateFormInfo": {
+                            "info": {
+                                "title": form_request.title,
+                                "description": f"Please indicate your availability for each date in {form_request.title.replace(' Shift Assignment', '')} (excluding Fridays, Saturdays, etc.)."
+                            },
+                            "updateMask": "title,description"
+                        }
+                    }]
+                }
+            ).execute()
+        else:
+            # No template - create from scratch
+            form = {
+                "info": {
+                    "title": form_request.title,
+                    "documentTitle": form_request.title,
+                }
             }
-        }
-
-        result = service.forms().create(body=form).execute()
-        form_id = result["formId"]
+            result = forms_service.forms().create(body=form).execute()
+            form_id = result["formId"]
 
         # Build the questions
         requests_list = []
         current_index = 0
-
-        # Add banner image as header if available
-        if banner_url:
-            requests_list.append({
-                "createItem": {
-                    "item": {
-                        "title": "",
-                        "imageItem": {
-                            "image": {
-                                "sourceUri": banner_url,
-                                "altText": "ECT Shifts Management Banner"
-                            }
-                        }
-                    },
-                    "location": {"index": current_index}
-                }
-            })
-            current_index += 1
 
         # Question 1: Employee Name (Text)
         requests_list.append({
@@ -438,7 +445,7 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
 
         # Batch update to add all questions
         if requests_list:
-            service.forms().batchUpdate(
+            forms_service.forms().batchUpdate(
                 formId=form_id,
                 body={"requests": requests_list}
             ).execute()
@@ -450,15 +457,18 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         # Log successful form creation
         log_audit(AuditAction.GOOGLE_FORM_CREATE, {
             "google_form_id": form_id,
-            "dates_count": len(form_request.included_dates)
+            "dates_count": len(form_request.included_dates),
+            "used_template": used_template
         })
 
+        template_note = " (from template with header)" if used_template else ""
         return {
             "success": True,
             "form_id": form_id,
             "edit_url": form_url,
             "responder_url": responder_url,
-            "message": f"Google Form created with {len(form_request.included_dates) + 2} questions",
+            "used_template": used_template,
+            "message": f"Google Form created{template_note} with {len(form_request.included_dates) + 2} questions",
         }
 
     except Exception as e:

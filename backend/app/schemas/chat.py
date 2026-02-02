@@ -27,6 +27,8 @@ class ChatResponse(BaseModel):
 
 class ChatHealthResponse(BaseModel):
     """Response from health check endpoint."""
+    model_config = {"protected_namespaces": ()}
+
     connected: bool = False
     model_available: bool = False
     model_name: str = "unknown"
