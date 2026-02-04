@@ -24,10 +24,33 @@ async function proxyRequest(request: NextRequest) {
       redirect: 'manual', // Don't follow redirects - pass them to the browser
     });
 
+    // Handle Set-Cookie headers specially - they must not be combined
+    // getSetCookie() returns an array of individual Set-Cookie header values
+    const setCookies = response.headers.getSetCookie();
+
+    // Handle redirect responses specially to ensure cookies are properly set
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (location) {
+        const redirectResponse = NextResponse.redirect(location, response.status);
+        // Copy cookies to the redirect response
+        setCookies.forEach((cookie) => {
+          redirectResponse.headers.append('Set-Cookie', cookie);
+        });
+        return redirectResponse;
+      }
+    }
+
     const responseHeaders = new Headers();
+
+    setCookies.forEach((cookie) => {
+      responseHeaders.append('Set-Cookie', cookie);
+    });
+
+    // Forward all other headers
     response.headers.forEach((value, key) => {
-      // Forward all headers except some that cause issues
-      if (!['content-encoding', 'transfer-encoding'].includes(key.toLowerCase())) {
+      // Skip headers that cause issues or are handled separately
+      if (!['content-encoding', 'transfer-encoding', 'set-cookie'].includes(key.toLowerCase())) {
         responseHeaders.set(key, value);
       }
     });

@@ -67,15 +67,15 @@ export function Header({
   return (
     <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       {/* Banner */}
-      <div className="w-full h-32 relative overflow-hidden">
+      <div className="w-full h-38 relative overflow-hidden">
         <Image
           src="/ect_banner.png"
           alt="ECT Shifts Management Platform Banner"
           fill
-          className="object-cover object-center"
+          className="object-cover object-top"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 to-slate-900/30 flex items-center px-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/40 to-transparent flex items-center px-6">
           <div className="flex items-center gap-4 w-full">
             <button
               onClick={onToggleSidebar}
