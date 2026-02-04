@@ -318,7 +318,7 @@ export default function HistoryPage() {
           {[
             { id: 'trends', label: 'Employee Trends', icon: TrendingUp },
             { id: 'monthly', label: 'Monthly Overview', icon: BarChart3 },
-            { id: 'distribution', label: 'Distribution', icon: PieChart },
+            { id: 'distribution', label: 'Shifts Distribution', icon: PieChart },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -439,7 +439,7 @@ export default function HistoryPage() {
                       />
                     ))}
                   </Pie>
-                  <Tooltip content={<PieTooltip />} />
+                  <Tooltip content={<PieTooltip />} isAnimationActive={false} />
                   <Legend
                     layout="vertical"
                     align="right"
