@@ -67,7 +67,7 @@ export function Header({
   return (
     <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       {/* Banner */}
-      <div className="w-full h-38 relative overflow-hidden">
+      <div className="w-full h-36 relative overflow-hidden">
         <Image
           src="/ect_banner.png"
           alt="ECT Shifts Management Platform Banner"
