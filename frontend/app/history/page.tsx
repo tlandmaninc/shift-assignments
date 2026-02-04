@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp,
@@ -53,6 +53,8 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<ChartView>('trends');
   const [employeeSort, setEmployeeSort] = useState<SortOption>('shifts-desc');
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [calendarHtml, setCalendarHtml] = useState<string>('');
   const [calendarLoading, setCalendarLoading] = useState(false);
@@ -77,6 +79,18 @@ export default function HistoryPage() {
       }
     }
     loadData();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
+        setSortDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Transform employee trends data for line chart
@@ -414,7 +428,7 @@ export default function HistoryPage() {
                     outerRadius={100}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                     labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                   >
                     {getDistributionChartData().map((_: any, index: number) => (
@@ -480,29 +494,57 @@ export default function HistoryPage() {
         />
 
         {/* Sorting Controls */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <ArrowUpDown className="w-4 h-4" />
-            <span>Sort by:</span>
-          </div>
-          {[
-            { id: 'shifts-desc', label: 'Shifts (High to Low)' },
-            { id: 'shifts-asc', label: 'Shifts (Low to High)' },
-            { id: 'name-asc', label: 'Name (A-Z)' },
-            { id: 'name-desc', label: 'Name (Z-A)' },
-          ].map((option) => (
-            <button
-              key={option.id}
-              onClick={() => setEmployeeSort(option.id as SortOption)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                employeeSort === option.id
-                  ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="relative mb-4" ref={sortDropdownRef}>
+          <button
+            onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-sm text-slate-600 dark:text-slate-400"
+          >
+            {(employeeSort === 'shifts-desc' || employeeSort === 'name-desc') ? (
+              <ArrowDown className="w-4 h-4" />
+            ) : (
+              <ArrowUp className="w-4 h-4" />
+            )}
+            <span>
+              {employeeSort === 'shifts-desc' && 'Most shifts'}
+              {employeeSort === 'shifts-asc' && 'Fewest shifts'}
+              {employeeSort === 'name-asc' && 'A-Z'}
+              {employeeSort === 'name-desc' && 'Z-A'}
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {sortDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.1 }}
+                className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-2 z-10 min-w-[140px]"
+              >
+                {[
+                  { id: 'shifts-desc', label: 'Most shifts' },
+                  { id: 'shifts-asc', label: 'Fewest shifts' },
+                  { id: 'name-asc', label: 'A-Z' },
+                  { id: 'name-desc', label: 'Z-A' },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => {
+                      setEmployeeSort(option.id as SortOption);
+                      setSortDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-1.5 text-sm transition-colors ${
+                      employeeSort === option.id
+                        ? 'text-primary-600 dark:text-primary-400 font-medium'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="space-y-4">

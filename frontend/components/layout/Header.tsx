@@ -72,7 +72,7 @@ export function Header({
           src="/ect_banner.png"
           alt="ECT Shifts Management Platform Banner"
           fill
-          className="object-cover"
+          className="object-cover object-center"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/70 to-slate-900/30 flex items-center px-6">

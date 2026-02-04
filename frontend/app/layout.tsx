@@ -35,7 +35,7 @@ export default function RootLayout({
             <div className="flex h-screen overflow-hidden">
               <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-              <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col overflow-auto">
                 <Header
                   darkMode={darkMode}
                   onToggleDarkMode={() => setDarkMode(!darkMode)}
@@ -43,7 +43,7 @@ export default function RootLayout({
                   onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 />
 
-                <main className="flex-1 overflow-auto p-6">
+                <main className="flex-1 p-6">
                   <div className="max-w-7xl mx-auto">
                     {children}
                   </div>
