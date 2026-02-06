@@ -33,7 +33,9 @@ import {
 import { Card, CardHeader, Badge, Tooltip as UITooltip } from '@/components/ui';
 import { historyApi, assignmentsApi } from '@/lib/api';
 import { formatMonthYear } from '@/lib/utils';
-import { X, ChevronRight } from 'lucide-react';
+import { X, ChevronRight, Printer } from 'lucide-react';
+import { printCalendarHtml } from '@/lib/printCalendar';
+import toast from 'react-hot-toast';
 
 // Color palette for charts
 const CHART_COLORS = [
@@ -221,6 +223,16 @@ export default function HistoryPage() {
   const closeCalendarModal = () => {
     setSelectedMonth(null);
     setCalendarHtml('');
+  };
+
+  const handlePrintCalendar = () => {
+    if (!calendarHtml) return;
+    try {
+      printCalendarHtml(calendarHtml);
+      toast.success('Print dialog opened');
+    } catch {
+      toast.error('Failed to open print dialog');
+    }
   };
 
   if (loading) {
@@ -712,12 +724,22 @@ export default function HistoryPage() {
                     <p className="text-sm text-slate-500">Shift assignments calendar</p>
                   </div>
                 </div>
-                <button
-                  onClick={closeCalendarModal}
-                  className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                >
-                  <X className="w-5 h-5 text-slate-500" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrintCalendar}
+                    disabled={calendarLoading || !calendarHtml}
+                    title="Print as PDF"
+                    className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Printer className="w-5 h-5 text-slate-500" />
+                  </button>
+                  <button
+                    onClick={closeCalendarModal}
+                    className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
               </div>
 
               {/* Modal Content */}

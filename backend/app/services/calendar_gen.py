@@ -232,19 +232,51 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         @media print {
+            @page {
+                size: landscape;
+                margin: 1cm;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
             body {
                 background: white;
                 color: black;
-                padding: 1rem;
+                padding: 0;
             }
 
             .calendar {
                 box-shadow: none;
                 border: 1px solid #ccc;
+                background: white;
+            }
+
+            .calendar-header {
+                background: #f1f5f9;
+            }
+
+            .day-header {
+                color: #334155;
             }
 
             .day-cell {
                 border: 1px solid #e5e7eb;
+                background: white;
+            }
+
+            .day-cell.weekend {
+                background: #fef2f2;
+            }
+
+            .day-cell.has-shift {
+                background: #eff6ff;
+            }
+
+            .day-cell.other-month {
+                background: #f8fafc;
             }
 
             .header h1 {
@@ -254,6 +286,35 @@ CALENDAR_HTML_TEMPLATE = """
 
             .header p, .day-number, .legend-name {
                 color: #374151;
+            }
+
+            .legend-item {
+                background: #f8fafc;
+            }
+
+            .legend-count {
+                color: #4b5563;
+            }
+
+            .summary {
+                background: #f8fafc;
+            }
+
+            .summary h2 {
+                color: #1e293b;
+            }
+
+            .summary-card {
+                background: #f1f5f9;
+            }
+
+            .summary-card .name {
+                color: #1e293b;
+            }
+
+            .summary-card .count {
+                color: #3b82f6;
+                background: #dbeafe;
             }
         }
     </style>
