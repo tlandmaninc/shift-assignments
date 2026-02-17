@@ -1,6 +1,7 @@
 """Assignments API router."""
 
-from datetime import date
+import logging
+from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from ..schemas import (
@@ -18,7 +19,12 @@ from ..services import (
     parse_csv_responses,
     validate_availability_data,
 )
+from ..services.calendar_service import build_shift_calendar_url
+from ..services.ws_manager import ws_manager
+from ..audit import log_audit, AuditAction
 from .auth import require_admin
+
+logger = logging.getLogger(__name__)
 
 # All endpoints in this router require admin access
 router = APIRouter(
@@ -230,3 +236,74 @@ async def export_calendar(month_year: str):
         assignments=assignments,
         shift_counts=shift_counts,
     )
+
+
+@router.post("/{month_year}/publish")
+async def publish_shifts(month_year: str):
+    """
+    Publish shifts for a month and notify employees via WebSocket.
+
+    Sends each employee their shift dates with Google Calendar links.
+    """
+    data = storage.get_month_assignment(month_year)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"No assignments found for {month_year}")
+
+    assignments = data.get("assignments", {})
+    if not assignments:
+        raise HTTPException(status_code=400, detail="No assignments to publish")
+
+    # Group shifts by employee name
+    employee_shifts: dict[str, list[str]] = {}
+    for shift_date, employee_name in assignments.items():
+        employee_shifts.setdefault(employee_name, []).append(shift_date)
+
+    # Sort each employee's dates
+    for name in employee_shifts:
+        employee_shifts[name].sort()
+
+    # Format month for human-readable message
+    dt = datetime.strptime(month_year, "%Y-%m")
+    month_label = dt.strftime("%B %Y")
+
+    notified = []
+    not_linked = []
+
+    for employee_name, dates in employee_shifts.items():
+        employee = storage.get_employee_by_name(employee_name)
+        if not employee or not employee.get("id"):
+            not_linked.append(employee_name)
+            continue
+
+        # Build shift list with calendar URLs
+        shifts_payload = []
+        for d in dates:
+            d_dt = datetime.strptime(d, "%Y-%m-%d")
+            shifts_payload.append({
+                "date": d,
+                "day_of_week": d_dt.strftime("%A"),
+                "calendar_url": build_shift_calendar_url(d, employee_name),
+            })
+
+        await ws_manager.send_to_employee(employee["id"], {
+            "type": "shifts_published",
+            "month_year": month_year,
+            "shifts": shifts_payload,
+            "message": f"Your shifts for {month_label} have been published",
+        })
+
+        notified.append(employee_name)
+
+    log_audit(AuditAction.SHIFTS_PUBLISHED, {
+        "month_year": month_year,
+        "notified_count": len(notified),
+        "not_linked_count": len(not_linked),
+    })
+
+    return {
+        "success": True,
+        "month_year": month_year,
+        "notified": notified,
+        "not_linked": not_linked,
+        "message": f"Notified {len(notified)} employees for {month_label}",
+    }

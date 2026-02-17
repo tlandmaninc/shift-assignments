@@ -12,6 +12,8 @@ import {
   ChevronLeft,
   CalendarDays,
   MessageCircle,
+  ArrowLeftRight,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,10 +32,12 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/profile', label: 'My Profile', icon: User },
   { href: '/forms', label: 'Form Generation', icon: FileText },
   { href: '/assignments', label: 'Assignments', icon: Calendar, adminOnly: true },
   { href: '/employees', label: 'Employees', icon: Users, adminOnly: true },
   { href: '/history', label: 'History', icon: History },
+  { href: '/shift-exchange', label: 'Shift Exchange', icon: ArrowLeftRight },
   { href: '/chat', label: 'Chat', icon: MessageCircle },
 ];
 
@@ -50,7 +54,7 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-slate-200 dark:border-slate-800">
         <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/30">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 dark:from-primary-500 dark:to-primary-700 flex items-center justify-center shadow-md dark:shadow-lg shadow-primary-500/15 dark:shadow-primary-500/30">
             <CalendarDays className="w-6 h-6 text-white" />
           </div>
           <AnimatePresence>
@@ -91,7 +95,7 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
                 'hover:bg-slate-100 dark:hover:bg-slate-800',
-                isActive && 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400',
+                isActive && 'bg-primary-50/70 dark:bg-primary-900/30 text-primary-500 dark:text-primary-400',
                 !isActive && 'text-slate-600 dark:text-slate-400'
               )}
             >
