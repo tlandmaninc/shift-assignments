@@ -124,6 +124,7 @@ class FormResponse(BaseModel):
     status: str
     included_dates: list[str]
     created_at: Optional[str] = None
+    google_form_id: Optional[str] = None
 
 
 class FormGenerateRequest(BaseModel):

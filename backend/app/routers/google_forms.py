@@ -16,6 +16,7 @@ from slowapi.util import get_remote_address
 
 from ..config import settings
 from ..audit import log_audit, AuditAction
+from ..storage import storage
 
 # Rate limiter for sensitive endpoints
 limiter = Limiter(key_func=get_remote_address)
@@ -60,6 +61,7 @@ GOOGLE_CLIENT_SECRET = settings.google_client_secret
 GOOGLE_REDIRECT_URI = settings.google_redirect_uri
 SCOPES = [
     "https://www.googleapis.com/auth/forms.body",
+    "https://www.googleapis.com/auth/forms.responses.readonly",
     "https://www.googleapis.com/auth/drive",  # Full drive access needed to copy template forms
 ]
 
@@ -74,6 +76,10 @@ class FormCreateRequest(BaseModel):
     form_id: int
     title: str
     included_dates: list[str]
+
+
+class FetchResponsesRequest(BaseModel):
+    form_id: int
 
 
 def get_stored_credentials():
@@ -95,6 +101,12 @@ def get_stored_credentials():
                     token_data = json.load(f)
 
             from google.oauth2.credentials import Credentials
+
+            # Restore expiry so the expired check works correctly
+            expiry = None
+            if token_data.get("expiry"):
+                expiry = datetime.fromisoformat(token_data["expiry"])
+
             creds = Credentials(
                 token=token_data.get("token"),
                 refresh_token=token_data.get("refresh_token"),
@@ -102,13 +114,20 @@ def get_stored_credentials():
                 client_id=GOOGLE_CLIENT_ID,
                 client_secret=GOOGLE_CLIENT_SECRET,
                 scopes=SCOPES,
+                expiry=expiry,
             )
 
             # Refresh if expired
             if creds.expired and creds.refresh_token:
                 from google.auth.transport.requests import Request as GoogleRequest
-                creds.refresh(GoogleRequest())
-                save_credentials(creds)
+                try:
+                    creds.refresh(GoogleRequest())
+                    save_credentials(creds)
+                except Exception as refresh_err:
+                    logger.error(f"Failed to refresh Google token: {refresh_err}")
+                    # Token is revoked or invalid — remove it so user can re-authenticate
+                    os.remove(TOKEN_FILE)
+                    return None
 
             return creds
         except Exception as e:
@@ -462,6 +481,12 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
             "used_template": used_template
         })
 
+        # Persist google_form_id on the internal form record
+        internal_form = storage.get_form(form_request.form_id)
+        if internal_form:
+            internal_form["google_form_id"] = form_id
+            storage.save_form(internal_form)
+
         template_note = " (from template with header)" if used_template else ""
         return {
             "success": True,
@@ -473,9 +498,203 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         }
 
     except Exception as e:
-        # Log the actual error for debugging, return generic message to user
-        logger.error(f"Failed to create Google Form: {str(e)}")
+        logger.error(f"Failed to create Google Form: {str(e)}", exc_info=True)
+        error_msg = str(e)
+        # Handle token revocation/expiry that occurs during API calls
+        if "invalid_grant" in error_msg or "Token has been" in error_msg:
+            if os.path.exists(TOKEN_FILE):
+                os.remove(TOKEN_FILE)
+            raise HTTPException(
+                status_code=401,
+                detail="Google session expired. Please reconnect your Google account and try again.",
+            )
         raise HTTPException(
             status_code=500,
             detail="Failed to create Google Form. Please try again later.",
+        )
+
+
+@router.post("/fetch-responses")
+@limiter.limit("10/minute")
+async def fetch_google_form_responses(request: Request, body: FetchResponsesRequest):
+    """Fetch responses from a linked Google Form and return parsed availability data."""
+    from ..services.csv_parser import parse_date_from_header
+
+    # Look up internal form
+    form = storage.get_form(body.form_id)
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    google_form_id = form.get("google_form_id")
+    if not google_form_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No Google Form linked to this form. Create a Google Form first.",
+        )
+
+    included_dates = form.get("included_dates", [])
+    if not included_dates:
+        raise HTTPException(status_code=400, detail="Form has no included dates")
+
+    # Check Google credentials
+    creds = get_stored_credentials()
+    if not creds or not creds.valid:
+        raise HTTPException(
+            status_code=401,
+            detail="Google authentication expired. Please reconnect your Google account.",
+        )
+
+    try:
+        from googleapiclient.discovery import build
+
+        forms_service = build("forms", "v1", credentials=creds)
+
+        # 1. Get form structure to map questionIds to dates
+        form_structure = forms_service.forms().get(formId=google_form_id).execute()
+        items = form_structure.get("items", [])
+
+        logger.info(f"[fetch-responses] Form has {len(items)} items")
+
+        # Build mapping: questionId -> role ("name", "is_new", or ISO date)
+        question_map = {}
+        for item in items:
+            question_item = item.get("questionItem", {})
+            question = question_item.get("question", {})
+            question_id = question.get("questionId")
+            title = item.get("title", "")
+
+            if not question_id:
+                logger.debug(f"[fetch-responses] Skipping item without questionId: {title!r}")
+                continue
+
+            title_lower = title.lower()
+            if "employee name" in title_lower:
+                question_map[question_id] = "name"
+            elif "first month" in title_lower:
+                question_map[question_id] = "is_new"
+            else:
+                # Try to parse as a date question
+                date_iso = parse_date_from_header(title, included_dates)
+                if date_iso:
+                    question_map[question_id] = date_iso
+                else:
+                    logger.warning(f"[fetch-responses] Could not map question: {title!r}")
+
+        logger.info(f"[fetch-responses] question_map: {question_map}")
+
+        # 2. Fetch all responses (with pagination)
+        all_responses = []
+        page_token = None
+        while True:
+            kwargs = {"formId": google_form_id}
+            if page_token:
+                kwargs["pageToken"] = page_token
+            resp = forms_service.forms().responses().list(**kwargs).execute()
+            batch = resp.get("responses", [])
+            logger.info(f"[fetch-responses] Fetched page with {len(batch)} responses")
+            all_responses.extend(batch)
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+
+        logger.info(f"[fetch-responses] Total responses fetched: {len(all_responses)}")
+
+        if not all_responses:
+            raise HTTPException(
+                status_code=400,
+                detail="No responses found in the Google Form. "
+                       "Note: only actual form submissions are returned — rows manually added to the linked Google Sheet are not included. "
+                       "Please wait for employees to submit their availability via the form link.",
+            )
+
+        # 3. Convert responses to employee availability format
+        employees = []
+        for resp_idx, response in enumerate(all_responses):
+            answers = response.get("answers", {})
+            employee_name = None
+            is_first_month = True
+            availability = {}
+
+            logger.debug(f"[fetch-responses] Response {resp_idx}: answer keys={list(answers.keys())}")
+
+            for q_id, answer_data in answers.items():
+                role = question_map.get(q_id)
+                if not role:
+                    logger.debug(f"[fetch-responses] Response {resp_idx}: unmapped q_id={q_id!r}")
+                    continue
+
+                # Extract the answer text
+                text_answers = answer_data.get("textAnswers", {})
+                answer_list = text_answers.get("answers", [])
+                answer_value = answer_list[0].get("value", "") if answer_list else ""
+
+                if role == "name":
+                    employee_name = answer_value.strip()
+                elif role == "is_new":
+                    is_first_month = answer_value.strip().lower() == "yes"
+                else:
+                    # It's a date - check availability
+                    availability[role] = answer_value.strip().lower() == "available"
+
+            if not employee_name:
+                logger.warning(f"[fetch-responses] Response {resp_idx}: no employee name found, skipping. answer_keys={list(answers.keys())}")
+                continue
+
+            logger.info(f"[fetch-responses] Response {resp_idx}: employee={employee_name!r}")
+
+            # Ensure all included dates are in availability
+            for date_iso in included_dates:
+                if date_iso not in availability:
+                    availability[date_iso] = False
+
+            employees.append({
+                "employee_name": employee_name,
+                "is_first_month": is_first_month,
+                "availability": availability,
+            })
+
+        log_audit(AuditAction.GOOGLE_FORM_FETCH, {
+            "form_id": body.form_id,
+            "google_form_id": google_form_id,
+            "employees_count": len(employees),
+        })
+
+        return {
+            "success": True,
+            "employees_count": len(employees),
+            "total_responses_fetched": len(all_responses),
+            "employees": employees,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch Google Form responses: {str(e)}", exc_info=True)
+        error_msg = str(e)
+
+        if "invalid_grant" in error_msg or "Token has been" in error_msg:
+            if os.path.exists(TOKEN_FILE):
+                os.remove(TOKEN_FILE)
+            raise HTTPException(
+                status_code=401,
+                detail="Google session expired. Please reconnect your Google account and try again.",
+            )
+
+        if "403" in error_msg or "Forbidden" in error_msg or "insufficient" in error_msg.lower():
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to read form responses. "
+                       "Please disconnect and reconnect Google to grant the required scopes.",
+            )
+
+        if "404" in error_msg or "not found" in error_msg.lower():
+            raise HTTPException(
+                status_code=404,
+                detail="Google Form not found. It may have been deleted. "
+                       "Please create a new Google Form for this month.",
+            )
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch Google Form responses: {error_msg}",
         )

@@ -13,9 +13,12 @@ import {
   AlertCircle,
   Copy,
   ExternalLink,
+  ArrowLeft,
+  Globe,
+  Bell,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Badge } from '@/components/ui';
-import { formsApi, assignmentsApi } from '@/lib/api';
+import { formsApi, assignmentsApi, googleApi } from '@/lib/api';
 import { formatMonthYear } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -24,6 +27,16 @@ export default function AssignmentsPage() {
   const router = useRouter();
   const { isAdmin, isLoading: authLoading } = useAuth();
   const [forms, setForms] = useState<any[]>([]);
+  const [selectedForm, setSelectedForm] = useState<any>(null);
+  const [csvData, setCsvData] = useState('');
+  const [parsedEmployees, setParsedEmployees] = useState<any[]>([]);
+  const [validation, setValidation] = useState<any>(null);
+  const [assignmentResult, setAssignmentResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1); // 1: Select Form, 2: Upload CSV, 3: Review, 4: Results
+  const [inputMethod, setInputMethod] = useState<'csv' | 'google' | null>(null);
+  const [fetchingResponses, setFetchingResponses] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
 
   // Redirect non-admin users
   useEffect(() => {
@@ -31,6 +44,10 @@ export default function AssignmentsPage() {
       router.push('/unauthorized');
     }
   }, [isAdmin, authLoading, router]);
+
+  useEffect(() => {
+    formsApi.list().then(setForms).catch(console.error);
+  }, []);
 
   // Show loading while checking auth
   if (authLoading) {
@@ -45,17 +62,6 @@ export default function AssignmentsPage() {
   if (!isAdmin) {
     return null;
   }
-  const [selectedForm, setSelectedForm] = useState<any>(null);
-  const [csvData, setCsvData] = useState('');
-  const [parsedEmployees, setParsedEmployees] = useState<any[]>([]);
-  const [validation, setValidation] = useState<any>(null);
-  const [assignmentResult, setAssignmentResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: Select Form, 2: Upload CSV, 3: Review, 4: Results
-
-  useEffect(() => {
-    formsApi.list().then(setForms).catch(console.error);
-  }, []);
 
   const handleFormSelect = (form: any) => {
     setSelectedForm(form);
@@ -85,6 +91,29 @@ export default function AssignmentsPage() {
       toast.error(error.message || 'Failed to parse CSV');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFetchFromGoogle = async () => {
+    if (!selectedForm) return;
+
+    setFetchingResponses(true);
+    try {
+      const result = await googleApi.fetchResponses(selectedForm.id);
+      setParsedEmployees(result.employees);
+
+      // Validate
+      const validationResult = await assignmentsApi.validate(
+        selectedForm.id,
+        result.employees
+      );
+      setValidation(validationResult);
+      setStep(3);
+      toast.success(`Fetched ${result.employees_count} employees from ${result.total_responses_fetched ?? result.employees_count} form submissions`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fetch responses from Google Forms');
+    } finally {
+      setFetchingResponses(false);
     }
   };
 
@@ -133,6 +162,27 @@ export default function AssignmentsPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Calendar HTML exported!');
+  };
+
+  const handlePublish = async () => {
+    if (!assignmentResult?.month_year) return;
+
+    setPublishLoading(true);
+    try {
+      const result = await assignmentsApi.publish(assignmentResult.month_year);
+      const parts = [];
+      if (result.notified.length > 0) {
+        parts.push(`Notified ${result.notified.length} employees`);
+      }
+      if (result.not_linked.length > 0) {
+        parts.push(`${result.not_linked.length} not linked`);
+      }
+      toast.success(parts.join('. ') || result.message);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to publish shifts');
+    } finally {
+      setPublishLoading(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -224,39 +274,141 @@ export default function AssignmentsPage() {
         </Card>
       )}
 
-      {/* Step 2: Upload CSV */}
+      {/* Step 2: Input Method Selection / CSV / Google Fetch */}
       {step === 2 && selectedForm && (
         <Card>
-          <CardHeader
-            title="Step 2: Paste CSV Data"
-            description="Copy the responses from Google Sheets and paste below"
-          />
+          {/* Method selector */}
+          {inputMethod === null && (
+            <>
+              <CardHeader
+                title="Step 2: Import Availability Data"
+                description="Choose how to import employee availability responses"
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setInputMethod('csv')}
+                  className="p-6 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent hover:border-primary-500 transition-all text-left"
+                >
+                  <Upload className="w-10 h-10 text-primary-500 mb-3" />
+                  <p className="font-semibold text-slate-900 dark:text-white text-lg">
+                    Paste CSV Data
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Copy data from Google Sheets and paste it manually
+                  </p>
+                </motion.button>
 
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                <strong>Instructions:</strong> Open your Google Form responses in Google Sheets,
-                select all data (Ctrl+A), copy it (Ctrl+C), and paste it below.
-              </p>
-            </div>
+                <motion.button
+                  whileHover={selectedForm.google_form_id ? { scale: 1.02 } : {}}
+                  whileTap={selectedForm.google_form_id ? { scale: 0.98 } : {}}
+                  onClick={() => selectedForm.google_form_id && setInputMethod('google')}
+                  disabled={!selectedForm.google_form_id}
+                  className={`p-6 rounded-xl border-2 transition-all text-left ${
+                    selectedForm.google_form_id
+                      ? 'bg-slate-50 dark:bg-slate-800 border-transparent hover:border-primary-500 cursor-pointer'
+                      : 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <Globe className={`w-10 h-10 mb-3 ${selectedForm.google_form_id ? 'text-primary-500' : 'text-slate-400'}`} />
+                  <p className={`font-semibold text-lg ${selectedForm.google_form_id ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                    Fetch from Google Forms
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    {selectedForm.google_form_id
+                      ? 'Automatically fetch responses from the linked Google Form'
+                      : 'No Google Form linked. Create one in the Forms page first.'}
+                  </p>
+                </motion.button>
+              </div>
+              <div className="flex items-center justify-between mt-6">
+                <Button variant="outline" onClick={() => { setStep(1); setInputMethod(null); }}>
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
+              </div>
+            </>
+          )}
 
-            <textarea
-              value={csvData}
-              onChange={(e) => setCsvData(e.target.value)}
-              placeholder="Paste CSV data here..."
-              className="w-full h-64 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+          {/* CSV sub-view */}
+          {inputMethod === 'csv' && (
+            <>
+              <CardHeader
+                title="Step 2: Paste CSV Data"
+                description="Copy the responses from Google Sheets and paste below"
+              />
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Instructions:</strong> Open your Google Form responses in Google Sheets,
+                    select all data (Ctrl+A), copy it (Ctrl+C), and paste it below.
+                  </p>
+                </div>
 
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <Button onClick={handleCSVPaste} loading={loading} disabled={!csvData.trim()}>
-                <Upload className="w-4 h-4" />
-                Parse CSV
-              </Button>
-            </div>
-          </div>
+                <textarea
+                  value={csvData}
+                  onChange={(e) => setCsvData(e.target.value)}
+                  placeholder="Paste CSV data here..."
+                  className="w-full h-64 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" onClick={() => setInputMethod(null)}>
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                  <Button onClick={handleCSVPaste} loading={loading} disabled={!csvData.trim()}>
+                    <Upload className="w-4 h-4" />
+                    Parse CSV
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Google Forms sub-view */}
+          {inputMethod === 'google' && (
+            <>
+              <CardHeader
+                title="Step 2: Fetch from Google Forms"
+                description="Fetch employee responses directly from the linked Google Form"
+              />
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                    <strong>Ready to fetch.</strong> This will retrieve all responses from the linked
+                    Google Form and parse them automatically. No copy-paste needed.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-3">
+                    <Globe className="w-5 h-5 text-primary-500" />
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">
+                        {selectedForm.title}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {selectedForm.included_dates?.length || 0} dates &middot; Google Form ID: {selectedForm.google_form_id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" onClick={() => setInputMethod(null)}>
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                  <Button onClick={handleFetchFromGoogle} loading={fetchingResponses}>
+                    <Globe className="w-4 h-4" />
+                    Fetch Responses
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </Card>
       )}
 
@@ -386,6 +538,10 @@ export default function AssignmentsPage() {
                     <Download className="w-4 h-4" />
                     HTML
                   </Button>
+                  <Button size="sm" onClick={handlePublish} loading={publishLoading}>
+                    <Bell className="w-4 h-4" />
+                    Publish &amp; Notify
+                  </Button>
                 </div>
               }
             />
@@ -429,6 +585,7 @@ export default function AssignmentsPage() {
               setParsedEmployees([]);
               setValidation(null);
               setAssignmentResult(null);
+              setInputMethod(null);
             }}
           >
             Start New Assignment

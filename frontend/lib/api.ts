@@ -1,4 +1,5 @@
 import { AuthStatus } from './types/auth';
+import { ExchangeRequest, ShiftAssignment, SwapCandidate } from './types/exchange';
 
 const API_BASE = '/api';
 
@@ -70,6 +71,28 @@ export const authApi = {
       return false;
     }
   },
+
+  verifyPhoneAuth: async (
+    email: string,
+    phoneNumber: string,
+    firebaseToken: string
+  ): Promise<{ success: boolean; message: string; redirect_url: string }> => {
+    const response = await fetch(`${API_BASE}/auth/phone/verify`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        phone_number: phoneNumber,
+        firebase_token: firebaseToken,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Phone verification failed');
+    }
+    return data;
+  },
 };
 
 // Forms API
@@ -138,6 +161,15 @@ export const assignmentsApi = {
     fetch(`${API_BASE}/assignments/${monthYear}/calendar`).then((r) => r.text()),
 
   export: (monthYear: string) => fetchApi<any>(`/assignments/${monthYear}/export`),
+
+  publish: (monthYear: string) =>
+    fetchApi<{
+      success: boolean;
+      month_year: string;
+      notified: string[];
+      not_linked: string[];
+      message: string;
+    }>(`/assignments/${monthYear}/publish`, { method: 'POST' }),
 };
 
 // Employees API
@@ -218,6 +250,59 @@ export const googleApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+
+  fetchResponses: (formId: number) =>
+    fetchApi<{ success: boolean; employees_count: number; employees: any[]; total_responses_fetched?: number }>(
+      '/google/fetch-responses',
+      { method: 'POST', body: JSON.stringify({ form_id: formId }) }
+    ),
+};
+
+// Exchange API
+export const exchangeApi = {
+  getMyShifts: (monthYear: string) =>
+    fetchApi<{ shifts: ShiftAssignment[]; month_year: string }>(
+      `/exchanges/my-shifts?month_year=${monthYear}`
+    ),
+
+  getCandidates: (shiftDate: string) =>
+    fetchApi<{ partners: SwapCandidate[]; shift_date: string }>(
+      `/exchanges/eligible/${shiftDate}`
+    ),
+
+  create: (data: {
+    requester_date: string;
+    target_employee_id: number;
+    target_date: string;
+    reason?: string;
+  }) =>
+    fetchApi<ExchangeRequest>('/exchanges/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: (params?: { month_year?: string; status?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.month_year) searchParams.set('month_year', params.month_year);
+    if (params?.status) searchParams.set('status', params.status);
+    const qs = searchParams.toString();
+    return fetchApi<{ exchanges: ExchangeRequest[] }>(
+      `/exchanges/${qs ? `?${qs}` : ''}`
+    );
+  },
+
+  get: (id: number) => fetchApi<ExchangeRequest>(`/exchanges/${id}`),
+
+  respond: (id: number, data: { action: string; decline_reason?: string }) =>
+    fetchApi<ExchangeRequest>(`/exchanges/${id}/respond`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  cancel: (id: number) =>
+    fetchApi<ExchangeRequest>(`/exchanges/${id}/cancel`, {
+      method: 'POST',
+    }),
 };
 
 // Chat API
