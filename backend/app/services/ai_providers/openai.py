@@ -1,6 +1,8 @@
 """OpenAI-compatible AI provider (works with OpenAI, Groq, Together, etc.)."""
 
+import json
 import httpx
+from collections.abc import AsyncGenerator
 from typing import Optional
 from .base import AIProvider, AIResponse
 
@@ -127,6 +129,56 @@ class OpenAIProvider(AIProvider):
                 "provider": self.provider_name,
                 "error": str(e),
             }
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 512,
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat response from OpenAI-compatible API."""
+        if not self.api_key:
+            raise RuntimeError(f"API key not configured for {self.provider_type}")
+
+        all_messages = []
+        if system_prompt:
+            all_messages.append({"role": "system", "content": system_prompt})
+        all_messages.extend(messages)
+
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": all_messages,
+                    "max_tokens": max_tokens,
+                    "temperature": 0.7,
+                    "stream": True,
+                },
+                timeout=60.0,
+            ) as response:
+                if response.status_code != 200:
+                    body = await response.aread()
+                    raise RuntimeError(f"API error ({response.status_code}): {body.decode()[:200]}")
+
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    content = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                    if content:
+                        yield content
 
     async def chat(
         self,

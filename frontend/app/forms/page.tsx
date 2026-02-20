@@ -17,12 +17,22 @@ import {
   Link2,
   Unlink,
   Trash2,
+  FlaskConical,
+  Radio,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Badge } from '@/components/ui';
 import { formsApi, googleApi } from '@/lib/api';
-import { formatMonthYear, getMonthYearString } from '@/lib/utils';
+import { cn, formatMonthYear, getMonthYearString } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'next/navigation';
+import { useExchangeStore } from '@/lib/stores/exchangeStore';
+import {
+  mockGenerateDates,
+  mockListForms,
+  mockCreateForm,
+  mockDeleteForm,
+} from '@/lib/mockData/formsMockData';
+import { SHIFT_TYPES, DEFAULT_SHIFT_TYPE } from '@/lib/constants/shiftTypes';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -40,9 +50,11 @@ const formatDateQuestion = (dateStr: string) => {
 };
 
 export default function FormsPage() {
+  const { useMockData, setUseMockData } = useExchangeStore();
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const defaultMonth = today.getMonth() + 2; // getMonth() is 0-indexed, +2 for next month
+  const [year, setYear] = useState(defaultMonth > 12 ? today.getFullYear() + 1 : today.getFullYear());
+  const [month, setMonth] = useState(defaultMonth > 12 ? 1 : defaultMonth);
   const [includeTuesdays, setIncludeTuesdays] = useState(false);
   const [excludedDates, setExcludedDates] = useState<string[]>([]);
   const [includedDates, setIncludedDates] = useState<string[]>([]);
@@ -51,6 +63,7 @@ export default function FormsPage() {
   const [createdForm, setCreatedForm] = useState<any>(null);
   const [forms, setForms] = useState<any[]>([]);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [shiftType, setShiftType] = useState<string>(DEFAULT_SHIFT_TYPE);
 
   // Google Forms integration
   const searchParams = useSearchParams();
@@ -72,9 +85,10 @@ export default function FormsPage() {
 
   const generateFormQuestions = () => {
     if (!createdForm) return [];
+    const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
     const questions = [
       { type: 'Short answer', question: 'Employee Name', required: true },
-      { type: 'Multiple choice', question: 'Is this your first month doing ECT in Psychiatrics?', options: ['Yes', 'No'], required: true },
+      { type: 'Multiple choice', question: `Is this your first month doing ${stConfig.label} shift?`, options: ['Yes', 'No'], required: true },
     ];
     createdForm.included_dates?.forEach((dateStr: string) => {
       questions.push({
@@ -87,10 +101,10 @@ export default function FormsPage() {
     return questions;
   };
 
-  // Helper to get existing form for current month/year selection
+  // Helper to get existing form for current month/year/shiftType selection
   const getExistingFormForSelectedMonth = () => {
     const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
-    return forms.find((f) => f?.month_year === monthYear);
+    return forms.find((f) => f?.month_year === monthYear && f?.shift_type === shiftType);
   };
 
   const existingFormForMonth = getExistingFormForSelectedMonth();
@@ -98,7 +112,7 @@ export default function FormsPage() {
   // Load existing forms
   const loadForms = async (): Promise<any[]> => {
     try {
-      const data = await formsApi.list();
+      const data = useMockData ? mockListForms() : await formsApi.list();
       console.log('Loaded forms:', data.map((f: any) => f.month_year));
       setForms(data);
       return data;
@@ -110,12 +124,14 @@ export default function FormsPage() {
 
   useEffect(() => {
     loadForms();
-  }, []);
+  }, [useMockData]);
 
   // Check Google auth status
   useEffect(() => {
-    googleApi.getStatus().then(setGoogleAuth).catch(console.error);
-  }, []);
+    if (!useMockData) {
+      googleApi.getStatus().then(setGoogleAuth).catch(console.error);
+    }
+  }, [useMockData]);
 
   // Handle OAuth callback
   useEffect(() => {
@@ -135,22 +151,29 @@ export default function FormsPage() {
   // Generate dates when settings change
   useEffect(() => {
     generateDates();
-  }, [year, month, includeTuesdays, excludedDates, includedDates]);
+  }, [year, month, includeTuesdays, excludedDates, includedDates, useMockData, shiftType]);
 
   // Refresh forms when month/year changes to ensure existence check is accurate
+  // Also reset created form when shift type changes (title/dates differ per type)
   useEffect(() => {
     loadForms();
-  }, [year, month]);
+    setCreatedForm(null);
+    setCreatedGoogleForm(null);
+  }, [year, month, shiftType]);
 
   const generateDates = async () => {
     try {
-      const result = await formsApi.generateDates({
+      const params = {
         year,
         month,
         include_tuesdays: includeTuesdays,
         excluded_dates: excludedDates,
         included_dates: includedDates,
-      });
+        shift_type: shiftType,
+      };
+      const result = useMockData
+        ? mockGenerateDates(params)
+        : await formsApi.generateDates(params);
       setGeneratedDates(result.included_dates);
     } catch (error) {
       console.error('Failed to generate dates:', error);
@@ -187,6 +210,7 @@ export default function FormsPage() {
         form_id: createdForm.id,
         title: createdForm.title,
         included_dates: createdForm.included_dates,
+        shift_type: shiftType,
       });
       setCreatedGoogleForm({
         edit_url: result.edit_url,
@@ -197,6 +221,8 @@ export default function FormsPage() {
       window.open(result.edit_url, '_blank');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create Google Form');
+      // Refresh Google auth status in case token was revoked
+      googleApi.getStatus().then(setGoogleAuth).catch(console.error);
     } finally {
       setGoogleLoading(false);
     }
@@ -208,8 +234,12 @@ export default function FormsPage() {
     }
 
     try {
-      await formsApi.delete(formId);
-      // Refresh forms from server to ensure state is synchronized
+      if (useMockData) {
+        mockDeleteForm(formId);
+      } else {
+        await formsApi.delete(formId);
+      }
+      // Refresh forms to ensure state is synchronized
       await loadForms();
       toast.success('Form deleted successfully');
     } catch (error: any) {
@@ -224,13 +254,14 @@ export default function FormsPage() {
     // Refresh forms from server before checking to ensure we have latest data
     const freshForms = await loadForms();
 
-    // Check if form already exists for this month
+    // Check if form already exists for this month + shift type
     const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
-    const existingForm = freshForms.find((f) => f?.month_year === monthYear);
+    const stLabel = SHIFT_TYPES[shiftType]?.label || shiftType.toUpperCase();
+    const existingForm = freshForms.find((f) => f?.month_year === monthYear && f?.shift_type === shiftType);
     if (existingForm) {
       console.log('Found existing form:', existingForm);
       toast.error(
-        `A form already exists for ${MONTHS[month - 1]} ${year}. Delete it first or select a different month.`,
+        `A ${stLabel} form already exists for ${MONTHS[month - 1]} ${year}. Delete it first to create a new one.`,
         { duration: 5000 }
       );
       return;
@@ -238,13 +269,17 @@ export default function FormsPage() {
 
     setLoading(true);
     try {
-      const result = await formsApi.create({
+      const createParams = {
         year,
         month,
         include_tuesdays: includeTuesdays,
         excluded_dates: excludedDates,
         included_dates: includedDates,
-      });
+        shift_type: shiftType,
+      };
+      const result = useMockData
+        ? mockCreateForm(createParams)
+        : await formsApi.create(createParams);
       setCreatedForm(result);
       // Refresh from server to ensure state is synchronized
       await loadForms();
@@ -254,10 +289,7 @@ export default function FormsPage() {
       const message = error.message || 'Failed to create form';
       // Make error messages more user-friendly
       if (message.includes('already exists')) {
-        toast.error(
-          `A form already exists for ${MONTHS[month - 1]} ${year}. Delete it first or select a different month.`,
-          { duration: 5000 }
-        );
+        toast.error(message, { duration: 5000 });
       } else {
         toast.error(message);
       }
@@ -279,10 +311,11 @@ export default function FormsPage() {
   const isDateExcluded = (dateStr: string) => {
     const d = new Date(dateStr);
     const day = d.getDay();
-    // Friday (5) and Saturday (6) always excluded
-    if (day === 5 || day === 6) return true;
-    // Tuesday (2) excluded unless includeTuesdays
-    if (day === 2 && !includeTuesdays) return true;
+    const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+    // Friday (5) and Saturday (6) excluded only for shift types that exclude weekends
+    if (stConfig.excludeWeekends && (day === 5 || day === 6)) return true;
+    // Tuesday (2) excluded unless includeTuesdays (only for weekend-excluding types)
+    if (stConfig.excludeWeekends && day === 2 && !includeTuesdays) return true;
     // Manually excluded
     if (excludedDates.includes(dateStr)) return true;
     return false;
@@ -295,9 +328,10 @@ export default function FormsPage() {
   const toggleDate = (dateStr: string) => {
     const d = new Date(dateStr);
     const day = d.getDay();
+    const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
 
-    // Can't toggle Friday/Saturday
-    if (day === 5 || day === 6) return;
+    // Can't toggle Friday/Saturday for types that exclude weekends
+    if (stConfig.excludeWeekends && (day === 5 || day === 6)) return;
 
     if (isDateIncluded(dateStr)) {
       // Remove from included by adding to excluded
@@ -341,13 +375,35 @@ export default function FormsPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
       >
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Form Generation
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
-          Configure and create availability forms for Psychiatrics staff
-        </p>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+            Form Generation
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Configure and create availability forms for department staff
+          </p>
+        </div>
+        {process.env.NODE_ENV === 'development' && (
+          <button
+            onClick={() => setUseMockData(!useMockData)}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors',
+              useMockData
+                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+            )}
+            title={useMockData ? 'Using mock data' : 'Using real API'}
+          >
+            {useMockData ? (
+              <FlaskConical className="w-3.5 h-3.5" />
+            ) : (
+              <Radio className="w-3.5 h-3.5" />
+            )}
+            {useMockData ? 'Mock' : 'Live'}
+          </button>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -390,8 +446,9 @@ export default function FormsPage() {
                 .padStart(2, '0')}`;
               const d = new Date(dateStr);
               const dayOfWeek = d.getDay();
-              const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
-              const isTuesday = dayOfWeek === 2;
+              const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+              const isWeekend = stConfig.excludeWeekends && (dayOfWeek === 5 || dayOfWeek === 6);
+              const isTuesday = stConfig.excludeWeekends && dayOfWeek === 2;
               const included = isDateIncluded(dateStr);
 
               return (
@@ -424,14 +481,18 @@ export default function FormsPage() {
               <div className="w-4 h-4 rounded bg-primary-100 dark:bg-primary-900/30 border-2 border-primary-500" />
               <span>Included</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800" />
-              <span>Weekend (excluded)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-300" />
-              <span>Tuesday (default excluded)</span>
-            </div>
+            {(SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect).excludeWeekends && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800" />
+                  <span>Weekend (excluded)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-300" />
+                  <span>Tuesday (default excluded)</span>
+                </div>
+              </>
+            )}
           </div>
         </Card>
 
@@ -439,6 +500,29 @@ export default function FormsPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader title="Settings" />
+
+            {/* Shift Type Selector */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Shift Type
+              </p>
+              <div className="flex gap-2">
+                {Object.entries(SHIFT_TYPES).map(([key, config]) => (
+                  <button
+                    key={key}
+                    onClick={() => setShiftType(key)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-xs font-semibold transition-all border',
+                      shiftType === key
+                        ? `${config.bgClass} text-white ${config.borderClass}`
+                        : `${config.bgLight} ${config.textClass} border-transparent hover:${config.borderClass}`
+                    )}
+                  >
+                    {config.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Google Connection Status */}
             {googleAuth?.configured && (
@@ -477,25 +561,27 @@ export default function FormsPage() {
               </div>
             )}
 
-            {/* Include Tuesdays Toggle */}
-            <button
-              onClick={() => setIncludeTuesdays(!includeTuesdays)}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            >
-              <div>
-                <p className="font-medium text-slate-900 dark:text-white">
-                  Include Tuesdays
-                </p>
-                <p className="text-xs text-slate-500">
-                  {includeTuesdays ? 'Tuesdays will be included' : 'Tuesdays are excluded'}
-                </p>
-              </div>
-              {includeTuesdays ? (
-                <ToggleRight className="w-8 h-8 text-primary-500" />
-              ) : (
-                <ToggleLeft className="w-8 h-8 text-slate-400" />
-              )}
-            </button>
+            {/* Include Tuesdays Toggle - only relevant for ECT (weekend-excluding types) */}
+            {(SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect).excludeWeekends && (
+              <button
+                onClick={() => setIncludeTuesdays(!includeTuesdays)}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">
+                    Include Tuesdays
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {includeTuesdays ? 'Tuesdays will be included' : 'Tuesdays are excluded'}
+                  </p>
+                </div>
+                {includeTuesdays ? (
+                  <ToggleRight className="w-8 h-8 text-primary-500" />
+                ) : (
+                  <ToggleLeft className="w-8 h-8 text-slate-400" />
+                )}
+              </button>
+            )}
 
             {/* Summary */}
             <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800">
@@ -507,16 +593,16 @@ export default function FormsPage() {
           </Card>
 
           {/* Existing Form Warning */}
-          {existingFormForMonth && (
+          {existingFormForMonth && !createdForm && (
             <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
               <div className="flex items-start gap-2">
                 <X className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm text-amber-700 dark:text-amber-300">
-                    A form already exists for {MONTHS[month - 1]} {year}.
+                    A {SHIFT_TYPES[shiftType]?.label || 'ECT'} form already exists for {MONTHS[month - 1]} {year}.
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                    Delete the existing form below to create a new one.
+                    Delete the existing form below to create a new one, or select a different shift type.
                   </p>
                 </div>
                 <button
@@ -538,18 +624,30 @@ export default function FormsPage() {
             disabled={generatedDates.length === 0 || !!existingFormForMonth}
           >
             <FileText className="w-4 h-4" />
-            Create Form Configuration
+            Configure Google Form
           </Button>
 
           {/* Created Form Info */}
           {createdForm && (
-            <Card className="bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
+            <Card className={cn(
+              'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+              `border-l-4 ${SHIFT_TYPES[shiftType]?.borderClass || 'border-blue-500'}`
+            )}>
               <div className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-emerald-800 dark:text-emerald-300">
-                    Form Created!
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                      Form Created!
+                    </p>
+                    <span className={cn(
+                      'px-2 py-0.5 rounded-full text-xs font-semibold',
+                      SHIFT_TYPES[shiftType]?.bgClass || 'bg-blue-500',
+                      'text-white'
+                    )}>
+                      {SHIFT_TYPES[shiftType]?.label || 'ECT'}
+                    </span>
+                  </div>
 
                   {/* Form Title with Copy */}
                   <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg">
@@ -594,24 +692,23 @@ export default function FormsPage() {
                           <ExternalLink className="w-4 h-4" />
                           Edit Google Form
                         </a>
-                        <a
-                          href={createdGoogleForm.responder_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => copyToClipboard(createdGoogleForm.responder_url)}
                           className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 rounded-lg transition-colors"
                         >
-                          <Link2 className="w-4 h-4" />
-                          Share Form Link
-                        </a>
+                          <Copy className="w-4 h-4" />
+                          Copy Share Link
+                        </button>
                       </div>
                     ) : googleAuth?.authenticated ? (
                       <Button
                         onClick={handleCreateGoogleForm}
                         loading={googleLoading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap"
+                        size="sm"
                       >
-                        <FileText className="w-4 h-4" />
-                        Create Google Form Automatically
+                        <FileText className="w-4 h-4 flex-shrink-0" />
+                        Generate Google Form
                       </Button>
                     ) : googleAuth?.configured ? (
                       <Button
@@ -703,7 +800,21 @@ export default function FormsPage() {
                 className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800"
               >
                 <div>
-                  <p className="font-medium text-slate-900 dark:text-white">{form.title}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-900 dark:text-white">{form.title}</p>
+                    {(() => {
+                      const formSt = SHIFT_TYPES[form.shift_type] || SHIFT_TYPES.ect;
+                      return (
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-xs font-semibold',
+                          formSt.bgClass,
+                          'text-white'
+                        )}>
+                          {formSt.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <p className="text-sm text-slate-500">
                     {form.included_dates?.length || 0} dates
                   </p>

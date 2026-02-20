@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     openai_base_url: str = ""
     openai_model: str = ""
 
+    # Firebase Authentication (for phone OTP)
+    firebase_project_id: str = ""
+    firebase_service_account_json_base64: str = ""
+
     # GitHub Integration (placeholder for future use)
     github_token: str = ""
     github_repo: str = ""
@@ -88,6 +92,14 @@ class Settings(BaseSettings):
     @property
     def users_file(self) -> Path:
         return self.data_dir / "users.json"
+
+    @property
+    def exchanges_file(self) -> Path:
+        return self.data_dir / "exchanges.json"
+
+    @property
+    def chat_history_file(self) -> Path:
+        return self.data_dir / "chat_history.json"
 
 
 @lru_cache()

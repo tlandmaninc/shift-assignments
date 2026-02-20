@@ -8,6 +8,7 @@ from .google_forms import router as google_forms_router
 from .chat import router as chat_router
 from .github import router as github_router
 from .auth import router as auth_router
+from .exchanges import router as exchanges_router
 
 __all__ = [
     "forms_router",
@@ -18,4 +19,5 @@ __all__ = [
     "chat_router",
     "github_router",
     "auth_router",
+    "exchanges_router",
 ]

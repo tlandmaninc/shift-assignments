@@ -19,6 +19,7 @@ from ..services import (
     parse_csv_responses,
     validate_availability_data,
 )
+from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
 from ..services.calendar_service import build_shift_calendar_url
 from ..services.ws_manager import ws_manager
 from ..audit import log_audit, AuditAction
@@ -155,6 +156,9 @@ async def generate_assignments(request: AssignmentGenerateRequest):
             detail=f"Invalid data: {'; '.join(validation['errors'])}"
         )
 
+    # Determine shift type from form
+    shift_type = form.get("shift_type", DEFAULT_SHIFT_TYPE)
+
     # Run scheduler
     scheduler = SchedulerService()
     try:
@@ -162,6 +166,7 @@ async def generate_assignments(request: AssignmentGenerateRequest):
             employees=emp_data,
             dates=dates,
             month_year=month_year,
+            shift_type=shift_type,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -193,6 +198,7 @@ async def generate_assignments(request: AssignmentGenerateRequest):
         success=True,
         month_year=month_year,
         assignments=assignments,
+        shift_type=shift_type,
         shift_counts=shift_counts,
         calendar_html=calendar_html,
         message=f"Successfully assigned {len(assignments)} shifts to {len(set(assignments.values()))} employees",
@@ -253,14 +259,23 @@ async def publish_shifts(month_year: str):
     if not assignments:
         raise HTTPException(status_code=400, detail="No assignments to publish")
 
-    # Group shifts by employee name
-    employee_shifts: dict[str, list[str]] = {}
-    for shift_date, employee_name in assignments.items():
-        employee_shifts.setdefault(employee_name, []).append(shift_date)
+    # Group shifts by employee name (handles both old and new format)
+    employee_shifts: dict[str, list[dict]] = {}
+    for shift_date, value in assignments.items():
+        entries = value if isinstance(value, list) else [
+            {"employee_name": value, "shift_type": DEFAULT_SHIFT_TYPE}
+        ]
+        for entry in entries:
+            emp_name = entry["employee_name"]
+            shift_type = entry.get("shift_type", DEFAULT_SHIFT_TYPE)
+            employee_shifts.setdefault(emp_name, []).append({
+                "date": shift_date,
+                "shift_type": shift_type,
+            })
 
     # Sort each employee's dates
     for name in employee_shifts:
-        employee_shifts[name].sort()
+        employee_shifts[name].sort(key=lambda s: s["date"])
 
     # Format month for human-readable message
     dt = datetime.strptime(month_year, "%Y-%m")
@@ -269,7 +284,7 @@ async def publish_shifts(month_year: str):
     notified = []
     not_linked = []
 
-    for employee_name, dates in employee_shifts.items():
+    for employee_name, shift_entries in employee_shifts.items():
         employee = storage.get_employee_by_name(employee_name)
         if not employee or not employee.get("id"):
             not_linked.append(employee_name)
@@ -277,12 +292,15 @@ async def publish_shifts(month_year: str):
 
         # Build shift list with calendar URLs
         shifts_payload = []
-        for d in dates:
-            d_dt = datetime.strptime(d, "%Y-%m-%d")
+        for s in shift_entries:
+            d_dt = datetime.strptime(s["date"], "%Y-%m-%d")
             shifts_payload.append({
-                "date": d,
+                "date": s["date"],
                 "day_of_week": d_dt.strftime("%A"),
-                "calendar_url": build_shift_calendar_url(d, employee_name),
+                "shift_type": s["shift_type"],
+                "calendar_url": build_shift_calendar_url(
+                    s["date"], employee_name, s["shift_type"]
+                ),
             })
 
         await ws_manager.send_to_employee(employee["id"], {

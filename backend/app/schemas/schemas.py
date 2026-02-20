@@ -114,6 +114,7 @@ class FormCreate(BaseModel):
     title: str
     included_dates: list[str] = []
     status: str = "active"
+    shift_type: Optional[str] = "ect"
 
 
 class FormResponse(BaseModel):
@@ -123,6 +124,7 @@ class FormResponse(BaseModel):
     title: str
     status: str
     included_dates: list[str]
+    shift_type: Optional[str] = None
     created_at: Optional[str] = None
     google_form_id: Optional[str] = None
 
@@ -134,6 +136,7 @@ class FormGenerateRequest(BaseModel):
     include_tuesdays: bool = False
     excluded_dates: list[str] = []  # Additional dates to exclude (ISO format)
     included_dates: list[str] = []  # Dates to force-include (overrides defaults)
+    shift_type: Optional[str] = "ect"
 
 
 # CSV/Availability Data Schemas
@@ -174,7 +177,8 @@ class AssignmentGenerateResponse(BaseModel):
     """Schema for assignment generation response."""
     success: bool
     month_year: str
-    assignments: dict[str, str]  # date -> employee name
+    assignments: dict  # date -> employee name (str) or list of entries
+    shift_type: Optional[str] = None
     shift_counts: list[EmployeeShiftCount]
     calendar_html: str  # HTML content for calendar
     message: str
@@ -186,6 +190,7 @@ class MonthlyAssignment(BaseModel):
     month_year: str
     total_shifts: int
     employees_count: int
+    by_type: Optional[dict[str, int]] = None
 
 
 class EmployeeStats(BaseModel):
@@ -195,6 +200,7 @@ class EmployeeStats(BaseModel):
     is_active: bool = True
     is_new: bool = True
     total_shifts: int
+    shifts_by_type: Optional[dict[str, int]] = None
     months_active: int = 0
     last_shift_date: Optional[str] = None
 

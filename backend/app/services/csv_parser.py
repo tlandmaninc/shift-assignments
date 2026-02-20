@@ -87,7 +87,7 @@ def parse_csv_responses(
     Expected CSV format (comma or tab-separated):
     - Column 0: Timestamp
     - Column 1: Employee Name
-    - Column 2: Is this your first month doing ECT? (Yes/No)
+    - Column 2: Is this your first month doing [shift type]? (Yes/No)
     - Columns 3+: Availability on [Date] ([Day]) - Available/Not Available
 
     Args:

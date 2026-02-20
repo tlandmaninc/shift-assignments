@@ -1,6 +1,8 @@
 /**
- * Google Calendar URL generation utilities for ECT shift events.
+ * Google Calendar URL generation utilities for shift events.
  */
+
+import { getShiftTypeConfig, DEFAULT_SHIFT_TYPE } from '@/lib/constants/shiftTypes';
 
 interface GoogleCalendarParams {
   title: string;
@@ -27,9 +29,43 @@ export function buildGoogleCalendarUrl(params: GoogleCalendarParams): string {
 }
 
 /**
- * Build a Google Calendar URL for an ECT shift (07:30-10:00 Israel time).
+ * Compute a date string offset by a number of days (YYYYMMDD format).
  */
-export function buildShiftCalendarUrl(date: string, employeeName: string): string {
+function addDaysCompact(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+/**
+ * Build a single Google Calendar URL for a shift.
+ * For multi-slot shift types (e.g. ER), returns the URL for the first slot.
+ */
+export function buildShiftCalendarUrl(
+  date: string,
+  employeeName: string,
+  shiftType?: string,
+): string {
+  const urls = buildShiftCalendarUrls(date, employeeName, shiftType);
+  return urls[0];
+}
+
+/**
+ * Build Google Calendar URL(s) for a shift (parameterized by shift type).
+ * Returns an array of URLs -- one per slot for multi-slot types (e.g. ER),
+ * or a single-element array for standard shifts.
+ */
+export function buildShiftCalendarUrls(
+  date: string,
+  employeeName: string,
+  shiftType?: string,
+): string[] {
+  const type = shiftType || DEFAULT_SHIFT_TYPE;
+  const cfg = getShiftTypeConfig(type);
+
   // date is "YYYY-MM-DD"
   const dateObj = new Date(date + 'T00:00:00');
   const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
@@ -38,11 +74,27 @@ export function buildShiftCalendarUrl(date: string, employeeName: string): strin
 
   const dateCompact = date.replace(/-/g, '');
 
-  return buildGoogleCalendarUrl({
-    title: `ECT Shift - ${dayName}, ${monthName} ${dayNum}`,
-    description: `ECT shift assignment for ${employeeName}.\nPsychiatrics Department`,
-    startDate: `${dateCompact}T073000`,
-    endDate: `${dateCompact}T100000`,
+  // Handle shift types with multiple slots (e.g. ER)
+  if (cfg.slotDetails) {
+    return cfg.slotDetails.map((slot) => {
+      const endDateCompact = slot.nextDay ? addDaysCompact(date, 1) : dateCompact;
+      return buildGoogleCalendarUrl({
+        title: `${cfg.calendarTitle} (${slot.label}) - ${dayName}, ${monthName} ${dayNum}`,
+        description: `${cfg.calendarTitle} (${slot.label}) assignment for ${employeeName}.\n${cfg.calendarDesc}`,
+        startDate: `${dateCompact}${slot.start}`,
+        endDate: `${endDateCompact}${slot.end}`,
+        timezone: 'Asia/Jerusalem',
+      });
+    });
+  }
+
+  const endDateCompact = cfg.nextDayEnd ? addDaysCompact(date, 1) : dateCompact;
+
+  return [buildGoogleCalendarUrl({
+    title: `${cfg.calendarTitle} - ${dayName}, ${monthName} ${dayNum}`,
+    description: `${cfg.calendarTitle} assignment for ${employeeName}.\n${cfg.calendarDesc}`,
+    startDate: `${dateCompact}${cfg.startTime}`,
+    endDate: `${endDateCompact}${cfg.endTime}`,
     timezone: 'Asia/Jerusalem',
-  });
+  })];
 }

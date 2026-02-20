@@ -52,12 +52,14 @@ function generateMockShifts(employeeName: string): ShiftAssignment[] {
 }
 
 export default function ProfilePage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
   const useMockData = useExchangeStore((s) => s.useMockData);
   const [shifts, setShifts] = useState<ShiftAssignment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+
     if (useMockData) {
       setShifts(generateMockShifts(user?.name || 'Test User'));
       setLoading(false);
@@ -95,7 +97,7 @@ export default function ProfilePage() {
     };
 
     fetchShifts();
-  }, [user?.employee_id, user?.name, useMockData]);
+  }, [user?.employee_id, user?.name, useMockData, authLoading]);
 
   const getInitials = (name: string) =>
     name

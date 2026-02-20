@@ -18,7 +18,7 @@ import {
 } from '@/components/exchange';
 
 export default function ShiftExchangePage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
   const {
     selectedMonth,
     setSelectedMonth,
@@ -31,7 +31,7 @@ export default function ShiftExchangePage() {
   const [activeTab, setActiveTab] = useState('shifts');
   const [incomingCount, setIncomingCount] = useState(0);
 
-  const isEmployee = !!user?.employee_id;
+  const isEmployee = useMockData || !!user?.employee_id;
 
   // Fetch incoming request count for badge
   useEffect(() => {
@@ -65,6 +65,15 @@ export default function ShiftExchangePage() {
     { id: 'outgoing', label: 'Outgoing' },
     { id: 'history', label: 'History' },
   ];
+
+  // Show loading while auth context is still fetching user data
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-primary-200 dark:border-primary-800 border-t-primary-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!isEmployee) {
     return (

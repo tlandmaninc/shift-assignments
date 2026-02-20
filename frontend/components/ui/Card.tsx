@@ -17,7 +17,7 @@ export function Card({ children, className, hover = false, glass = false }: Card
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      whileHover={hover ? { y: -2, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' } : undefined}
+      whileHover={hover ? { y: -2, boxShadow: '0 20px 40px rgba(0,0,0,0.06)' } : undefined}
       className={cn(
         'rounded-2xl p-6',
         glass

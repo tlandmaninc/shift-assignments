@@ -4,6 +4,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException
 from ..schemas import FormGenerateRequest, FormCreate, FormResponse
 from ..storage import storage
+from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
 from ..utils.date_utils import (
     get_included_dates_for_form,
     get_month_name,
@@ -36,12 +37,14 @@ async def generate_form_dates(request: FormGenerateRequest):
 
     Returns the dates that would be included in the form.
     """
+    shift_type = getattr(request, 'shift_type', None) or DEFAULT_SHIFT_TYPE
     included_dates = get_included_dates_for_form(
         year=request.year,
         month=request.month,
         include_tuesdays=request.include_tuesdays,
         additional_excluded=request.excluded_dates,
         force_included=request.included_dates,
+        shift_type=shift_type,
     )
 
     month_name = get_month_name(request.month)
@@ -69,33 +72,38 @@ async def create_form(request: FormGenerateRequest):
     This saves the form settings and included dates.
     The actual Google Form creation is done manually by the user.
     """
-    # Check if form already exists for this month
+    # Generate dates
+    shift_type = request.shift_type or DEFAULT_SHIFT_TYPE
+
+    # Check if form already exists for this month + shift type
     month_year = format_month_year(request.year, request.month)
-    existing = storage.get_form_by_month(month_year)
+    existing = storage.get_form_by_month(month_year, shift_type)
 
     if existing:
+        type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
         raise HTTPException(
             status_code=400,
-            detail=f"Form already exists for {month_year}"
+            detail=f"{type_label} form already exists for {month_year}"
         )
-
-    # Generate dates
     included_dates = get_included_dates_for_form(
         year=request.year,
         month=request.month,
         include_tuesdays=request.include_tuesdays,
         additional_excluded=request.excluded_dates,
         force_included=request.included_dates,
+        shift_type=shift_type,
     )
 
     month_name = get_month_name(request.month)
-    title = f"{month_name} {request.year} Shift Assignment"
+    type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
+    title = f"{month_name} {request.year} {type_label} Shift Assignment"
 
     # Save form
     form = storage.save_form({
         "month_year": month_year,
         "title": title,
         "status": "active",
+        "shift_type": shift_type,
         "included_dates": [d.isoformat() for d in included_dates],
         "settings": {
             "include_tuesdays": request.include_tuesdays,
@@ -147,6 +155,8 @@ async def get_form_template(form_id: int):
         raise HTTPException(status_code=404, detail="Form not found")
 
     included_dates = form.get("included_dates", [])
+    shift_type = form.get("shift_type", DEFAULT_SHIFT_TYPE)
+    type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
 
     questions = [
         {
@@ -157,7 +167,7 @@ async def get_form_template(form_id: int):
         },
         {
             "order": 2,
-            "title": "Is this your first month doing ECT?",
+            "title": f"Is this your first month doing {type_label} shift?",
             "type": "radio",
             "required": True,
             "options": ["Yes", "No"],
@@ -177,9 +187,16 @@ async def get_form_template(form_id: int):
             "options": ["Available", "Not Available"],
         })
 
+    exclude_weekends = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("exclude_weekends", True)
+    title_prefix = form["title"].replace(" Shift Assignment", "")
+    if exclude_weekends:
+        form_desc = f"Please indicate your availability for each date in {title_prefix} (excluding Fridays, Saturdays, etc.)."
+    else:
+        form_desc = f"Please indicate your availability for each date in {title_prefix}."
+
     return {
         "form_title": form["title"],
-        "form_description": f"Please indicate your availability for each date in {form['title'].replace(' Shift Assignment', '')} (excluding Fridays, Saturdays, etc.).",
+        "form_description": form_desc,
         "questions": questions,
         "total_questions": len(questions),
     }

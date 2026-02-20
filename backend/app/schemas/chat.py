@@ -16,13 +16,38 @@ class ChatRequest(BaseModel):
     """Request to send a chat message."""
     message: str = Field(..., min_length=1, max_length=2000)
     conversation_history: list[ChatMessage] = []
+    conversation_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     """Response from chat endpoint."""
     success: bool
     message: ChatMessage
+    conversation_id: Optional[str] = None
     error: Optional[str] = None
+
+
+class ConversationSummary(BaseModel):
+    """Summary of a conversation for listing."""
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int = 0
+
+
+class ConversationDetail(BaseModel):
+    """Full conversation with messages."""
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+    messages: list[ChatMessage] = []
+
+
+class ConversationListResponse(BaseModel):
+    """Response containing list of conversation summaries."""
+    conversations: list[ConversationSummary] = []
 
 
 class ChatHealthResponse(BaseModel):

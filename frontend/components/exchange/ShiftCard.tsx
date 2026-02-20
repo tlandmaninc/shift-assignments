@@ -5,6 +5,7 @@ import { ArrowLeftRight, CalendarPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ShiftAssignment } from '@/lib/types/exchange';
 import { buildShiftCalendarUrl } from '@/lib/utils/googleCalendar';
+import { getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 
 interface ShiftCardProps {
   shift: ShiftAssignment;
@@ -16,6 +17,7 @@ export function ShiftCard({ shift, onRequestSwap, isPast }: ShiftCardProps) {
   const dateObj = new Date(shift.date + 'T00:00:00');
   const dayNum = dateObj.getDate();
   const monthShort = dateObj.toLocaleDateString('en-US', { month: 'short' });
+  const typeCfg = getShiftTypeConfig(shift.shift_type || 'ect');
 
   return (
     <motion.div
@@ -38,9 +40,17 @@ export function ShiftCard({ shift, onRequestSwap, isPast }: ShiftCardProps) {
           </span>
         </div>
         <div>
-          <p className="font-medium text-slate-900 dark:text-white">
-            {shift.day_of_week}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-slate-900 dark:text-white">
+              {shift.day_of_week}
+            </p>
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
+              style={{ backgroundColor: typeCfg.color }}
+            >
+              {typeCfg.label}
+            </span>
+          </div>
           <p className="text-sm text-slate-500 dark:text-slate-400">{shift.date}</p>
         </div>
       </div>
@@ -48,7 +58,7 @@ export function ShiftCard({ shift, onRequestSwap, isPast }: ShiftCardProps) {
       {!isPast && (
         <div className="flex items-center gap-2">
           <a
-            href={buildShiftCalendarUrl(shift.date, shift.employee_name)}
+            href={buildShiftCalendarUrl(shift.date, shift.employee_name, shift.shift_type)}
             target="_blank"
             rel="noopener noreferrer"
             className={cn(

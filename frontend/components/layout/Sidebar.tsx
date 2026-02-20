@@ -66,10 +66,10 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
                 className="flex flex-col whitespace-nowrap overflow-hidden"
               >
                 <span className="text-xl font-bold gradient-text">
-                  ECT Shifts
+                  Shift Assignment
                 </span>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 -mt-1">
-                  Psychiatrics Dept
+                  Psychiatry
                 </span>
               </motion.div>
             )}
@@ -140,7 +140,7 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
               exit={{ opacity: 0 }}
               className="text-xs text-slate-400 dark:text-slate-600"
             >
-              ECT Shifts Management Platform v1.0
+              Shift Assignment Platform v1.0
             </motion.p>
           )}
         </AnimatePresence>

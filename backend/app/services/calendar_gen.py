@@ -6,21 +6,8 @@ from datetime import date
 from pathlib import Path
 from jinja2 import Template
 from ..config import settings
+from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
 from ..utils.date_utils import get_month_name, parse_month_year
-
-# Employee colors for consistent display
-EMPLOYEE_COLORS = [
-    "#3B82F6",  # Blue
-    "#10B981",  # Emerald
-    "#F59E0B",  # Amber
-    "#EF4444",  # Red
-    "#8B5CF6",  # Violet
-    "#EC4899",  # Pink
-    "#06B6D4",  # Cyan
-    "#84CC16",  # Lime
-    "#F97316",  # Orange
-    "#6366F1",  # Indigo
-]
 
 CALENDAR_HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -99,7 +86,7 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         .day-cell {
-            min-height: 100px;
+            min-height: 110px;
             padding: 0.75rem;
             border: 1px solid rgba(255, 255, 255, 0.05);
             position: relative;
@@ -123,7 +110,7 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         .day-cell.has-shift {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(59, 130, 246, 0.05);
         }
 
         .day-number {
@@ -145,16 +132,30 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         .shift-badge {
-            padding: 0.375rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.7rem;
             color: white;
             text-align: center;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            margin-bottom: 0.25rem;
+        }
+
+        .shift-badge .type-label {
+            font-weight: 700;
+            margin-right: 0.25rem;
+            opacity: 0.9;
+        }
+
+        .shift-badge .employee-name {
+            font-weight: 400;
+        }
+
+        .shift-badge.current-user .employee-name {
+            font-weight: 700;
         }
 
         .legend {
@@ -316,6 +317,11 @@ CALENDAR_HTML_TEMPLATE = """
                 color: #3b82f6;
                 background: #dbeafe;
             }
+
+            /* All employee names become regular weight when printing */
+            .shift-badge .employee-name {
+                font-weight: 400 !important;
+            }
         }
     </style>
 </head>
@@ -323,7 +329,7 @@ CALENDAR_HTML_TEMPLATE = """
     <div class="container">
         <div class="header">
             <h1>{{ title }}</h1>
-            <p>ECT Shift Assignments</p>
+            <p>Shift Assignments</p>
         </div>
 
         <div class="calendar">
@@ -341,11 +347,12 @@ CALENDAR_HTML_TEMPLATE = """
                 <div class="day-cell {{ day.classes }}">
                     {% if day.number %}
                     <div class="day-number">{{ day.number }}</div>
-                    {% if day.employee %}
-                    <div class="shift-badge" style="background-color: {{ day.color }}">
-                        {{ day.employee }}
+                    {% for assignment in day.assignments %}
+                    <div class="shift-badge{{ ' current-user' if assignment.is_current_user else '' }}" style="background-color: {{ assignment.color }}">
+                        <span class="type-label">{{ assignment.type_label }}</span>
+                        <span class="employee-name">{{ assignment.employee }}</span>
                     </div>
-                    {% endif %}
+                    {% endfor %}
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -353,11 +360,10 @@ CALENDAR_HTML_TEMPLATE = """
         </div>
 
         <div class="legend">
-            {% for emp in employees %}
+            {% for st in shift_types %}
             <div class="legend-item">
-                <div class="legend-color" style="background-color: {{ emp.color }}"></div>
-                <span class="legend-name">{{ emp.name }}</span>
-                <span class="legend-count">({{ emp.shifts }} shifts)</span>
+                <div class="legend-color" style="background-color: {{ st.color }}"></div>
+                <span class="legend-name">{{ st.label }}</span>
             </div>
             {% endfor %}
         </div>
@@ -385,23 +391,13 @@ class CalendarGenerator:
     def __init__(self):
         self.template = Template(CALENDAR_HTML_TEMPLATE)
 
-    def get_employee_color(self, name: str, employee_colors: dict[str, str]) -> str:
-        """Get consistent color for an employee."""
-        if name in employee_colors:
-            return employee_colors[name]
-
-        # Assign next available color
-        idx = len(employee_colors) % len(EMPLOYEE_COLORS)
-        color = EMPLOYEE_COLORS[idx]
-        employee_colors[name] = color
-        return color
-
     def generate_calendar(
         self,
         year: int,
         month: int,
-        assignments: dict[str, str],
+        assignments: dict,
         month_count: dict[str, int],
+        current_user_name: str | None = None,
     ) -> str:
         """
         Generate HTML calendar for a month.
@@ -409,8 +405,10 @@ class CalendarGenerator:
         Args:
             year: Year
             month: Month
-            assignments: Dict of date_iso -> employee_name
+            assignments: Dict of date_iso -> employee_name (str) or list of
+                         ``{employee_name, shift_type}`` dicts.
             month_count: Dict of employee_name -> shift count
+            current_user_name: Optional name to bold in the calendar view.
 
         Returns:
             HTML string
@@ -422,9 +420,9 @@ class CalendarGenerator:
         cal = calendar.Calendar(firstweekday=6)  # Sunday first
         month_days = cal.monthdayscalendar(year, month)
 
-        employee_colors: dict[str, str] = {}
         days = []
         today = date.today()
+        active_types: set[str] = set()
 
         for week in month_days:
             for day_num in week:
@@ -432,8 +430,7 @@ class CalendarGenerator:
                     days.append({
                         "number": None,
                         "classes": "other-month",
-                        "employee": None,
-                        "color": None,
+                        "assignments": [],
                     })
                 else:
                     d = date(year, month, day_num)
@@ -446,26 +443,48 @@ class CalendarGenerator:
                     if weekday in (4, 5):  # Friday, Saturday
                         classes.append("weekend")
 
-                    employee = assignments.get(date_iso)
-                    color = None
-                    if employee:
+                    # Normalize value to list of entries
+                    value = assignments.get(date_iso)
+                    entries: list[dict] = []
+                    if isinstance(value, str):
+                        entries = [{"employee_name": value, "shift_type": DEFAULT_SHIFT_TYPE}]
+                    elif isinstance(value, list):
+                        entries = value
+
+                    badge_list = []
+                    if entries:
                         classes.append("has-shift")
-                        color = self.get_employee_color(employee, employee_colors)
+                        for entry in entries:
+                            emp_name = entry["employee_name"]
+                            shift_type = entry.get("shift_type", DEFAULT_SHIFT_TYPE)
+                            type_cfg = SHIFT_TYPE_CONFIG.get(shift_type, SHIFT_TYPE_CONFIG[DEFAULT_SHIFT_TYPE])
+                            active_types.add(shift_type)
+                            badge_list.append({
+                                "employee": emp_name,
+                                "color": type_cfg["color"],
+                                "type_label": type_cfg["label"],
+                                "is_current_user": (
+                                    current_user_name is not None
+                                    and emp_name == current_user_name
+                                ),
+                            })
 
                     days.append({
                         "number": day_num,
                         "classes": " ".join(classes),
-                        "employee": employee,
-                        "color": color,
+                        "assignments": badge_list,
                     })
 
-        # Build employee list for legend
+        # Build shift type legend entries (only for types actually used)
+        shift_types_legend = [
+            {"label": cfg["label"], "color": cfg["color"]}
+            for st, cfg in SHIFT_TYPE_CONFIG.items()
+            if st in active_types
+        ]
+
+        # Build employee list for summary
         employees = [
-            {
-                "name": name,
-                "shifts": count,
-                "color": self.get_employee_color(name, employee_colors),
-            }
+            {"name": name, "shifts": count}
             for name, count in sorted(month_count.items())
             if count > 0
         ]
@@ -473,6 +492,7 @@ class CalendarGenerator:
         return self.template.render(
             title=title,
             days=days,
+            shift_types=shift_types_legend,
             employees=employees,
         )
 
@@ -480,7 +500,7 @@ class CalendarGenerator:
         self,
         year: int,
         month: int,
-        assignments: dict[str, str],
+        assignments: dict,
         month_count: dict[str, int],
     ) -> Path:
         """
@@ -489,7 +509,7 @@ class CalendarGenerator:
         Args:
             year: Year
             month: Month
-            assignments: Dict of date_iso -> employee_name
+            assignments: Dict of date_iso -> employee_name or list of dicts
             month_count: Dict of employee_name -> shift count
 
         Returns:
@@ -511,7 +531,7 @@ class CalendarGenerator:
         self,
         year: int,
         month: int,
-        assignments: dict[str, str],
+        assignments: dict,
         month_count: dict[str, int],
         employees: list[dict],
     ) -> Path:
@@ -521,7 +541,7 @@ class CalendarGenerator:
         Args:
             year: Year
             month: Month
-            assignments: Dict of date_iso -> employee_name
+            assignments: Dict of date_iso -> employee_name or list of dicts
             month_count: Dict of employee_name -> shift count
             employees: List of employee data
 

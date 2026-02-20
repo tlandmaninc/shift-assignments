@@ -222,7 +222,7 @@ export default function EmployeesPage() {
             Employees
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Manage Psychiatrics staff records and ECT assignment history
+            Manage Psychiatry staff records and shift assignment history
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -572,7 +572,7 @@ export default function EmployeesPage() {
                   }
                   className="w-4 h-4 rounded border-slate-300"
                 />
-                <span className="text-sm">First month doing ECT in Psychiatrics (new staff)</span>
+                <span className="text-sm">First month doing shifts in ECT/Internal/ER (new staff)</span>
               </label>
             </div>
 

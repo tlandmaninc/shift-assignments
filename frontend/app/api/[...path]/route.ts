@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Allow up to 3 minutes for AI chat responses (Ollama on CPU can be slow)
+export const maxDuration = 180;
+
 const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 async function proxyRequest(request: NextRequest) {
@@ -15,6 +18,11 @@ async function proxyRequest(request: NextRequest) {
   });
 
   try {
+    // Use longer timeout for chat endpoints (Ollama on CPU can take 60-120s)
+    const isChat = pathname.includes('/chat') && request.method === 'POST';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), isChat ? 180000 : 30000);
+
     const response = await fetch(url, {
       method: request.method,
       headers,
@@ -22,7 +30,10 @@ async function proxyRequest(request: NextRequest) {
         ? await request.text()
         : undefined,
       redirect: 'manual', // Don't follow redirects - pass them to the browser
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     // Handle Set-Cookie headers specially - they must not be combined
     // getSetCookie() returns an array of individual Set-Cookie header values
@@ -50,7 +61,7 @@ async function proxyRequest(request: NextRequest) {
     // Forward all other headers
     response.headers.forEach((value, key) => {
       // Skip headers that cause issues or are handled separately
-      if (!['content-encoding', 'transfer-encoding', 'set-cookie'].includes(key.toLowerCase())) {
+      if (!['content-encoding', 'transfer-encoding', 'set-cookie', 'cache-control', 'etag', 'last-modified', 'expires'].includes(key.toLowerCase())) {
         responseHeaders.set(key, value);
       }
     });

@@ -1,5 +1,6 @@
 """Authentication service for JWT and OAuth operations."""
 
+import hashlib
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
@@ -20,6 +21,13 @@ ADMIN_EMAILS = ["tlandmaninc@gmail.com"]
 
 # CSRF state storage (in-memory, single-server deployment)
 _oauth_states: dict[str, datetime] = {}
+
+
+def generate_email_user_id(email: str) -> str:
+    """Generate a deterministic user ID from an email address."""
+    email = email.lower()
+    email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
+    return f"email_{email_hash}"
 
 
 def get_user_role(email: str) -> UserRole:
@@ -120,7 +128,13 @@ def verify_google_id_token(token: str) -> Optional[dict]:
         return None
 
 
-def create_tokens(user_id: str, email: str, name: str, role: str) -> Tuple[str, str]:
+def create_tokens(
+    user_id: str,
+    email: str,
+    name: str,
+    role: str,
+    employee_id: Optional[int] = None,
+) -> Tuple[str, str]:
     """
     Create access and refresh JWT tokens.
 
@@ -128,7 +142,8 @@ def create_tokens(user_id: str, email: str, name: str, role: str) -> Tuple[str, 
         user_id: The user's unique ID
         email: The user's email address
         name: The user's display name
-        role: The user's role (admin or basic)
+        role: The user's role (admin, basic, or employee)
+        employee_id: Optional linked employee ID
 
     Returns:
         Tuple of (access_token, refresh_token)
@@ -145,6 +160,9 @@ def create_tokens(user_id: str, email: str, name: str, role: str) -> Tuple[str, 
         'iat': now,
         'exp': now + timedelta(minutes=60),  # 1 hour
     }
+    if employee_id is not None:
+        access_payload['employee_id'] = employee_id
+
     access_token = jwt.encode(
         access_payload,
         settings.secret_key,
@@ -161,6 +179,9 @@ def create_tokens(user_id: str, email: str, name: str, role: str) -> Tuple[str, 
         'iat': now,
         'exp': now + timedelta(days=7),
     }
+    if employee_id is not None:
+        refresh_payload['employee_id'] = employee_id
+
     refresh_token = jwt.encode(
         refresh_payload,
         settings.secret_key,

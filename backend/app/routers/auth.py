@@ -29,14 +29,51 @@ from ..services.auth_service import (
     create_tokens,
     verify_token,
     get_user_role,
+    generate_email_user_id,
 )
-from ..schemas.auth import UserResponse, AuthStatus, UserRole
+from ..services.email_service import validate_email_domain
+from ..services.firebase_service import (
+    is_firebase_available,
+    verify_firebase_token,
+    normalize_phone_number,
+)
+from ..schemas.auth import (
+    UserResponse,
+    AuthStatus,
+    UserRole,
+    PhoneAuthRequest,
+    PhoneAuthResponse,
+)
 
 
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _try_auto_link_employee(user: dict) -> dict:
+    """Try to auto-link user to an employee by matching email."""
+    if user.get("employee_id"):
+        return user  # Already linked
+
+    email = user.get("email", "").lower()
+    if not email:
+        return user
+
+    # Check employee records for matching email
+    employees = storage.get_employees()
+    for emp in employees:
+        emp_email = emp.get("email", "")
+        if emp_email and emp_email.lower() == email and emp.get("is_active", True):
+            try:
+                user = storage.link_user_to_employee(user["id"], emp["id"])
+                logger.info(f"Auto-linked user {user['id']} to employee {emp['id']} ({emp.get('name')})")
+            except ValueError:
+                pass
+            break
+
+    return user
 
 # Cookie names
 ACCESS_TOKEN_COOKIE = "ect_access_token"
@@ -147,6 +184,38 @@ async def require_admin(request: Request) -> dict:
             detail="Admin access required"
         )
     return user
+
+
+async def require_employee(request: Request) -> dict:
+    """
+    Dependency that requires an authenticated user linked to an employee.
+
+    Raises 401 if not authenticated, 403 if no employee_id.
+    """
+    user = await get_required_user(request)
+    if not user.get('employee_id'):
+        raise HTTPException(
+            status_code=403,
+            detail="Employee account required. Please link your account to an employee profile."
+        )
+    return user
+
+
+async def require_employee_or_admin(request: Request) -> dict:
+    """
+    Dependency that requires either admin role or linked employee.
+
+    Raises 401 if not authenticated, 403 if neither admin nor employee.
+    """
+    user = await get_required_user(request)
+    if user.get('role') == UserRole.ADMIN.value:
+        return user
+    if user.get('employee_id'):
+        return user
+    raise HTTPException(
+        status_code=403,
+        detail="Employee or admin access required"
+    )
 
 
 @router.get("/google/login")
@@ -269,12 +338,16 @@ async def google_callback(
         # Update last login
         storage.update_auth_user_last_login(user['id'])
 
+        # Auto-link to employee if possible
+        user = _try_auto_link_employee(user)
+
         # Create JWT tokens
         access_token, refresh_token = create_tokens(
             user_id=user['id'],
             email=user['email'],
             name=user['name'],
-            role=user['role']
+            role=user['role'],
+            employee_id=user.get('employee_id'),
         )
 
         # Log successful login
@@ -301,6 +374,101 @@ async def google_callback(
         )
 
 
+@router.post("/phone/verify", response_model=PhoneAuthResponse)
+@limiter.limit("10/minute")
+async def verify_phone_auth(request: Request, body: PhoneAuthRequest, response: Response):
+    """Verify Firebase phone authentication and issue JWT tokens."""
+    email = body.email
+    phone_number = body.phone_number
+
+    # 1. Validate email domain
+    if not validate_email_domain(email):
+        raise HTTPException(
+            status_code=400,
+            detail="Only @clalit.co.il and @clalit.com email addresses are allowed."
+        )
+
+    # 2. Check Firebase availability
+    if not is_firebase_available():
+        log_audit(AuditAction.PHONE_AUTH_FAILED, {"email": email, "reason": "firebase_not_configured"})
+        raise HTTPException(
+            status_code=500,
+            detail="Phone authentication is not configured."
+        )
+
+    # 3. Normalize submitted phone number to E.164
+    normalized_phone = normalize_phone_number(phone_number)
+
+    # 4. Verify Firebase ID token
+    firebase_claims = verify_firebase_token(body.firebase_token)
+    if not firebase_claims:
+        log_audit(AuditAction.PHONE_AUTH_FAILED, {"email": email, "reason": "invalid_firebase_token"})
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired verification. Please try again."
+        )
+
+    # 5. Confirm Firebase phone matches submitted phone
+    firebase_phone = firebase_claims.get("phone_number", "")
+    if normalize_phone_number(firebase_phone) != normalized_phone:
+        log_audit(AuditAction.PHONE_AUTH_FAILED, {"email": email, "reason": "phone_mismatch"})
+        raise HTTPException(
+            status_code=400,
+            detail="Phone number mismatch. Please try again."
+        )
+
+    # 6. Create / update user
+    user_id = generate_email_user_id(email)
+    name = email.split("@")[0].replace(".", " ").title()
+    role = get_user_role(email)
+
+    existing_user = storage.get_auth_user(user_id)
+    if existing_user:
+        existing_user['email'] = email
+        existing_user['phone_number'] = normalized_phone
+        existing_user['role'] = role.value
+        user = storage.save_auth_user(existing_user)
+    else:
+        user = storage.save_auth_user({
+            'id': user_id,
+            'email': email,
+            'name': name,
+            'phone_number': normalized_phone,
+            'picture': None,
+            'role': role.value,
+            'is_active': True,
+        })
+
+    storage.update_auth_user_last_login(user['id'])
+
+    # Auto-link to employee if possible
+    user = _try_auto_link_employee(user)
+
+    # 7. Issue JWT cookies
+    access_token, refresh_token = create_tokens(
+        user_id=user['id'],
+        email=user['email'],
+        name=user['name'],
+        role=user['role'],
+        employee_id=user.get('employee_id'),
+    )
+
+    log_audit(AuditAction.USER_LOGIN, {
+        "user_id": user['id'],
+        "email": user['email'],
+        "role": user['role'],
+        "method": "phone_firebase",
+    })
+
+    set_auth_cookies(response, access_token, refresh_token)
+
+    return PhoneAuthResponse(
+        success=True,
+        message="Authentication successful.",
+        redirect_url="/"
+    )
+
+
 @router.post("/logout")
 async def logout(response: Response, user: dict = Depends(get_current_user)):
     """
@@ -324,9 +492,17 @@ async def get_auth_status(user: Optional[dict] = Depends(get_current_user)):
     Get current authentication status and user info.
 
     Returns authenticated=False if not logged in.
+    Also attempts to auto-link the user to an employee profile if not already linked,
+    so that users who logged in before their employee record was created can still
+    get linked without having to log out and back in.
     """
     if not user:
         return AuthStatus(authenticated=False, user=None)
+
+    # Try auto-linking on every auth status check (not just at login)
+    # This handles the case where an employee record is created after the user logs in
+    if not user.get('employee_id'):
+        user = _try_auto_link_employee(user)
 
     return AuthStatus(
         authenticated=True,
@@ -336,9 +512,29 @@ async def get_auth_status(user: Optional[dict] = Depends(get_current_user)):
             name=user['name'],
             picture=user.get('picture'),
             role=UserRole(user.get('role', 'basic')),
+            employee_id=user.get('employee_id'),
             is_active=user.get('is_active', True),
         )
     )
+
+
+@router.post("/link-employee")
+async def link_employee(
+    request: Request,
+    body: dict,
+    user: dict = Depends(require_admin),
+):
+    """Admin endpoint to manually link a user to an employee."""
+    user_id = body.get("user_id")
+    employee_id = body.get("employee_id")
+    if not user_id or not employee_id:
+        raise HTTPException(status_code=400, detail="user_id and employee_id are required")
+
+    try:
+        updated = storage.link_user_to_employee(user_id, int(employee_id))
+        return {"success": True, "user": updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/refresh")
@@ -375,7 +571,8 @@ async def refresh_tokens(request: Request, response: Response):
         user_id=user['id'],
         email=user['email'],
         name=user['name'],
-        role=user['role']
+        role=user['role'],
+        employee_id=user.get('employee_id'),
     )
 
     set_auth_cookies(response, access_token, new_refresh_token)

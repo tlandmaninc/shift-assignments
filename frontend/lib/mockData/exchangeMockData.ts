@@ -8,6 +8,7 @@ import {
   ExchangeRequest,
   MonthSchedule,
   ScheduleDateCell,
+  CellAssignment,
   EmployeeAvailability,
   EnhancedSwapCandidate,
 } from '../types/exchange';
@@ -45,8 +46,11 @@ function seededRandom(seed: number) {
   };
 }
 
+// ── Shift types for mock data ────────────────────────────────────────
+const SHIFT_TYPE_KEYS = ['ect', 'internal', 'er'] as const;
+
 // ── Caches ───────────────────────────────────────────────────────────
-const assignmentCache = new Map<string, Map<string, { name: string; id: number }>>();
+const assignmentCache = new Map<string, Map<string, { name: string; id: number; shift_type: string }[]>>();
 const scheduleCache = new Map<string, MonthSchedule>();
 const exchangeCache = new Map<string, ExchangeRequest[]>();
 const availabilityCache = new Map<string, EmployeeAvailability[]>();
@@ -77,18 +81,19 @@ function getISOWeek(d: Date): number {
 
 // ── Assignment generation ────────────────────────────────────────────
 /**
- * Generate 15-18 shift dates for a month (weekdays only, no Fri/Sat),
- * then assign employees round-robin while respecting constraints:
- * - Max 2 per employee per month
- * - Max 1 per ISO week per employee
- * - No consecutive days for same employee
- * - Different weekdays if 2 shifts
- * - New employees only in last 2 ISO weeks
+ * Generate shift dates for a month across multiple shift types.
+ *
+ * ECT: 15-18 dates (weekdays, no Fri/Sat), max 2 per employee, 1 per week, etc.
+ * Internal & ER: A smaller number of additional shifts on some overlapping dates
+ * to demonstrate multi-type per date.
+ *
+ * Returns a Map where each date maps to an array of assignments (supporting
+ * multiple shift types on the same date).
  */
 export function generateMonthAssignments(
   year: number,
   month: number
-): Map<string, { name: string; id: number }> {
+): Map<string, { name: string; id: number; shift_type: string }[]> {
   const key = `${year}-${String(month).padStart(2, '0')}`;
   if (assignmentCache.has(key)) return assignmentCache.get(key)!;
 
@@ -105,21 +110,18 @@ export function generateMonthAssignments(
     }
   }
 
-  // Pick 15-18 shift dates
+  // ── ECT assignments (primary, same logic as before) ─────────────
   const targetCount = Math.min(15 + Math.floor(rand() * 4), eligibleDates.length);
   const shuffled = [...eligibleDates].sort(() => rand() - 0.5);
-  const shiftDates = shuffled.slice(0, targetCount).sort();
+  const ectDates = shuffled.slice(0, targetCount).sort();
 
-  // Compute last 2 ISO weeks of the shift dates for new-employee restriction
-  const allWeeks = [...new Set(shiftDates.map((ds) => getISOWeek(parseDate(ds))))].sort(
+  const allWeeks = [...new Set(ectDates.map((ds) => getISOWeek(parseDate(ds))))].sort(
     (a, b) => a - b
   );
   const allowedNewWeeks = new Set(allWeeks.slice(-2));
 
-  // Assign employees
-  const assignments = new Map<string, { name: string; id: number }>();
+  const assignments = new Map<string, { name: string; id: number; shift_type: string }[]>();
 
-  // Track per-employee: assigned count, weeks, dates, weekdays
   const empCount = new Map<number, number>();
   const empWeeks = new Map<number, Set<number>>();
   const empDates = new Map<number, string[]>();
@@ -132,10 +134,9 @@ export function generateMonthAssignments(
     empWeekdays.set(emp.id, new Set());
   }
 
-  // Shuffle employees for variety, but keep deterministic
   const empOrder = [...EMPLOYEES].sort(() => rand() - 0.5);
 
-  for (const dateStr of shiftDates) {
+  for (const dateStr of ectDates) {
     const d = parseDate(dateStr);
     const week = getISOWeek(d);
     const weekday = d.getDay();
@@ -147,22 +148,17 @@ export function generateMonthAssignments(
       const dates = empDates.get(emp.id)!;
       const weekdays = empWeekdays.get(emp.id)!;
 
-      // Max 2 per month
       if (count >= 2) continue;
-      // Max 1 per ISO week
       if (weeks.has(week)) continue;
-      // No consecutive days
       if (dates.length > 0) {
         const lastDate = parseDate(dates[dates.length - 1]);
         const diff = Math.abs(d.getTime() - lastDate.getTime()) / 86400000;
         if (diff === 1) continue;
       }
-      // Different weekdays
       if (count === 1 && weekdays.has(weekday)) continue;
-      // New employee restriction
       if (emp.is_new && !allowedNewWeeks.has(week)) continue;
 
-      assignments.set(dateStr, { name: emp.name, id: emp.id });
+      assignments.set(dateStr, [{ name: emp.name, id: emp.id, shift_type: 'ect' }]);
       empCount.set(emp.id, count + 1);
       weeks.add(week);
       dates.push(dateStr);
@@ -171,11 +167,10 @@ export function generateMonthAssignments(
       break;
     }
 
-    // Fallback: assign to anyone with room (relaxing constraints except max 2)
     if (!assigned) {
       for (const emp of empOrder) {
         if (empCount.get(emp.id)! < 2) {
-          assignments.set(dateStr, { name: emp.name, id: emp.id });
+          assignments.set(dateStr, [{ name: emp.name, id: emp.id, shift_type: 'ect' }]);
           empCount.set(emp.id, empCount.get(emp.id)! + 1);
           empWeeks.get(emp.id)!.add(week);
           empDates.get(emp.id)!.push(dateStr);
@@ -183,6 +178,43 @@ export function generateMonthAssignments(
           break;
         }
       }
+    }
+  }
+
+  // ── Internal Medicine & ER assignments (overlay on some ECT dates) ──
+  // Add ~4 Internal and ~3 ER shifts on some dates that already have ECT
+  const ectAssignedDates = [...assignments.keys()];
+  const overlayTypes: { type: string; count: number }[] = [
+    { type: 'internal', count: Math.min(4, Math.floor(ectAssignedDates.length / 4)) },
+    { type: 'er', count: Math.min(3, Math.floor(ectAssignedDates.length / 5)) },
+  ];
+
+  const rand2 = seededRandom(year * 300 + month);
+  const shuffledDates = [...ectAssignedDates].sort(() => rand2() - 0.5);
+
+  let dateIdx = 0;
+  for (const { type, count } of overlayTypes) {
+    const availableEmps = [...EMPLOYEES].sort(() => rand2() - 0.5);
+    let empIdx = 0;
+
+    for (let i = 0; i < count && dateIdx < shuffledDates.length; i++, dateIdx++) {
+      const dateStr = shuffledDates[dateIdx];
+      const existing = assignments.get(dateStr) || [];
+
+      // Pick an employee not already assigned on this date
+      let chosenEmp = availableEmps[empIdx % availableEmps.length];
+      const existingNames = new Set(existing.map((e) => e.name));
+      let tries = 0;
+      while (existingNames.has(chosenEmp.name) && tries < EMPLOYEES.length) {
+        empIdx++;
+        chosenEmp = availableEmps[empIdx % availableEmps.length];
+        tries++;
+      }
+      if (existingNames.has(chosenEmp.name)) continue;
+
+      existing.push({ name: chosenEmp.name, id: chosenEmp.id, shift_type: type });
+      assignments.set(dateStr, existing);
+      empIdx++;
     }
   }
 
@@ -217,8 +249,9 @@ export function generateFormResponses(
     const unavailable: string[] = [];
 
     for (const dateStr of eligibleDates) {
-      const assignee = assignments.get(dateStr);
-      if (assignee && assignee.id === emp.id) {
+      const entries = assignments.get(dateStr);
+      const isAssigned = entries?.some((e) => e.id === emp.id);
+      if (isAssigned) {
         // Assigned employees are always available on their dates
         available.push(dateStr);
       } else if (rand() < 0.65) {
@@ -240,19 +273,34 @@ export function generateFormResponses(
   return result;
 }
 
+// ── Helpers for flat view (for swap validation) ──────────────────────
+/** Flatten multi-entry assignments to a simple date->first-entry map for swap validation. */
+function flattenAssignments(
+  assignments: Map<string, { name: string; id: number; shift_type: string }[]>
+): Map<string, { name: string; id: number }> {
+  const flat = new Map<string, { name: string; id: number }>();
+  for (const [dateStr, entries] of assignments) {
+    if (entries.length > 0) {
+      flat.set(dateStr, { name: entries[0].name, id: entries[0].id });
+    }
+  }
+  return flat;
+}
+
 // ── Swap validation (port of backend validate_swap) ──────────────────
 function validateSwap(
-  assignments: Map<string, { name: string; id: number }>,
+  assignments: Map<string, { name: string; id: number; shift_type: string }[]>,
   requesterName: string,
   requesterDate: string,
   targetName: string,
   targetDate: string
 ): string[] {
+  const flat = flattenAssignments(assignments);
   const errors: string[] = [];
 
   // 1. Ownership check
-  const rAssignee = assignments.get(requesterDate);
-  const tAssignee = assignments.get(targetDate);
+  const rAssignee = flat.get(requesterDate);
+  const tAssignee = flat.get(targetDate);
   if (!rAssignee || rAssignee.name !== requesterName) {
     errors.push(`${requesterName} is not assigned to ${requesterDate}`);
   }
@@ -262,7 +310,7 @@ function validateSwap(
   if (errors.length > 0) return errors;
 
   // Simulate swap
-  const simulated = new Map(assignments);
+  const simulated = new Map(flat);
   simulated.set(requesterDate, { name: targetName, id: tAssignee!.id });
   simulated.set(targetDate, { name: requesterName, id: rAssignee!.id });
 
@@ -332,46 +380,50 @@ export function generateMockCandidates(
   const assignments = generateMonthAssignments(year, month);
   const formResponses = generateFormResponses(year, month);
 
-  const requester = assignments.get(shiftDate);
-  if (!requester || requester.id !== CURRENT_USER_ID) return [];
+  const dateEntries = assignments.get(shiftDate);
+  const requester = dateEntries?.find((e) => e.id === CURRENT_USER_ID);
+  if (!requester) return [];
 
   const candidates: EnhancedSwapCandidate[] = [];
 
-  // For each other employee who has shifts this month
-  for (const [dateStr, assignee] of assignments) {
-    if (assignee.id === CURRENT_USER_ID) continue;
+  // For each other employee who has shifts this month (use flat view for iteration)
+  for (const [dateStr, entries] of assignments) {
+    for (const assignee of entries) {
+      if (assignee.id === CURRENT_USER_ID) continue;
 
-    // Check if this employee already has an entry
-    let candidate = candidates.find((c) => c.employee_id === assignee.id);
+      let candidate = candidates.find((c) => c.employee_id === assignee.id);
 
-    // Validate swapping requester's date with this employee's date
-    const errors = validateSwap(
-      assignments,
-      requester.name,
-      shiftDate,
-      assignee.name,
-      dateStr
-    );
+      const errors = validateSwap(
+        assignments,
+        requester.name,
+        shiftDate,
+        assignee.name,
+        dateStr
+      );
 
-    if (errors.length === 0) {
-      if (!candidate) {
-        const emp = EMPLOYEES.find((e) => e.id === assignee.id)!;
-        const empDates = [...assignments.entries()]
-          .filter(([, a]) => a.id === assignee.id)
-          .map(([d]) => d);
-        const avail = formResponses.find((a) => a.employeeId === assignee.id);
+      if (errors.length === 0) {
+        if (!candidate) {
+          const emp = EMPLOYEES.find((e) => e.id === assignee.id)!;
+          const empDates: string[] = [];
+          for (const [d, ents] of assignments) {
+            if (ents.some((e) => e.id === assignee.id)) empDates.push(d);
+          }
+          const avail = formResponses.find((a) => a.employeeId === assignee.id);
 
-        candidate = {
-          employee_id: assignee.id,
-          employee_name: assignee.name,
-          eligible_dates: [],
-          is_new: emp.is_new,
-          all_shift_dates: empDates,
-          availability: avail,
-        };
-        candidates.push(candidate);
+          candidate = {
+            employee_id: assignee.id,
+            employee_name: assignee.name,
+            eligible_dates: [],
+            is_new: emp.is_new,
+            all_shift_dates: empDates,
+            availability: avail,
+          };
+          candidates.push(candidate);
+        }
+        if (!candidate.eligible_dates.includes(dateStr)) {
+          candidate.eligible_dates.push(dateStr);
+        }
       }
-      candidate.eligible_dates.push(dateStr);
     }
   }
 
@@ -396,16 +448,25 @@ export function generateMonthSchedule(year: number, month: number): MonthSchedul
     const dateObj = parseDate(dateStr);
     const dayOfWeek = dateObj.getDay();
     const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
-    const assignee = assignments.get(dateStr);
-    const isCurrentUser = assignee?.id === CURRENT_USER_ID;
+    const entries = assignments.get(dateStr) || [];
+    const isCurrentUser = entries.some((e) => e.id === CURRENT_USER_ID);
+    const firstEntry = entries[0] || null;
 
     if (isCurrentUser) currentUserShiftDates.push(dateStr);
+
+    const cellAssignments: CellAssignment[] = entries.map((e) => ({
+      employee_name: e.name,
+      employee_id: e.id,
+      shift_type: e.shift_type,
+      isCurrentUser: e.id === CURRENT_USER_ID,
+    }));
 
     dates.push({
       date: dateStr,
       dayNumber: d,
-      assignedEmployee: assignee?.name || null,
-      assignedEmployeeId: assignee?.id || null,
+      assignments: cellAssignments,
+      assignedEmployee: firstEntry?.name || null,
+      assignedEmployeeId: firstEntry?.id || null,
       isCurrentUserShift: isCurrentUser,
       isPast: dateStr < today,
       isWeekend,
@@ -439,32 +500,45 @@ export function generateMockExchanges(monthYear: string): ExchangeRequest[] {
   const exchanges: ExchangeRequest[] = [];
   let idCounter = 1;
 
-  // Find current user's shift dates and other employees' dates
-  const myDates: string[] = [];
-  const otherAssignments: { date: string; name: string; id: number }[] = [];
+  // Collect ALL dates (for history) and future dates (for pending exchanges)
+  const allMyDates: { date: string; shift_type: string }[] = [];
+  const futureMyDates: { date: string; shift_type: string }[] = [];
+  const allOtherAssignments: { date: string; name: string; id: number; shift_type: string }[] = [];
+  const futureOtherAssignments: { date: string; name: string; id: number; shift_type: string }[] = [];
 
-  for (const [dateStr, assignee] of assignments) {
-    if (dateStr < today) continue; // Only future dates for pending
-    if (assignee.id === CURRENT_USER_ID) {
-      myDates.push(dateStr);
-    } else {
-      otherAssignments.push({ date: dateStr, ...assignee });
+  for (const [dateStr, entries] of assignments) {
+    for (const assignee of entries) {
+      if (assignee.id === CURRENT_USER_ID) {
+        allMyDates.push({ date: dateStr, shift_type: assignee.shift_type });
+        if (dateStr >= today) futureMyDates.push({ date: dateStr, shift_type: assignee.shift_type });
+      } else {
+        allOtherAssignments.push({ date: dateStr, name: assignee.name, id: assignee.id, shift_type: assignee.shift_type });
+        if (dateStr >= today) futureOtherAssignments.push({ date: dateStr, name: assignee.name, id: assignee.id, shift_type: assignee.shift_type });
+      }
     }
   }
+
+  // Use future dates for pending if available, otherwise fall back to all dates
+  // (so that mid-month the mock data still shows realistic pending exchanges)
+  const myDates = futureMyDates.length > 0 ? futureMyDates : allMyDates;
+  const otherAssignments = futureOtherAssignments.length >= 3 ? futureOtherAssignments : allOtherAssignments;
 
   // 2 pending incoming requests (others want to swap with current user)
   if (myDates.length > 0 && otherAssignments.length >= 2) {
     for (let i = 0; i < Math.min(2, otherAssignments.length); i++) {
       const other = otherAssignments[i];
+      const myShift = myDates[0];
       exchanges.push({
         id: idCounter++,
         month_year: monthYear,
         requester_employee_id: other.id,
         requester_employee_name: other.name,
         requester_date: other.date,
+        requester_shift_type: other.shift_type,
         target_employee_id: CURRENT_USER_ID,
         target_employee_name: CURRENT_USER_NAME,
-        target_date: myDates[0],
+        target_date: myShift.date,
+        target_shift_type: myShift.shift_type,
         status: 'pending',
         reason: i === 0 ? 'I have a doctor appointment that day' : undefined,
         created_at: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
@@ -475,33 +549,39 @@ export function generateMockExchanges(monthYear: string): ExchangeRequest[] {
   // 1 pending outgoing request (current user wants to swap with someone)
   if (myDates.length > 0 && otherAssignments.length >= 3) {
     const other = otherAssignments[2];
+    const myShift = myDates[myDates.length > 1 ? 1 : 0];
     exchanges.push({
       id: idCounter++,
       month_year: monthYear,
       requester_employee_id: CURRENT_USER_ID,
       requester_employee_name: CURRENT_USER_NAME,
-      requester_date: myDates[myDates.length > 1 ? 1 : 0],
+      requester_date: myShift.date,
+      requester_shift_type: myShift.shift_type,
       target_employee_id: other.id,
       target_employee_name: other.name,
       target_date: other.date,
+      target_shift_type: other.shift_type,
       status: 'pending',
       reason: 'Family event',
       created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     });
   }
 
-  // 1 accepted (history)
-  if (otherAssignments.length >= 4) {
-    const other = otherAssignments[3];
+  // 1 accepted (history) - use all dates (including past) for history items
+  if (allOtherAssignments.length >= 4) {
+    const other = allOtherAssignments[3];
+    const myShift = allMyDates.length > 0 ? allMyDates[0] : null;
     exchanges.push({
       id: idCounter++,
       month_year: monthYear,
       requester_employee_id: CURRENT_USER_ID,
       requester_employee_name: CURRENT_USER_NAME,
-      requester_date: myDates.length > 0 ? myDates[0] : formatDate(year, month, 10),
+      requester_date: myShift ? myShift.date : formatDate(year, month, 10),
+      requester_shift_type: myShift?.shift_type,
       target_employee_id: other.id,
       target_employee_name: other.name,
       target_date: other.date,
+      target_shift_type: other.shift_type,
       status: 'accepted',
       created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
       responded_at: new Date(Date.now() - 6 * 86400000).toISOString(),
@@ -509,18 +589,21 @@ export function generateMockExchanges(monthYear: string): ExchangeRequest[] {
     });
   }
 
-  // 1 declined (history)
-  if (otherAssignments.length >= 5) {
-    const other = otherAssignments[4];
+  // 1 declined (history) - use all dates for history items
+  if (allOtherAssignments.length >= 5) {
+    const other = allOtherAssignments[4];
+    const myShift = allMyDates.length > 1 ? allMyDates[1] : null;
     exchanges.push({
       id: idCounter++,
       month_year: monthYear,
       requester_employee_id: other.id,
       requester_employee_name: other.name,
       requester_date: other.date,
+      requester_shift_type: other.shift_type,
       target_employee_id: CURRENT_USER_ID,
       target_employee_name: CURRENT_USER_NAME,
-      target_date: myDates.length > 1 ? myDates[1] : formatDate(year, month, 15),
+      target_date: myShift ? myShift.date : formatDate(year, month, 15),
+      target_shift_type: myShift?.shift_type,
       status: 'declined',
       decline_reason: 'Cannot swap that week',
       created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
@@ -568,6 +651,8 @@ export function mockCreateExchange(monthYear: string, data: {
   targetEmployeeName: string;
   targetDate: string;
   reason?: string;
+  requesterShiftType?: string;
+  targetShiftType?: string;
 }): void {
   const exchanges = generateMockExchanges(monthYear);
   const maxId = exchanges.reduce((max, e) => Math.max(max, e.id), 0);
@@ -577,9 +662,11 @@ export function mockCreateExchange(monthYear: string, data: {
     requester_employee_id: CURRENT_USER_ID,
     requester_employee_name: CURRENT_USER_NAME,
     requester_date: data.requesterDate,
+    requester_shift_type: data.requesterShiftType,
     target_employee_id: data.targetEmployeeId,
     target_employee_name: data.targetEmployeeName,
     target_date: data.targetDate,
+    target_shift_type: data.targetShiftType,
     status: 'pending',
     reason: data.reason,
     created_at: new Date().toISOString(),

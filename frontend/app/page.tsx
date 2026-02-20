@@ -48,28 +48,28 @@ export default function Dashboard() {
       title: 'Total Employees',
       value: stats?.employee_stats?.length || 0,
       icon: Users,
-      color: 'from-blue-500 to-blue-600',
+      color: 'from-blue-400 to-blue-500 dark:from-blue-500 dark:to-blue-600',
       change: '+2 this month',
     },
     {
       title: 'Total Shifts Assigned',
       value: stats?.monthly_assignments?.reduce((a: number, m: any) => a + m.total_shifts, 0) || 0,
       icon: Calendar,
-      color: 'from-emerald-500 to-emerald-600',
+      color: 'from-emerald-400 to-emerald-500 dark:from-emerald-500 dark:to-emerald-600',
       change: 'All time',
     },
     {
       title: 'Active Forms',
       value: recentForms.filter((f) => f.status === 'active').length,
       icon: FileText,
-      color: 'from-amber-500 to-amber-600',
+      color: 'from-amber-400 to-amber-500 dark:from-amber-500 dark:to-amber-600',
       change: 'Pending responses',
     },
     {
       title: 'Fairness Score',
       value: fairness?.fairness_score ? `${fairness.fairness_score.toFixed(1)}%` : '—',
       icon: TrendingUp,
-      color: 'from-violet-500 to-violet-600',
+      color: 'from-violet-400 to-violet-500 dark:from-violet-500 dark:to-violet-600',
       change: 'Well balanced',
       tooltip: 'Score = 100 − (MAD ÷ Median) × 100. Uses Median Absolute Deviation for robustness against outliers.',
     },
@@ -86,7 +86,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Psychiatrics Department - ECT shift assignments overview
+            Psychiatry Department - Shift assignments overview
           </p>
         </div>
         <Link href="/forms">
@@ -125,14 +125,14 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div
-                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-md dark:shadow-lg`}
                 >
                   <stat.icon className="w-6 h-6 text-white" />
                 </div>
               </div>
               {/* Decorative gradient */}
               <div
-                className={`absolute -right-8 -bottom-8 w-24 h-24 bg-gradient-to-br ${stat.color} opacity-10 rounded-full blur-2xl`}
+                className={`absolute -right-8 -bottom-8 w-24 h-24 bg-gradient-to-br ${stat.color} opacity-[0.06] dark:opacity-10 rounded-full blur-2xl`}
               />
             </Card>
           </motion.div>
@@ -151,8 +151,8 @@ export default function Dashboard() {
                 className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-primary-500 dark:text-primary-400" />
                   </div>
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">Form Generation</p>
@@ -169,8 +169,8 @@ export default function Dashboard() {
                 className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
                   </div>
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">
@@ -189,8 +189,8 @@ export default function Dashboard() {
                 className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                  <div className="w-10 h-10 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-violet-500 dark:text-violet-400" />
                   </div>
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">View History</p>
@@ -229,14 +229,14 @@ export default function Dashboard() {
                     <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                         form.status === 'processed'
-                          ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                          : 'bg-amber-100 dark:bg-amber-900/30'
+                          ? 'bg-emerald-50 dark:bg-emerald-900/30'
+                          : 'bg-amber-50 dark:bg-amber-900/30'
                       }`}
                     >
                       {form.status === 'processed' ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
                       ) : (
-                        <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        <Clock className="w-5 h-5 text-amber-500 dark:text-amber-400" />
                       )}
                     </div>
                     <div>

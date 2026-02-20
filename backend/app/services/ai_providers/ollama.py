@@ -1,6 +1,8 @@
 """Ollama AI provider for local LLM inference."""
 
+import json
 import httpx
+from collections.abc import AsyncGenerator
 from typing import Optional
 from .base import AIProvider, AIResponse
 
@@ -79,6 +81,48 @@ class OllamaProvider(AIProvider):
                 "provider": self.provider_name,
                 "error": str(e),
             }
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 512,
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat response from Ollama."""
+        all_messages = []
+        if system_prompt:
+            all_messages.append({"role": "system", "content": system_prompt})
+        all_messages.extend(messages)
+
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": all_messages,
+                    "stream": True,
+                    "options": {"num_predict": max_tokens},
+                    "think": False,
+                },
+                timeout=180.0,
+            ) as response:
+                if response.status_code != 200:
+                    body = await response.aread()
+                    raise RuntimeError(f"Ollama error ({response.status_code}): {body.decode()[:200]}")
+
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    content = data.get("message", {}).get("content", "")
+                    if content:
+                        yield content
+                    if data.get("done"):
+                        break
 
     async def chat(
         self,

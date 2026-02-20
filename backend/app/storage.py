@@ -6,6 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 from .config import settings
+from .constants import DEFAULT_SHIFT_TYPE
 from .utils.name_translator import (
     is_hebrew,
     translate_hebrew_to_english,
@@ -487,12 +488,13 @@ class Storage:
                 return form
         return None
 
-    def get_form_by_month(self, month_year: str) -> Optional[dict]:
-        """Get form by month-year."""
+    def get_form_by_month(self, month_year: str, shift_type: Optional[str] = None) -> Optional[dict]:
+        """Get form by month-year and optionally shift_type."""
         forms = self.get_forms()
         for form in forms:
             if form.get("month_year") == month_year:
-                return form
+                if shift_type is None or form.get("shift_type") == shift_type:
+                    return form
         return None
 
     def save_form(self, form: dict) -> dict:
@@ -542,10 +544,14 @@ class Storage:
     def save_assignments(
         self,
         month_year: str,
-        assignments: dict[str, str],  # date_iso -> employee_name
+        assignments: dict,  # date_iso -> employee_name (str) or list of entries
         month_count: dict[str, int],  # employee_name -> shift_count
     ) -> dict:
-        """Save assignments for a month with path traversal protection."""
+        """Save assignments for a month with path traversal protection.
+
+        Handles both legacy ``{date: name}`` and multi-type
+        ``{date: [{employee_name, shift_type}]}`` formats.
+        """
         # Validate month_year format to prevent path traversal
         year, month = validate_month_year(month_year)
 
@@ -556,14 +562,28 @@ class Storage:
         # Remove existing assignments for this month
         all_assignments = [a for a in all_assignments if a.get("month_year") != month_year]
 
-        # Add new assignments
-        for date_str, employee_name in assignments.items():
-            all_assignments.append({
-                "date": date_str,
-                "employee_name": employee_name,
-                "month_year": month_year,
-                "created_at": datetime.now().isoformat(),
-            })
+        # Add new assignments to history (flatten multi-type to individual records)
+        now_iso = datetime.now().isoformat()
+        for date_str, value in assignments.items():
+            if isinstance(value, str):
+                # Legacy format: single employee name per date
+                all_assignments.append({
+                    "date": date_str,
+                    "employee_name": value,
+                    "month_year": month_year,
+                    "created_at": now_iso,
+                })
+            elif isinstance(value, list):
+                # Multi-type format: list of assignment entries per date
+                for entry in value:
+                    emp_name = entry.get("employee_name", "") if isinstance(entry, dict) else str(entry)
+                    all_assignments.append({
+                        "date": date_str,
+                        "employee_name": emp_name,
+                        "shift_type": entry.get("shift_type", DEFAULT_SHIFT_TYPE) if isinstance(entry, dict) else DEFAULT_SHIFT_TYPE,
+                        "month_year": month_year,
+                        "created_at": now_iso,
+                    })
 
         history["assignments"] = all_assignments
         self._save_json(settings.history_file, history)
@@ -580,12 +600,33 @@ class Storage:
             "month_year": month_year,
             "assignments": assignments,
             "shift_counts": month_count,
-            "created_at": datetime.now().isoformat(),
+            "created_at": now_iso,
         }
 
         self._save_json(output_dir / "assignment.json", assignment_data)
 
         return assignment_data
+
+    @staticmethod
+    def _normalize_assignments(data: dict) -> dict:
+        """Normalize assignment data to the multi-type format.
+
+        Converts old format ``{date: employee_name}`` to
+        ``{date: [{employee_name, shift_type}]}``.
+        """
+        assignments = data.get("assignments", {})
+        normalized = {}
+        for date_key, value in assignments.items():
+            if isinstance(value, str):
+                normalized[date_key] = [
+                    {"employee_name": value, "shift_type": DEFAULT_SHIFT_TYPE}
+                ]
+            elif isinstance(value, list):
+                normalized[date_key] = value
+            else:
+                normalized[date_key] = value
+        data["assignments"] = normalized
+        return data
 
     def get_month_assignment(self, month_year: str) -> Optional[dict]:
         """Get assignment data for a specific month with path traversal protection."""
@@ -598,7 +639,8 @@ class Storage:
         if not path.exists():
             return None
 
-        return self._load_json(path)
+        data = self._load_json(path)
+        return self._normalize_assignments(data)
 
     # ==================== History & Stats ====================
 
@@ -627,18 +669,25 @@ class Storage:
 
         return name_map
 
-    def get_employee_shift_counts(self) -> dict[str, int]:
+    def get_employee_shift_counts(
+        self, shift_type: Optional[str] = None
+    ) -> dict[str, int]:
         """
         Get total shift counts per employee (for fairness).
 
         Aggregates counts for merged/renamed employees by mapping all name variants
         to the canonical employee name.
+
+        Args:
+            shift_type: If provided, only count shifts of this type.
         """
         assignments = self.get_assignments()
         name_map = self._build_name_mapping()
         counts = {}
 
         for a in assignments:
+            if shift_type and a.get("shift_type", DEFAULT_SHIFT_TYPE) != shift_type:
+                continue
             name = a.get("employee_name", "")
             # Map to canonical name if mapping exists
             canonical_name = name_map.get(name, name)
@@ -646,7 +695,9 @@ class Storage:
 
         return counts
 
-    def get_employee_stats(self, active_only: bool = True) -> list[dict]:
+    def get_employee_stats(
+        self, active_only: bool = True, shift_type: Optional[str] = None
+    ) -> list[dict]:
         """
         Get statistics for employees.
 
@@ -655,13 +706,14 @@ class Storage:
         Args:
             active_only: If True, only return stats for active employees (default True).
                          This excludes merged/deactivated Hebrew name entries.
+            shift_type: If provided, only count shifts of this type for total_shifts.
         """
         employees = self.get_employees()
         all_assignments = self.get_assignments()
         name_map = self._build_name_mapping()
 
-        # Pre-compute shift counts using canonical names
-        shift_counts = self.get_employee_shift_counts()
+        # Pre-compute shift counts using canonical names (filtered if shift_type given)
+        shift_counts = self.get_employee_shift_counts(shift_type=shift_type)
 
         stats = []
         for emp in employees:
@@ -684,14 +736,29 @@ class Storage:
                 if a.get("employee_name") in name_variants
             ]
 
+            # Apply shift_type filter for date/month calculations
+            if shift_type:
+                filtered_assignments = [
+                    a for a in emp_assignments
+                    if a.get("shift_type", DEFAULT_SHIFT_TYPE) == shift_type
+                ]
+            else:
+                filtered_assignments = emp_assignments
+
             # Find last shift date
             last_shift = None
-            if emp_assignments:
-                dates = [a.get("date") for a in emp_assignments]
+            if filtered_assignments:
+                dates = [a.get("date") for a in filtered_assignments]
                 last_shift = max(dates)
 
             # Count unique months
-            months = set(a.get("month_year") for a in emp_assignments)
+            months = set(a.get("month_year") for a in filtered_assignments)
+
+            # Compute per-type breakdown (always, regardless of filter)
+            type_counts: dict[str, int] = {}
+            for a in emp_assignments:
+                st = a.get("shift_type", DEFAULT_SHIFT_TYPE)
+                type_counts[st] = type_counts.get(st, 0) + 1
 
             stats.append({
                 "id": emp.get("id"),
@@ -699,27 +766,47 @@ class Storage:
                 "is_active": emp.get("is_active", True),
                 "is_new": emp.get("is_new", True),
                 "total_shifts": shift_counts.get(name, 0),
+                "shifts_by_type": type_counts if type_counts else None,
                 "months_active": len(months),
                 "last_shift_date": last_shift,
             })
 
         return stats
 
-    def get_monthly_summaries(self) -> list[dict]:
+    def get_monthly_summaries(
+        self, shift_type: Optional[str] = None
+    ) -> list[dict]:
         """
         Get summary of shifts per month.
 
         Uses canonical employee names to properly count unique employees.
+
+        Args:
+            shift_type: If provided, only count shifts of this type for totals.
+                        The by_type breakdown is always included.
         """
         assignments = self.get_assignments()
         name_map = self._build_name_mapping()
 
         # Group by month
-        monthly = {}
+        monthly: dict[str, dict] = {}
         for a in assignments:
             my = a.get("month_year", "")
             if my not in monthly:
-                monthly[my] = {"month_year": my, "total_shifts": 0, "employees": set()}
+                monthly[my] = {
+                    "month_year": my,
+                    "total_shifts": 0,
+                    "employees": set(),
+                    "by_type": {},
+                }
+
+            st = a.get("shift_type", DEFAULT_SHIFT_TYPE)
+            monthly[my]["by_type"][st] = monthly[my]["by_type"].get(st, 0) + 1
+
+            # When filtering, only count matching type in totals
+            if shift_type and st != shift_type:
+                continue
+
             monthly[my]["total_shifts"] += 1
             # Use canonical name for counting unique employees
             name = a.get("employee_name", "")
@@ -729,10 +816,14 @@ class Storage:
         # Convert to list
         result = []
         for my, data in sorted(monthly.items(), reverse=True):
+            # Skip months with zero matching shifts when filtering
+            if shift_type and data["total_shifts"] == 0:
+                continue
             result.append({
                 "month_year": my,
                 "total_shifts": data["total_shifts"],
                 "employees_count": len(data["employees"]),
+                "by_type": data["by_type"],
             })
 
         return result
@@ -790,6 +881,163 @@ class Storage:
             user["last_login"] = datetime.now().isoformat()
             return self.save_auth_user(user)
         return None
+
+    def link_user_to_employee(self, user_id: str, employee_id: int) -> dict:
+        """Link a user account to an employee record."""
+        user = self.get_auth_user(user_id)
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+
+        employee = self.get_employee(employee_id)
+        if not employee:
+            raise ValueError(f"Employee {employee_id} not found")
+
+        # Check no other user is already linked to this employee
+        users = self.get_auth_users()
+        for u in users:
+            if u.get("employee_id") == employee_id and u.get("id") != user_id:
+                raise ValueError(f"Employee {employee_id} is already linked to another user")
+
+        user["employee_id"] = employee_id
+        # Only upgrade role to 'employee' if the user is currently 'basic'.
+        # Preserve 'admin' role so admins don't lose admin access when linked.
+        if user.get("role") == "basic":
+            user["role"] = "employee"
+        return self.save_auth_user(user)
+
+    def get_user_by_employee_id(self, employee_id: int) -> Optional[dict]:
+        """Get user by linked employee ID."""
+        users = self.get_auth_users()
+        for user in users:
+            if user.get("employee_id") == employee_id:
+                return user
+        return None
+
+    # ==================== Chat History ====================
+
+    def get_conversations(self) -> list[dict]:
+        """Get all conversations (summaries only, without messages)."""
+        data = self._load_json(settings.chat_history_file)
+        conversations = data.get("conversations", [])
+        summaries = []
+        for conv in conversations:
+            summaries.append({
+                "id": conv.get("id"),
+                "title": conv.get("title", "Untitled"),
+                "created_at": conv.get("created_at", ""),
+                "updated_at": conv.get("updated_at", ""),
+                "message_count": len(conv.get("messages", [])),
+            })
+        # Sort by updated_at descending (most recent first)
+        summaries.sort(key=lambda c: c.get("updated_at", ""), reverse=True)
+        return summaries
+
+    def get_conversation(self, conversation_id: str) -> Optional[dict]:
+        """Get full conversation with messages."""
+        data = self._load_json(settings.chat_history_file)
+        for conv in data.get("conversations", []):
+            if conv.get("id") == conversation_id:
+                return conv
+        return None
+
+    def save_conversation(self, conversation: dict) -> dict:
+        """Create or update a conversation."""
+        data = self._load_json(settings.chat_history_file)
+        conversations = data.get("conversations", [])
+
+        existing_idx = None
+        for i, conv in enumerate(conversations):
+            if conv.get("id") == conversation.get("id"):
+                existing_idx = i
+                break
+
+        conversation["updated_at"] = datetime.now().isoformat()
+
+        if existing_idx is not None:
+            conversations[existing_idx] = conversation
+        else:
+            conversation.setdefault("created_at", datetime.now().isoformat())
+            conversations.append(conversation)
+
+        self._save_json(settings.chat_history_file, {"conversations": conversations})
+        return conversation
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        """Delete a conversation by ID."""
+        data = self._load_json(settings.chat_history_file)
+        conversations = data.get("conversations", [])
+        original_len = len(conversations)
+        conversations = [c for c in conversations if c.get("id") != conversation_id]
+
+        if len(conversations) < original_len:
+            self._save_json(settings.chat_history_file, {"conversations": conversations})
+            return True
+        return False
+
+    # ==================== Exchanges ====================
+
+    def get_exchanges(
+        self,
+        month_year: Optional[str] = None,
+        employee_id: Optional[int] = None,
+        status: Optional[str] = None,
+    ) -> list[dict]:
+        """Get exchanges with optional filters and lazy expiry."""
+        data = self._load_json(settings.exchanges_file)
+        exchanges = data.get("exchanges", [])
+
+        # Lazy expiry: mark pending exchanges as expired if shift date has passed
+        now = date.today().isoformat()
+        modified = False
+        for ex in exchanges:
+            if ex.get("status") == "pending":
+                if ex.get("requester_date", "") < now or ex.get("target_date", "") < now:
+                    ex["status"] = "expired"
+                    ex["responded_at"] = datetime.now().isoformat()
+                    modified = True
+        if modified:
+            self._save_json(settings.exchanges_file, {"exchanges": exchanges})
+
+        # Apply filters
+        if month_year:
+            exchanges = [e for e in exchanges if e.get("month_year") == month_year]
+        if employee_id is not None:
+            exchanges = [
+                e for e in exchanges
+                if e.get("requester_employee_id") == employee_id
+                or e.get("target_employee_id") == employee_id
+            ]
+        if status:
+            exchanges = [e for e in exchanges if e.get("status") == status]
+
+        return exchanges
+
+    def get_exchange(self, exchange_id: int) -> Optional[dict]:
+        """Get a single exchange by ID."""
+        data = self._load_json(settings.exchanges_file)
+        for ex in data.get("exchanges", []):
+            if ex.get("id") == exchange_id:
+                return ex
+        return None
+
+    def save_exchange(self, exchange: dict) -> dict:
+        """Save or update an exchange."""
+        data = self._load_json(settings.exchanges_file)
+        exchanges = data.get("exchanges", [])
+
+        if "id" not in exchange or exchange["id"] is None:
+            max_id = max((e.get("id", 0) for e in exchanges), default=0)
+            exchange["id"] = max_id + 1
+            exchange["created_at"] = datetime.now().isoformat()
+            exchanges.append(exchange)
+        else:
+            for i, ex in enumerate(exchanges):
+                if ex.get("id") == exchange["id"]:
+                    exchanges[i] = exchange
+                    break
+
+        self._save_json(settings.exchanges_file, {"exchanges": exchanges})
+        return exchange
 
 
 # Global storage instance

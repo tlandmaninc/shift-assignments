@@ -1,6 +1,8 @@
 """Google Gemini AI provider using the free API tier."""
 
+import json
 import httpx
+from collections.abc import AsyncGenerator
 from typing import Optional
 from .base import AIProvider, AIResponse
 
@@ -150,6 +152,56 @@ class GeminiProvider(AIProvider):
             })
 
         return contents, system_instruction
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 512,
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat response from Gemini using SSE."""
+        if not self.api_key:
+            raise RuntimeError("GEMINI_API_KEY not configured")
+
+        contents, system_instruction = self._convert_messages_to_gemini_format(
+            messages, system_prompt
+        )
+        request_body = {
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.7,
+            },
+        }
+        if system_instruction:
+            request_body["systemInstruction"] = system_instruction
+
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/models/{self.model}:streamGenerateContent",
+                params={"key": self.api_key, "alt": "sse"},
+                json=request_body,
+                timeout=60.0,
+            ) as response:
+                if response.status_code != 200:
+                    body = await response.aread()
+                    raise RuntimeError(f"Gemini API error ({response.status_code}): {body.decode()[:200]}")
+
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    try:
+                        data = json.loads(line[6:])
+                    except json.JSONDecodeError:
+                        continue
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        for part in parts:
+                            text = part.get("text", "")
+                            if text:
+                                yield text
 
     async def chat(
         self,

@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 from typing import Optional
 from ..storage import storage
+from ..constants import DEFAULT_SHIFT_TYPE, SHIFT_TYPE_CONFIG
 
 
 def backtracking_assign(
@@ -191,7 +192,8 @@ class SchedulerService:
         employees: list[dict],
         dates: list[date],
         month_year: str,
-    ) -> tuple[dict[str, str], dict[str, int]]:
+        shift_type: str = DEFAULT_SHIFT_TYPE,
+    ) -> tuple[dict, dict[str, int]]:
         """
         Generate assignments and store in JSON.
 
@@ -199,15 +201,63 @@ class SchedulerService:
             employees: List of employee dicts with 'name', 'is_new', 'availability'
             dates: List of dates to assign
             month_year: Month-year string (YYYY-MM)
+            shift_type: Shift type key (e.g. "ect", "internal", "er")
 
         Returns:
-            Tuple of (assignments, shift_counts)
+            Tuple of (assignments in multi-type format, shift_counts)
         """
         # Get historical data for fairness
         historical = self.get_historical_shifts()
 
-        # Run scheduler
-        assignments, month_count = backtracking_assign(employees, dates, historical)
+        slots = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("slots", 1)
+
+        if slots > 1:
+            # For multi-slot shifts (e.g. ER with 2 slots), run the scheduler
+            # multiple times to assign multiple employees per date.
+            all_raw: list[dict[str, str]] = []
+            cumulative_month_count: dict[str, int] = {}
+
+            for slot_idx in range(slots):
+                # Build adjusted historical counts so fairness accounts for
+                # employees already assigned in prior slots.
+                adjusted_hist = dict(historical)
+                for name, extra in cumulative_month_count.items():
+                    adjusted_hist[name] = adjusted_hist.get(name, 0) + extra
+
+                # Filter out employees already assigned to this date in a
+                # prior slot by temporarily removing their availability for
+                # those dates.
+                adjusted_employees = []
+                for emp in employees:
+                    adj_avail = dict(emp["availability"])
+                    for prev_raw in all_raw:
+                        for d_iso, assigned_name in prev_raw.items():
+                            if assigned_name == emp["name"]:
+                                adj_avail[d_iso] = False
+                    adjusted_employees.append({**emp, "availability": adj_avail})
+
+                raw, mc = backtracking_assign(adjusted_employees, dates, adjusted_hist)
+                all_raw.append(raw)
+                for name, count in mc.items():
+                    cumulative_month_count[name] = cumulative_month_count.get(name, 0) + count
+
+            # Merge into multi-type format
+            assignments: dict[str, list[dict]] = {}
+            for raw in all_raw:
+                for date_str, emp_name in raw.items():
+                    assignments.setdefault(date_str, []).append(
+                        {"employee_name": emp_name, "shift_type": shift_type}
+                    )
+            month_count = cumulative_month_count
+        else:
+            # Run scheduler
+            raw_assignments, month_count = backtracking_assign(employees, dates, historical)
+
+            # Wrap in multi-type format: {date: [{employee_name, shift_type}]}
+            assignments = {
+                date_str: [{"employee_name": emp_name, "shift_type": shift_type}]
+                for date_str, emp_name in raw_assignments.items()
+            }
 
         # Store assignments in JSON
         self.storage.save_assignments(month_year, assignments, month_count)

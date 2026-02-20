@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { MonthSchedule, EnhancedSwapCandidate, EmployeeAvailability } from '@/lib/types/exchange';
+import { MonthSchedule, EnhancedSwapCandidate, EmployeeAvailability, CellAssignment } from '@/lib/types/exchange';
+import { DEFAULT_SHIFT_TYPE } from '@/lib/constants/shiftTypes';
 import { useExchangeStore } from '@/lib/stores/exchangeStore';
 import { exchangeApi } from '@/lib/api';
 import {
@@ -38,39 +39,54 @@ export function useScheduleData(monthYear: string): UseScheduleDataReturn {
       const avail = generateFormResponses(year, month);
       setAvailability(avail);
     } else {
-      // Real API: build schedule from my shifts endpoint
+      // Real API: fetch full month schedule for all employees
       const fetchReal = async () => {
         try {
-          const data = await exchangeApi.getMyShifts(monthYear);
-          // When using real data, we build a minimal schedule
-          // (the calendar still needs assignment data from a full endpoint)
+          const data = await exchangeApi.getSchedule(monthYear);
           const daysInMonth = new Date(year, month, 0).getDate();
           const firstDayOffset = new Date(year, month - 1, 1).getDay();
           const today = new Date().toISOString().split('T')[0];
-          const myDates = data.shifts.map((s: { date: string }) => s.date);
+          const currentUserShiftDates: string[] = [];
+
+          const dates = Array.from({ length: daysInMonth }, (_, i) => {
+            const d = i + 1;
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+            const entries = data.assignments[dateStr] || [];
+
+            const cellAssignments: CellAssignment[] = entries.map(
+              (e: { employee_name: string; shift_type: string; is_current_user: boolean }) => ({
+                employee_name: e.employee_name,
+                employee_id: null,
+                shift_type: e.shift_type || DEFAULT_SHIFT_TYPE,
+                isCurrentUser: e.is_current_user,
+              })
+            );
+
+            const isMyShift = cellAssignments.some((a) => a.isCurrentUser);
+            if (isMyShift) currentUserShiftDates.push(dateStr);
+
+            const firstEntry = entries[0] || null;
+            return {
+              date: dateStr,
+              dayNumber: d,
+              assignments: cellAssignments,
+              assignedEmployee: firstEntry?.employee_name || null,
+              assignedEmployeeId: null,
+              isCurrentUserShift: isMyShift,
+              isPast: dateStr < today,
+              isWeekend: dayOfWeek === 5 || dayOfWeek === 6,
+              hasPendingExchange: false,
+            };
+          });
 
           setSchedule({
             year,
             month,
             firstDayOffset,
             daysInMonth,
-            dates: Array.from({ length: daysInMonth }, (_, i) => {
-              const d = i + 1;
-              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-              const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
-              const shift = data.shifts.find((s: { date: string }) => s.date === dateStr);
-              return {
-                date: dateStr,
-                dayNumber: d,
-                assignedEmployee: shift?.employee_name || null,
-                assignedEmployeeId: null,
-                isCurrentUserShift: myDates.includes(dateStr),
-                isPast: dateStr < today,
-                isWeekend: dayOfWeek === 5 || dayOfWeek === 6,
-                hasPendingExchange: false,
-              };
-            }),
-            currentUserShiftDates: myDates,
+            dates,
+            currentUserShiftDates,
           });
         } catch {
           setSchedule(null);

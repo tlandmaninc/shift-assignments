@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'basic';
+export type UserRole = 'admin' | 'basic' | 'employee';
 
 export interface User {
   id: string;
@@ -6,6 +6,7 @@ export interface User {
   name: string;
   picture?: string;
   role: UserRole;
+  employee_id?: number;
   is_active: boolean;
 }
 

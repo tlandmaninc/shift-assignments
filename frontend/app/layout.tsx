@@ -1,15 +1,16 @@
 'use client';
 
-import { Inter } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { WebSocketProvider } from '@/components/exchange/WebSocketProvider';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-const inter = Inter({ subsets: ['latin'] });
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export default function RootLayout({
   children,
@@ -25,40 +26,42 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={darkMode ? 'dark' : ''}>
-      <body className={`${inter.className} bg-slate-50 dark:bg-slate-950 min-h-screen`} suppressHydrationWarning>
+      <body className={`${plusJakarta.className} bg-slate-50 dark:bg-slate-950 min-h-screen`} suppressHydrationWarning>
         <AuthProvider>
-          {isAuthPage ? (
-            // Auth pages without layout
-            children
-          ) : (
-            // Main app with layout
-            <div className="flex h-screen overflow-hidden">
-              <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+          <WebSocketProvider>
+            {isAuthPage ? (
+              // Auth pages without layout
+              children
+            ) : (
+              // Main app with layout
+              <div className="flex h-screen overflow-hidden">
+                <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-              <div className="flex-1 flex flex-col overflow-auto">
-                <Header
-                  darkMode={darkMode}
-                  onToggleDarkMode={() => setDarkMode(!darkMode)}
-                  sidebarOpen={sidebarOpen}
-                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-                />
+                <div className="flex-1 flex flex-col overflow-auto">
+                  <Header
+                    darkMode={darkMode}
+                    onToggleDarkMode={() => setDarkMode(!darkMode)}
+                    sidebarOpen={sidebarOpen}
+                    onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                  />
 
-                <main className="flex-1 p-6">
-                  <div className="max-w-7xl mx-auto">
-                    {children}
-                  </div>
-                </main>
+                  <main className="flex-1 p-6">
+                    <div className="max-w-7xl mx-auto">
+                      {children}
+                    </div>
+                  </main>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              className: 'dark:bg-slate-800 dark:text-white',
-              duration: 4000,
-            }}
-          />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                className: 'dark:bg-slate-800 dark:text-white',
+                duration: 4000,
+              }}
+            />
+          </WebSocketProvider>
         </AuthProvider>
       </body>
     </html>

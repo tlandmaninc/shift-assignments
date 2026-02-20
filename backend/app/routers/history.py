@@ -1,6 +1,7 @@
 """History API router."""
 
-from fastapi import APIRouter
+from typing import Optional
+from fastapi import APIRouter, Query
 from ..schemas import HistoryResponse, FairnessMetrics, EmployeeStats
 from ..storage import storage
 
@@ -8,10 +9,10 @@ router = APIRouter(prefix="/history", tags=["history"])
 
 
 @router.get("", response_model=HistoryResponse)
-async def get_history():
-    """Get historical assignment data."""
-    monthly = storage.get_monthly_summaries()
-    employee_stats = storage.get_employee_stats()
+async def get_history(shift_type: Optional[str] = Query(None)):
+    """Get historical assignment data, optionally filtered by shift type."""
+    monthly = storage.get_monthly_summaries(shift_type=shift_type)
+    employee_stats = storage.get_employee_stats(shift_type=shift_type)
 
     return HistoryResponse(
         monthly_assignments=monthly,
@@ -22,6 +23,7 @@ async def get_history():
                 is_active=s.get("is_active", True),
                 is_new=s.get("is_new", True),
                 total_shifts=s["total_shifts"],
+                shifts_by_type=s.get("shifts_by_type"),
                 months_active=s.get("months_active", 0),
                 last_shift_date=s.get("last_shift_date"),
             )
@@ -31,9 +33,9 @@ async def get_history():
 
 
 @router.get("/fairness", response_model=FairnessMetrics)
-async def get_fairness_metrics():
-    """Get fairness metrics for shift distribution."""
-    stats = storage.get_employee_stats()
+async def get_fairness_metrics(shift_type: Optional[str] = Query(None)):
+    """Get fairness metrics for shift distribution, optionally filtered by shift type."""
+    stats = storage.get_employee_stats(shift_type=shift_type)
 
     if not stats:
         return FairnessMetrics(
@@ -96,6 +98,7 @@ async def get_fairness_metrics():
                 is_active=s.get("is_active", True),
                 is_new=s.get("is_new", True),
                 total_shifts=s["total_shifts"],
+                shifts_by_type=s.get("shifts_by_type"),
                 months_active=s.get("months_active", 0),
                 last_shift_date=s.get("last_shift_date"),
             )
@@ -105,9 +108,9 @@ async def get_fairness_metrics():
 
 
 @router.get("/monthly")
-async def get_monthly_history():
-    """Get monthly breakdown of assignments."""
-    summaries = storage.get_monthly_summaries()
+async def get_monthly_history(shift_type: Optional[str] = Query(None)):
+    """Get monthly breakdown of assignments, optionally filtered by shift type."""
+    summaries = storage.get_monthly_summaries(shift_type=shift_type)
 
     # Get detailed data for each month
     detailed = []
@@ -118,6 +121,7 @@ async def get_monthly_history():
                 "month_year": summary["month_year"],
                 "total_shifts": summary["total_shifts"],
                 "employees_count": summary["employees_count"],
+                "by_type": summary.get("by_type"),
                 "shift_counts": month_data.get("shift_counts", {}),
                 "created_at": month_data.get("created_at"),
             })
@@ -126,10 +130,17 @@ async def get_monthly_history():
 
 
 @router.get("/employee-trends")
-async def get_employee_trends():
-    """Get shift trends per employee over time."""
-    stats = storage.get_employee_stats()
+async def get_employee_trends(shift_type: Optional[str] = Query(None)):
+    """Get shift trends per employee over time, optionally filtered by shift type."""
+    stats = storage.get_employee_stats(shift_type=shift_type)
     all_assignments = storage.get_assignments()
+
+    # Filter assignments by shift_type if provided
+    if shift_type:
+        all_assignments = [
+            a for a in all_assignments
+            if a.get("shift_type", "ect") == shift_type
+        ]
 
     trends = []
     for emp in stats:

@@ -1,0 +1,8 @@
+__pycache__
+*.pyc
+.venv
+venv
+venv-wsl
+data/
+=6.5.0
+tests/

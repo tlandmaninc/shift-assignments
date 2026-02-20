@@ -1,8 +1,10 @@
-"""Date utility functions for ECT scheduling."""
+"""Date utility functions for shift scheduling."""
 
 import calendar
 from datetime import date, timedelta
 from typing import Optional
+
+from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
 
 
 def get_month_dates(year: int, month: int) -> list[date]:
@@ -17,15 +19,20 @@ def get_excluded_dates(
     include_tuesdays: bool = False,
     additional_excluded: Optional[list[str]] = None,
     force_included: Optional[list[str]] = None,
+    shift_type: Optional[str] = None,
 ) -> tuple[list[date], list[date]]:
     """
     Calculate included and excluded dates for a month.
 
-    Rules:
-    - Fridays and Saturdays are always excluded
+    Rules (when exclude_weekends is True, i.e. ECT):
+    - Fridays and Saturdays are excluded
     - Tuesdays are excluded by default (unless include_tuesdays=True)
-    - Additional dates can be manually excluded
-    - Some dates can be force-included (overrides defaults)
+
+    For 24/7 shift types (Internal, ER) where exclude_weekends is False:
+    - All days of the month are included by default
+
+    Additional dates can be manually excluded.
+    Some dates can be force-included (overrides defaults).
 
     Returns:
         Tuple of (included_dates, excluded_dates)
@@ -33,6 +40,11 @@ def get_excluded_dates(
     all_dates = get_month_dates(year, month)
     additional_excluded = additional_excluded or []
     force_included = force_included or []
+
+    # Look up whether this shift type excludes weekends
+    st = shift_type or DEFAULT_SHIFT_TYPE
+    cfg = SHIFT_TYPE_CONFIG.get(st, SHIFT_TYPE_CONFIG[DEFAULT_SHIFT_TYPE])
+    exclude_weekends = cfg.get("exclude_weekends", True)
 
     # Convert string dates to date objects
     additional_excluded_dates = {
@@ -56,14 +68,16 @@ def get_excluded_dates(
         # Check if date should be excluded
         is_excluded = False
 
-        # Friday (4) and Saturday (5) are always excluded
-        if weekday in (4, 5):
-            is_excluded = True
-        # Tuesday (1) excluded by default unless include_tuesdays is True
-        elif weekday == 1 and not include_tuesdays:
-            is_excluded = True
-        # Check additional exclusions
-        elif d in additional_excluded_dates:
+        if exclude_weekends:
+            # Friday (4) and Saturday (5) excluded for ECT-type shifts
+            if weekday in (4, 5):
+                is_excluded = True
+            # Tuesday (1) excluded by default unless include_tuesdays is True
+            elif weekday == 1 and not include_tuesdays:
+                is_excluded = True
+
+        # Check additional exclusions (applies to all shift types)
+        if d in additional_excluded_dates:
             is_excluded = True
 
         if is_excluded:
@@ -80,10 +94,12 @@ def get_included_dates_for_form(
     include_tuesdays: bool = False,
     additional_excluded: Optional[list[str]] = None,
     force_included: Optional[list[str]] = None,
+    shift_type: Optional[str] = None,
 ) -> list[date]:
     """Get list of dates to include in the form."""
     included, _ = get_excluded_dates(
-        year, month, include_tuesdays, additional_excluded, force_included
+        year, month, include_tuesdays, additional_excluded, force_included,
+        shift_type=shift_type,
     )
     return included
 

@@ -1,6 +1,7 @@
 """Base class for AI providers."""
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Optional
 
@@ -64,6 +65,24 @@ class AIProvider(ABC):
             AIResponse with the result
         """
         pass
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 512,
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream chat response as async generator of text chunks.
+
+        Default implementation falls back to non-streaming chat.
+        Override in subclasses for native streaming support.
+        """
+        result = await self.chat(messages, system_prompt, max_tokens)
+        if result.success and result.content:
+            yield result.content
+        elif result.error:
+            raise RuntimeError(result.error)
 
     def _format_error(self, error: Exception) -> str:
         """Format exception into user-friendly error message."""

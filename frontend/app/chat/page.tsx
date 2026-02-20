@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui';
-import { MessageBubble, TypingIndicator, EmptyState } from '@/components/chat';
+import { MessageBubble, TypingIndicator, EmptyState, ChatHistoryPanel } from '@/components/chat';
 import { chatApi } from '@/lib/api';
 
 interface Message {
@@ -20,10 +20,14 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const streamingMessageId = useRef<string | null>(null);
 
   // Quick suggestions for common queries
   const suggestions = [
@@ -55,7 +59,7 @@ export default function ChatPage() {
     }
   };
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages or streaming content
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
@@ -67,8 +71,32 @@ export default function ChatPage() {
     }
   }, [connectionStatus]);
 
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setConversationId(null);
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSelectConversation = useCallback(async (id: string) => {
+    if (id === conversationId) return;
+    try {
+      const conv = await chatApi.getConversation(id);
+      setConversationId(id);
+      setMessages(
+        conv.messages.map((m, i) => ({
+          id: `${id}_${i}`,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+        }))
+      );
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+    }
+  }, [conversationId]);
+
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || streaming) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -77,37 +105,111 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
 
+    const currentMessages = messages;
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
+    const assistantMsgId = (Date.now() + 1).toString();
+    streamingMessageId.current = assistantMsgId;
+    let firstToken = true;
+
     try {
-      const response = await chatApi.send({
-        message: userMessage.content,
-        conversation_history: messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      });
+      await chatApi.sendStream(
+        {
+          message: userMessage.content,
+          conversation_history: currentMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          conversation_id: conversationId || undefined,
+        },
+        // onToken
+        (token) => {
+          if (firstToken) {
+            firstToken = false;
+            setLoading(false);
+          }
+          setStreaming(true);
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.message.content,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+          setMessages((prev) => {
+            const existing = prev.find((m) => m.id === assistantMsgId);
+            if (existing) {
+              return prev.map((m) =>
+                m.id === assistantMsgId
+                  ? { ...m, content: m.content + token }
+                  : m
+              );
+            }
+            return [
+              ...prev,
+              {
+                id: assistantMsgId,
+                role: 'assistant' as const,
+                content: token,
+                timestamp: new Date(),
+              },
+            ];
+          });
+        },
+        // onConversationId
+        (id) => {
+          setConversationId(id);
+        },
+        // onDone
+        () => {
+          setLoading(false);
+          setStreaming(false);
+          streamingMessageId.current = null;
+          setRefreshTrigger((prev) => prev + 1);
+          inputRef.current?.focus();
+        },
+        // onError
+        (error) => {
+          setLoading(false);
+          setStreaming(false);
+          streamingMessageId.current = null;
+          setMessages((prev) => {
+            const existing = prev.find((m) => m.id === assistantMsgId);
+            if (existing) {
+              return prev.map((m) =>
+                m.id === assistantMsgId
+                  ? { ...m, content: m.content || 'Sorry, an error occurred. Please try again.' }
+                  : m
+              );
+            }
+            return [
+              ...prev,
+              {
+                id: assistantMsgId,
+                role: 'assistant' as const,
+                content: 'Sorry, an error occurred. Please try again.',
+                timestamp: new Date(),
+              },
+            ];
+          });
+          inputRef.current?.focus();
+        },
+      );
     } catch (error) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Sorry, I encountered an error processing your request. Please try again.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setLoading(false);
+      setStreaming(false);
+      streamingMessageId.current = null;
+      setMessages((prev) => {
+        const existing = prev.find((m) => m.id === assistantMsgId);
+        if (!existing) {
+          return [
+            ...prev,
+            {
+              id: assistantMsgId,
+              role: 'assistant' as const,
+              content: 'Sorry, I encountered an error processing your request. Please try again.',
+              timestamp: new Date(),
+            },
+          ];
+        }
+        return prev;
+      });
       inputRef.current?.focus();
     }
   };
@@ -210,7 +312,7 @@ export default function ChatPage() {
     );
   }
 
-  // Connected state - main chat interface
+  // Connected state - main chat interface with sidebar
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Header */}
@@ -227,60 +329,71 @@ export default function ChatPage() {
         </p>
       </motion.div>
 
-      {/* Chat Container */}
-      <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 ? (
-            <EmptyState
-              suggestions={suggestions}
-              onSuggestionClick={handleSuggestionClick}
-            />
-          ) : (
-            <>
-              {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))}
-              <AnimatePresence>
-                {loading && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                  >
-                    <TypingIndicator />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+      {/* Chat Layout: Sidebar + Chat Area */}
+      <Card className="flex-1 flex overflow-hidden min-h-0">
+        {/* History Sidebar */}
+        <ChatHistoryPanel
+          activeConversationId={conversationId}
+          onSelectConversation={handleSelectConversation}
+          onNewChat={handleNewChat}
+          refreshTrigger={refreshTrigger}
+        />
 
-        {/* Input Area */}
-        <div className="border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0">
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask about shifts, employees, or statistics..."
-              className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              disabled={loading}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={loading || !input.trim()}
-              className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.length === 0 ? (
+              <EmptyState
+                suggestions={suggestions}
+                onSuggestionClick={handleSuggestionClick}
+              />
+            ) : (
+              <>
+                {messages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))}
+                <AnimatePresence>
+                  {loading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                    >
+                      <TypingIndicator />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0">
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about shifts, employees, or statistics..."
+                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled={loading || streaming}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={loading || streaming || !input.trim()}
+                className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              >
+                {loading || streaming ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </Card>

@@ -76,7 +76,7 @@ export function Header({
       <div className="w-full h-32 relative overflow-hidden">
         <Image
           src="/ect_banner.png"
-          alt="ECT Shifts Management Platform Banner"
+          alt="Shift Assignment Platform Banner"
           fill
           className="object-cover object-center"
           priority
@@ -91,10 +91,10 @@ export function Header({
             </button>
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-white">
-                ECT Shifts Management Platform
+                Shift Assignment Platform
               </h1>
               <p className="text-sm text-slate-200">
-                Psychiatrics Department - Shift & Employee Management
+                Psychiatry Department - Shift & Employee Management
               </p>
             </div>
             <div className="flex items-center gap-2">

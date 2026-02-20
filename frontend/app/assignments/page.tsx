@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, Button, Badge } from '@/components/ui';
 import { formsApi, assignmentsApi, googleApi } from '@/lib/api';
-import { formatMonthYear } from '@/lib/utils';
+import { cn, formatMonthYear } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { SHIFT_TYPES, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 import toast from 'react-hot-toast';
 
 export default function AssignmentsPage() {
@@ -201,7 +202,7 @@ export default function AssignmentsPage() {
           Shift Assignments
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1">
-          Generate Psychiatrics ECT shift assignments from form responses
+          Generate shift assignments from form responses
         </p>
       </motion.div>
 
@@ -253,9 +254,22 @@ export default function AssignmentsPage() {
                       {form.status}
                     </Badge>
                   </div>
-                  <p className="font-medium text-slate-900 dark:text-white mt-3">
-                    {form.title}
-                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {form.title}
+                    </p>
+                    {(() => {
+                      const stConfig = getShiftTypeConfig(form.shift_type || 'ect');
+                      return (
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-xs font-semibold text-white',
+                          stConfig.bgClass
+                        )}>
+                          {stConfig.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <p className="text-sm text-slate-500 mt-1">
                     {form.included_dates?.length || 0} dates
                   </p>
@@ -513,10 +527,23 @@ export default function AssignmentsPage() {
           <Card className="bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-              <div>
-                <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-300">
-                  Assignments Generated Successfully!
-                </h3>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-300">
+                    Assignments Generated Successfully!
+                  </h3>
+                  {(() => {
+                    const stConfig = getShiftTypeConfig(selectedForm?.shift_type || 'ect');
+                    return (
+                      <span className={cn(
+                        'px-2 py-0.5 rounded-full text-xs font-semibold text-white',
+                        stConfig.bgClass
+                      )}>
+                        {stConfig.label}
+                      </span>
+                    );
+                  })()}
+                </div>
                 <p className="text-emerald-600 dark:text-emerald-400">
                   {assignmentResult.message}
                 </p>

@@ -16,6 +16,7 @@ from slowapi.util import get_remote_address
 
 from ..config import settings
 from ..audit import log_audit, AuditAction
+from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
 from ..storage import storage
 
 # Rate limiter for sensitive endpoints
@@ -76,6 +77,7 @@ class FormCreateRequest(BaseModel):
     form_id: int
     title: str
     included_dates: list[str]
+    shift_type: Optional[str] = "ect"
 
 
 class FetchResponsesRequest(BaseModel):
@@ -339,6 +341,15 @@ def clear_form_items(service, form_id: str) -> None:
 @limiter.limit("10/minute")
 async def create_google_form(request: Request, form_request: FormCreateRequest):
     """Create a Google Form with the specified questions. Rate limited."""
+    shift_type = form_request.shift_type or DEFAULT_SHIFT_TYPE
+    type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
+    exclude_weekends = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("exclude_weekends", True)
+    title_prefix = form_request.title.replace(" Shift Assignment", "")
+    if exclude_weekends:
+        form_description = f"Please indicate your availability for each date in {title_prefix} (excluding Fridays, Saturdays, etc.)."
+    else:
+        form_description = f"Please indicate your availability for each date in {title_prefix}."
+
     creds = get_stored_credentials()
     if not creds or not creds.valid:
         raise HTTPException(
@@ -353,8 +364,10 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         forms_service = build("forms", "v1", credentials=creds)
 
         # Try to copy from template (preserves header image)
+        logger.info(f"Creating Google Form: title={form_request.title!r}, shift_type={shift_type}, dates={len(form_request.included_dates)}")
         form_id = copy_template_form(creds, form_request.title)
         used_template = form_id is not None
+        logger.info(f"Template copy result: form_id={form_id}, used_template={used_template}")
 
         if form_id:
             # Clear any existing items from the copied template
@@ -368,7 +381,7 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
                         "updateFormInfo": {
                             "info": {
                                 "title": form_request.title,
-                                "description": f"Please indicate your availability for each date in {form_request.title.replace(' Shift Assignment', '')} (excluding Fridays, Saturdays, etc.)."
+                                "description": form_description
                             },
                             "updateMask": "title,description"
                         }
@@ -413,7 +426,7 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
         requests_list.append({
             "createItem": {
                 "item": {
-                    "title": "Is this your first month doing ECT?",
+                    "title": f"Is this your first month doing {type_label} shift?",
                     "questionItem": {
                         "question": {
                             "required": True,
@@ -465,10 +478,14 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
 
         # Batch update to add all questions
         if requests_list:
-            forms_service.forms().batchUpdate(
+            logger.info(f"Adding {len(requests_list)} questions to form {form_id}")
+            batch_response = forms_service.forms().batchUpdate(
                 formId=form_id,
                 body={"requests": requests_list}
             ).execute()
+            logger.info(f"batchUpdate response keys: {list(batch_response.keys()) if batch_response else 'None'}")
+        else:
+            logger.warning(f"requests_list is empty — no questions to add for form {form_id}")
 
         # Get the form URL
         form_url = f"https://docs.google.com/forms/d/{form_id}/edit"

@@ -28,3 +28,7 @@ google-api-python-client==2.116.0
 cryptography>=41.0.0
 slowapi>=0.1.9
 PyJWT>=2.8.0
+
+# Firebase Authentication (for phone OTP)
+firebase-admin>=6.5.0
+

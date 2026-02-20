@@ -107,6 +107,7 @@ export const formsApi = {
     include_tuesdays: boolean;
     excluded_dates: string[];
     included_dates: string[];
+    shift_type?: string;
   }) => fetchApi<any>('/forms/generate-dates', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -118,6 +119,7 @@ export const formsApi = {
     include_tuesdays: boolean;
     excluded_dates: string[];
     included_dates: string[];
+    shift_type?: string;
   }) => fetchApi<any>('/forms/create', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -157,8 +159,14 @@ export const assignmentsApi = {
       body: JSON.stringify(data),
     }),
 
-  getCalendar: (monthYear: string) =>
-    fetch(`${API_BASE}/assignments/${monthYear}/calendar`).then((r) => r.text()),
+  getCalendar: async (monthYear: string) => {
+    const r = await fetch(`${API_BASE}/assignments/${monthYear}/calendar`);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: 'Failed to load calendar' }));
+      throw new Error(err.detail || `HTTP error ${r.status}`);
+    }
+    return r.text();
+  },
 
   export: (monthYear: string) => fetchApi<any>(`/assignments/${monthYear}/export`),
 
@@ -215,13 +223,17 @@ export const employeesApi = {
 
 // History API
 export const historyApi = {
-  get: () => fetchApi<any>('/history'),
+  get: (shiftType?: string | null) =>
+    fetchApi<any>(`/history${shiftType ? `?shift_type=${shiftType}` : ''}`),
 
-  getFairness: () => fetchApi<any>('/history/fairness'),
+  getFairness: (shiftType?: string | null) =>
+    fetchApi<any>(`/history/fairness${shiftType ? `?shift_type=${shiftType}` : ''}`),
 
-  getMonthly: () => fetchApi<any>('/history/monthly'),
+  getMonthly: (shiftType?: string | null) =>
+    fetchApi<any>(`/history/monthly${shiftType ? `?shift_type=${shiftType}` : ''}`),
 
-  getEmployeeTrends: () => fetchApi<any>('/history/employee-trends'),
+  getEmployeeTrends: (shiftType?: string | null) =>
+    fetchApi<any>(`/history/employee-trends${shiftType ? `?shift_type=${shiftType}` : ''}`),
 };
 
 // Google Forms API
@@ -240,6 +252,7 @@ export const googleApi = {
     form_id: number;
     title: string;
     included_dates: string[];
+    shift_type?: string;
   }) => fetchApi<{
     success: boolean;
     form_id: string;
@@ -264,6 +277,13 @@ export const exchangeApi = {
     fetchApi<{ shifts: ShiftAssignment[]; month_year: string }>(
       `/exchanges/my-shifts?month_year=${monthYear}`
     ),
+
+  getSchedule: (monthYear: string) =>
+    fetchApi<{
+      month_year: string;
+      employee_id: number;
+      assignments: Record<string, { employee_name: string; shift_type: string; is_current_user: boolean }[]>;
+    }>(`/exchanges/schedule?month_year=${monthYear}`),
 
   getCandidates: (shiftDate: string) =>
     fetchApi<{ partners: SwapCandidate[]; shift_date: string }>(
@@ -305,24 +325,125 @@ export const exchangeApi = {
     }),
 };
 
-// Chat API
+// Chat API - uses direct backend URL for send() to avoid proxy timeout with slow LLM inference
+const CHAT_BACKEND_URL = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  : '';
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ConversationDetail {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: { role: string; content: string; timestamp?: string }[];
+}
+
 export const chatApi = {
   health: () => fetchApi<{
+    connected: boolean;
     ollama_connected: boolean;
     model_available: boolean;
     model_name: string;
+    provider: string;
     error: string | null;
   }>('/chat/health'),
 
-  send: (data: {
+  send: async (data: {
     message: string;
     conversation_history?: { role: string; content: string }[];
-  }) => fetchApi<{
+    conversation_id?: string;
+  }): Promise<{
     success: boolean;
     message: { role: string; content: string; timestamp?: string };
+    conversation_id?: string;
     error?: string;
-  }>('/chat', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  }> => {
+    // Call backend directly to avoid Next.js proxy timeout for slow LLM responses
+    const url = `${CHAT_BACKEND_URL}/api/chat`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `HTTP error ${response.status}`);
+    }
+    return response.json();
+  },
+
+  sendStream: async (
+    data: {
+      message: string;
+      conversation_history?: { role: string; content: string }[];
+      conversation_id?: string;
+    },
+    onToken: (token: string) => void,
+    onConversationId: (id: string) => void,
+    onDone: () => void,
+    onError: (error: string) => void,
+  ): Promise<void> => {
+    const url = `${CHAT_BACKEND_URL}/api/chat/stream`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `HTTP error ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.conversation_id) {
+            onConversationId(data.conversation_id);
+          } else if (data.token) {
+            onToken(data.token);
+          } else if (data.error) {
+            onError(data.error);
+          } else if (data.done) {
+            onDone();
+          }
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+  },
+
+  listConversations: () =>
+    fetchApi<{ conversations: ConversationSummary[] }>('/chat/conversations'),
+
+  getConversation: (id: string) =>
+    fetchApi<ConversationDetail>(`/chat/conversations/${id}`),
+
+  deleteConversation: (id: string) =>
+    fetchApi<{ success: boolean }>(`/chat/conversations/${id}`, { method: 'DELETE' }),
 };

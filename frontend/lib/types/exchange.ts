@@ -10,6 +10,14 @@ export interface ShiftAssignment {
   date: string;
   day_of_week: string;
   employee_name: string;
+  shift_type?: string;
+}
+
+export interface CellAssignment {
+  employee_name: string;
+  employee_id: number | null;
+  shift_type: string;
+  isCurrentUser: boolean;
 }
 
 export interface ExchangeRequest {
@@ -18,9 +26,11 @@ export interface ExchangeRequest {
   requester_employee_id: number;
   requester_employee_name: string;
   requester_date: string;
+  requester_shift_type?: string;
   target_employee_id: number;
   target_employee_name: string;
   target_date: string;
+  target_shift_type?: string;
   status: ExchangeStatus;
   reason?: string;
   decline_reason?: string;
@@ -64,6 +74,7 @@ export interface WSMessage {
 export interface ScheduleDateCell {
   date: string; // YYYY-MM-DD
   dayNumber: number;
+  assignments: CellAssignment[];
   assignedEmployee: string | null;
   assignedEmployeeId: number | null;
   isCurrentUserShift: boolean;

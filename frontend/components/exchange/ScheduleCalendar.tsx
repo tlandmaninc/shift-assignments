@@ -3,8 +3,9 @@
 import { motion } from 'framer-motion';
 import { CalendarPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MonthSchedule, ScheduleDateCell } from '@/lib/types/exchange';
+import { MonthSchedule, ScheduleDateCell, CellAssignment } from '@/lib/types/exchange';
 import { buildShiftCalendarUrl } from '@/lib/utils/googleCalendar';
+import { SHIFT_TYPES, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -17,15 +18,17 @@ interface ScheduleCalendarProps {
 
 function truncateName(name: string, maxLen = 8): string {
   if (name.length <= maxLen) return name;
-  return name.slice(0, maxLen - 1) + '…';
+  return name.slice(0, maxLen - 1) + '\u2026';
 }
 
 function getCellClasses(cell: ScheduleDateCell, isSelected: boolean): string {
+  const hasCurrentUserShift = cell.assignments?.some((a) => a.isCurrentUser) ?? cell.isCurrentUserShift;
+
   if (cell.isWeekend) {
     return 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-600 cursor-not-allowed';
   }
 
-  if (cell.isCurrentUserShift) {
+  if (hasCurrentUserShift) {
     if (isSelected) {
       return 'bg-primary-500 dark:bg-primary-600 text-white ring-2 ring-primary-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 cursor-pointer';
     }
@@ -39,11 +42,34 @@ function getCellClasses(cell: ScheduleDateCell, isSelected: boolean): string {
     return 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-600';
   }
 
-  if (cell.assignedEmployee) {
+  if (cell.assignments?.length > 0 || cell.assignedEmployee) {
     return 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
   }
 
   return 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-600';
+}
+
+function ShiftBadge({ assignment }: { assignment: CellAssignment }) {
+  const cfg = getShiftTypeConfig(assignment.shift_type);
+  const displayName = assignment.isCurrentUser
+    ? 'You'
+    : truncateName(assignment.employee_name.split(' ')[0]);
+
+  return (
+    <div
+      className="text-[9px] sm:text-[10px] rounded-full px-1.5 py-0.5 leading-none truncate max-w-full shift-badge-name"
+      style={{
+        backgroundColor: cfg.color + '20',
+        color: cfg.color,
+      }}
+    >
+      <span className="font-bold">{cfg.label}</span>
+      {' '}
+      <span className={assignment.isCurrentUser ? 'font-bold' : 'font-normal'}>
+        {displayName}
+      </span>
+    </div>
+  );
 }
 
 export function ScheduleCalendar({
@@ -53,6 +79,14 @@ export function ScheduleCalendar({
   currentUserName,
 }: ScheduleCalendarProps) {
   const blanks = Array.from({ length: schedule.firstDayOffset }, (_, i) => i);
+
+  // Collect active shift types for legend
+  const activeTypes = new Set<string>();
+  for (const cell of schedule.dates) {
+    for (const a of cell.assignments || []) {
+      activeTypes.add(a.shift_type);
+    }
+  }
 
   return (
     <div>
@@ -75,14 +109,17 @@ export function ScheduleCalendar({
 
         {/* Blank cells for offset */}
         {blanks.map((i) => (
-          <div key={`blank-${i}`} className="h-14 sm:h-16" />
+          <div key={`blank-${i}`} className="h-20 sm:h-24" />
         ))}
 
         {/* Date cells */}
         {schedule.dates.map((cell) => {
           const isSelected = selectedDate === cell.date;
-          const isClickable =
-            cell.isCurrentUserShift && !cell.isPast && !cell.isWeekend;
+          const hasCurrentUserShift = cell.assignments?.some((a) => a.isCurrentUser) ?? cell.isCurrentUserShift;
+          const isClickable = hasCurrentUserShift && !cell.isPast && !cell.isWeekend;
+
+          // Pick the first current-user assignment's shift_type for the Google Calendar link
+          const currentUserAssignment = cell.assignments?.find((a) => a.isCurrentUser);
 
           return (
             <motion.button
@@ -92,21 +129,37 @@ export function ScheduleCalendar({
               onClick={() => isClickable && onSelectDate(cell.date)}
               disabled={!isClickable}
               className={cn(
-                'h-14 sm:h-16 rounded-lg flex flex-col items-center justify-center text-xs sm:text-sm transition-all relative',
+                'h-20 sm:h-24 rounded-lg flex flex-col items-center justify-start pt-1.5 text-xs sm:text-sm transition-all relative gap-0.5',
                 getCellClasses(cell, isSelected)
               )}
             >
               <span className="font-semibold leading-none">{cell.dayNumber}</span>
-              {cell.assignedEmployee && (
+
+              {/* Multi-type shift badges */}
+              {cell.assignments?.map((a) => (
+                <ShiftBadge
+                  key={`${a.shift_type}-${a.employee_name}`}
+                  assignment={a}
+                />
+              ))}
+
+              {/* Fallback: show old single-assignment if no typed assignments */}
+              {(!cell.assignments || cell.assignments.length === 0) && cell.assignedEmployee && (
                 <span className="text-[10px] sm:text-xs leading-none mt-0.5 max-w-full px-0.5 truncate">
                   {cell.isCurrentUserShift
                     ? 'You'
                     : truncateName(cell.assignedEmployee.split(' ')[0])}
                 </span>
               )}
-              {cell.isCurrentUserShift && !cell.isPast && !cell.isWeekend && currentUserName && (
+
+              {/* Google Calendar link */}
+              {hasCurrentUserShift && !cell.isPast && !cell.isWeekend && currentUserName && (
                 <a
-                  href={buildShiftCalendarUrl(cell.date, currentUserName)}
+                  href={buildShiftCalendarUrl(
+                    cell.date,
+                    currentUserName,
+                    currentUserAssignment?.shift_type
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
@@ -123,13 +176,25 @@ export function ScheduleCalendar({
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 sm:gap-4 mt-4 text-xs sm:text-sm">
+        {/* Shift type legend */}
+        {Array.from(activeTypes).map((type) => {
+          const cfg = SHIFT_TYPES[type];
+          if (!cfg) return null;
+          return (
+            <div key={type} className="flex items-center gap-1.5">
+              <div
+                className="w-3.5 h-3.5 rounded"
+                style={{ backgroundColor: cfg.color }}
+              />
+              <span className="text-slate-600 dark:text-slate-400">{cfg.label}</span>
+            </div>
+          );
+        })}
+
+        {/* Status legend */}
         <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 rounded bg-primary-100 dark:bg-primary-900/40 border-2 border-primary-500" />
           <span className="text-slate-600 dark:text-slate-400">Your shift</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3.5 h-3.5 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
-          <span className="text-slate-600 dark:text-slate-400">Other&apos;s shift</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-600" />

@@ -7,6 +7,7 @@ Supports:
 - OpenAI (paid)
 """
 
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Optional
 from ..storage import Storage
@@ -193,31 +194,32 @@ Be concise. Answer in 1-2 sentences."""
             "available_models": result.get("available_models", []),
         }
 
-    async def chat(
+    def _build_messages(
         self,
         message: str,
-        conversation_history: Optional[list[dict]] = None
-    ) -> dict:
-        """Send message to AI provider and get response."""
-        # Build context and system prompt
-        context = self._build_data_context()
-        system_prompt = self._build_system_prompt(context)
-
-        # Build messages array (without system prompt - passed separately)
+        conversation_history: Optional[list[dict]] = None,
+    ) -> list[dict]:
+        """Build messages array from history and current message."""
         messages = []
-
-        # Add conversation history if provided
         if conversation_history:
             for msg in conversation_history:
                 messages.append({
                     "role": msg.get("role", "user"),
                     "content": msg.get("content", ""),
                 })
-
-        # Add current user message
         messages.append({"role": "user", "content": message})
+        return messages
 
-        # Send to provider
+    async def chat(
+        self,
+        message: str,
+        conversation_history: Optional[list[dict]] = None
+    ) -> dict:
+        """Send message to AI provider and get response."""
+        context = self._build_data_context()
+        system_prompt = self._build_system_prompt(context)
+        messages = self._build_messages(message, conversation_history)
+
         result = await self.provider.chat(
             messages=messages,
             system_prompt=system_prompt,
@@ -231,3 +233,20 @@ Be concise. Answer in 1-2 sentences."""
             "provider": result.provider,
             "model": result.model,
         }
+
+    async def stream_chat(
+        self,
+        message: str,
+        conversation_history: Optional[list[dict]] = None,
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat response as async generator of text chunks."""
+        context = self._build_data_context()
+        system_prompt = self._build_system_prompt(context)
+        messages = self._build_messages(message, conversation_history)
+
+        async for chunk in self.provider.stream_chat(
+            messages=messages,
+            system_prompt=system_prompt,
+            max_tokens=512,
+        ):
+            yield chunk
