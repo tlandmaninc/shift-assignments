@@ -33,7 +33,7 @@ export default function ChatPage() {
     "Show me recent assignments",
   ];
 
-  // Check Ollama connection on mount
+  // Check AI provider connection on mount
   useEffect(() => {
     checkConnection();
   }, []);
@@ -43,7 +43,7 @@ export default function ChatPage() {
     setConnectionError(null);
     try {
       const health = await chatApi.health();
-      if (health.ollama_connected && health.model_available) {
+      if (health.connected && health.model_available) {
         setConnectionStatus('connected');
       } else {
         setConnectionStatus('disconnected');
@@ -149,16 +149,24 @@ export default function ChatPage() {
               AI Service Unavailable
             </h3>
             <p className="text-slate-500 dark:text-slate-400 mb-4 max-w-md mx-auto">
-              {connectionError || 'Please ensure Ollama is running locally with the required model.'}
+              {connectionError || 'The AI provider is not properly configured.'}
             </p>
             <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 text-left max-w-md mx-auto mb-6">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                To get started:
+                To get started with Gemini (recommended):
+              </p>
+              <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
+                <li>Get a free API key at <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">aistudio.google.com/app/apikey</code></li>
+                <li>Set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">AI_PROVIDER=gemini</code> in backend .env</li>
+                <li>Set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">GEMINI_API_KEY=your_key</code> in backend .env</li>
+              </ol>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-3 mb-2">
+                Or use Ollama for local inference:
               </p>
               <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
                 <li>Install Ollama from ollama.ai</li>
                 <li>Run: <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">ollama serve</code></li>
-                <li>Pull the model: <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">ollama pull qwen3-vl:4b</code></li>
+                <li>Set <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">AI_PROVIDER=ollama</code> in backend .env</li>
               </ol>
             </div>
             <button

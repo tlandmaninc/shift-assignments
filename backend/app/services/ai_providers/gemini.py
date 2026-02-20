@@ -19,9 +19,10 @@ class GeminiProvider(AIProvider):
 
     # Available free models
     MODELS = {
-        "gemini-2.0-flash": "gemini-2.0-flash",  # Latest, fastest
-        "gemini-1.5-flash": "gemini-1.5-flash",  # Fast and capable
-        "gemini-1.5-pro": "gemini-1.5-pro",      # Most capable
+        "gemini-2.5-flash": "gemini-2.5-flash",  # Latest, fastest, thinking model
+        "gemini-2.5-pro": "gemini-2.5-pro",      # Most capable
+        "gemini-2.0-flash": "gemini-2.0-flash",  # Fast and capable
+        "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",  # Lightweight
         "gemini-pro": "gemini-pro",              # Legacy
     }
 
