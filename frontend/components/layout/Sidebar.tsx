@@ -49,7 +49,7 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
     <motion.aside
       initial={false}
       animate={{ width: open ? 256 : 72 }}
-      className="relative flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-full"
+      className="relative flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-screen"
     >
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-slate-200 dark:border-slate-800">
