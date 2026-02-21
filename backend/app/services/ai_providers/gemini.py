@@ -24,9 +24,16 @@ class GeminiProvider(AIProvider):
         "gemini-2.5-flash": "gemini-2.5-flash",  # Latest, fastest, thinking model
         "gemini-2.5-pro": "gemini-2.5-pro",      # Most capable
         "gemini-2.0-flash": "gemini-2.0-flash",  # Fast and capable
-        "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",  # Lightweight
+        "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",  # Lightweight fallback
         "gemini-pro": "gemini-pro",              # Legacy
     }
+
+    # Ordered fallback chain for daily quota exhaustion
+    FALLBACK_CHAIN = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+    ]
 
     def __init__(
         self,
@@ -36,6 +43,7 @@ class GeminiProvider(AIProvider):
         self.api_key = api_key
         self.model = self.MODELS.get(model, model)
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
+        self._exhausted_models: set[str] = set()
 
     @property
     def provider_name(self) -> str:
@@ -44,6 +52,20 @@ class GeminiProvider(AIProvider):
     @property
     def model_name(self) -> str:
         return self.model
+
+    @staticmethod
+    def _is_quota_error(error_msg: str) -> bool:
+        """Detect HTTP 429 quota/rate-limit errors."""
+        return "429" in error_msg
+
+    def _build_model_sequence(self) -> list[str]:
+        """Return the ordered list of models to try, skipping exhausted ones."""
+        if self.model in self.FALLBACK_CHAIN:
+            start = self.FALLBACK_CHAIN.index(self.model)
+            chain = self.FALLBACK_CHAIN[start:]
+        else:
+            chain = [self.model]
+        return [m for m in chain if m not in self._exhausted_models]
 
     async def check_health(self) -> dict:
         """Check if Gemini API is accessible with the provided key."""
@@ -153,13 +175,76 @@ class GeminiProvider(AIProvider):
 
         return contents, system_instruction
 
+    async def _chat_with_model(
+        self,
+        model: str,
+        messages: list[dict],
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 512,
+    ) -> AIResponse:
+        """Send a single non-streaming request to the specified model."""
+        contents, system_instruction = self._convert_messages_to_gemini_format(
+            messages, system_prompt
+        )
+
+        request_body = {
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.7,
+            },
+        }
+        if system_instruction:
+            request_body["systemInstruction"] = system_instruction
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/models/{model}:generateContent",
+                params={"key": self.api_key},
+                json=request_body,
+                timeout=60.0,
+            )
+
+            if response.status_code != 200:
+                error_detail = response.json().get("error", {}).get("message", response.text)
+                return AIResponse(
+                    success=False,
+                    content=None,
+                    error=f"Gemini API error ({response.status_code}): {error_detail}",
+                    provider=self.provider_name,
+                    model=model,
+                )
+
+            result = response.json()
+            candidates = result.get("candidates", [])
+            if not candidates:
+                return AIResponse(
+                    success=False,
+                    content=None,
+                    error="No response generated",
+                    provider=self.provider_name,
+                    model=model,
+                )
+
+            content_parts = candidates[0].get("content", {}).get("parts", [])
+            text_content = "".join(
+                part.get("text", "") for part in content_parts
+            )
+
+            return AIResponse(
+                success=True,
+                content=text_content,
+                provider=self.provider_name,
+                model=model,
+            )
+
     async def stream_chat(
         self,
         messages: list[dict],
         system_prompt: Optional[str] = None,
         max_tokens: int = 512,
     ) -> AsyncGenerator[str, None]:
-        """Stream chat response from Gemini using SSE."""
+        """Stream chat response from Gemini using SSE, with model fallback on quota errors."""
         if not self.api_key:
             raise RuntimeError("GEMINI_API_KEY not configured")
 
@@ -176,32 +261,55 @@ class GeminiProvider(AIProvider):
         if system_instruction:
             request_body["systemInstruction"] = system_instruction
 
-        async with httpx.AsyncClient() as client:
-            async with client.stream(
-                "POST",
-                f"{self.base_url}/models/{self.model}:streamGenerateContent",
-                params={"key": self.api_key, "alt": "sse"},
-                json=request_body,
-                timeout=60.0,
-            ) as response:
-                if response.status_code != 200:
-                    body = await response.aread()
-                    raise RuntimeError(f"Gemini API error ({response.status_code}): {body.decode()[:200]}")
+        models_to_try = self._build_model_sequence()
+        last_error = None
 
-                async for line in response.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    try:
-                        data = json.loads(line[6:])
-                    except json.JSONDecodeError:
-                        continue
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        for part in parts:
-                            text = part.get("text", "")
-                            if text:
-                                yield text
+        for model in models_to_try:
+            got_429 = False
+            try:
+                async with httpx.AsyncClient() as client:
+                    async with client.stream(
+                        "POST",
+                        f"{self.base_url}/models/{model}:streamGenerateContent",
+                        params={"key": self.api_key, "alt": "sse"},
+                        json=request_body,
+                        timeout=60.0,
+                    ) as response:
+                        if response.status_code != 200:
+                            body = await response.aread()
+                            error_msg = f"Gemini API error ({response.status_code}): {body.decode()[:200]}"
+                            if self._is_quota_error(error_msg):
+                                got_429 = True
+                                last_error = error_msg
+                            else:
+                                raise RuntimeError(error_msg)
+                        else:
+                            self.model = model  # persist active model after successful fallback
+                            async for line in response.aiter_lines():
+                                if not line.startswith("data: "):
+                                    continue
+                                try:
+                                    data = json.loads(line[6:])
+                                except json.JSONDecodeError:
+                                    continue
+                                candidates = data.get("candidates", [])
+                                if candidates:
+                                    parts = candidates[0].get("content", {}).get("parts", [])
+                                    for part in parts:
+                                        text = part.get("text", "")
+                                        if text:
+                                            yield text
+                            return  # streaming complete, exit generator
+            except RuntimeError:
+                raise  # non-429 errors propagate immediately
+
+            if got_429:
+                self._exhausted_models.add(model)
+                continue
+
+        raise RuntimeError(
+            f"All Gemini models have exceeded their daily quota. Last error: {last_error}"
+        )
 
     async def chat(
         self,
@@ -209,7 +317,7 @@ class GeminiProvider(AIProvider):
         system_prompt: Optional[str] = None,
         max_tokens: int = 512,
     ) -> AIResponse:
-        """Send chat request to Gemini API."""
+        """Send chat request to Gemini API, with automatic model fallback on quota errors."""
         if not self.api_key:
             return AIResponse(
                 success=False,
@@ -219,79 +327,45 @@ class GeminiProvider(AIProvider):
                 model=self.model,
             )
 
-        try:
-            contents, system_instruction = self._convert_messages_to_gemini_format(
-                messages, system_prompt
-            )
+        models_to_try = self._build_model_sequence()
+        last_error = None
 
-            # Build request body
-            request_body = {
-                "contents": contents,
-                "generationConfig": {
-                    "maxOutputTokens": max_tokens,
-                    "temperature": 0.7,
-                },
-            }
-
-            if system_instruction:
-                request_body["systemInstruction"] = system_instruction
-
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.base_url}/models/{self.model}:generateContent",
-                    params={"key": self.api_key},
-                    json=request_body,
-                    timeout=60.0,
-                )
-
-                if response.status_code != 200:
-                    error_detail = response.json().get("error", {}).get("message", response.text)
-                    return AIResponse(
-                        success=False,
-                        content=None,
-                        error=f"Gemini API error: {error_detail}",
-                        provider=self.provider_name,
-                        model=self.model,
-                    )
-
-                result = response.json()
-
-                # Extract text from response
-                candidates = result.get("candidates", [])
-                if not candidates:
-                    return AIResponse(
-                        success=False,
-                        content=None,
-                        error="No response generated",
-                        provider=self.provider_name,
-                        model=self.model,
-                    )
-
-                content_parts = candidates[0].get("content", {}).get("parts", [])
-                text_content = "".join(
-                    part.get("text", "") for part in content_parts
-                )
-
+        for model in models_to_try:
+            try:
+                result = await self._chat_with_model(model, messages, system_prompt, max_tokens)
+            except httpx.TimeoutException:
                 return AIResponse(
-                    success=True,
-                    content=text_content,
+                    success=False,
+                    content=None,
+                    error="Request to Gemini timed out. Try again.",
                     provider=self.provider_name,
-                    model=self.model,
+                    model=model,
+                )
+            except Exception as e:
+                return AIResponse(
+                    success=False,
+                    content=None,
+                    error=self._format_error(e),
+                    provider=self.provider_name,
+                    model=model,
                 )
 
-        except httpx.TimeoutException:
-            return AIResponse(
-                success=False,
-                content=None,
-                error="Request to Gemini timed out. Try again.",
-                provider=self.provider_name,
-                model=self.model,
-            )
-        except Exception as e:
-            return AIResponse(
-                success=False,
-                content=None,
-                error=self._format_error(e),
-                provider=self.provider_name,
-                model=self.model,
-            )
+            if result.success:
+                self.model = model  # persist active model after successful fallback
+                return result
+
+            if self._is_quota_error(result.error or ""):
+                self._exhausted_models.add(model)
+                last_error = result.error
+                continue  # try next model
+
+            return result  # non-429 failure, return immediately
+
+        # All fallback models exhausted
+        return AIResponse(
+            success=False,
+            content=None,
+            error="All Gemini models have exceeded their daily quota. Please try again tomorrow.",
+            provider=self.provider_name,
+            model=self.model,
+        )

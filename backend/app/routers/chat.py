@@ -1,5 +1,6 @@
 """Chat API router for AI-powered data queries."""
 
+import asyncio
 import json
 import uuid
 from datetime import datetime
@@ -106,6 +107,15 @@ async def stream_message(request: ChatRequest):
         "timestamp": now,
     })
 
+    async def _stream_words(text: str):
+        """Yield text word-by-word with a small delay for a typing effect."""
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            token = word if i == 0 else " " + word
+            if token:
+                yield f"data: {json.dumps({'token': token})}\n\n"
+                await asyncio.sleep(0.05)
+
     async def event_stream():
         # Send conversation_id first so frontend can track it
         yield f"data: {json.dumps({'conversation_id': conversation_id})}\n\n"
@@ -119,12 +129,26 @@ async def stream_message(request: ChatRequest):
                 conversation_history=history,
             ):
                 full_content += chunk
-                yield f"data: {json.dumps({'token': chunk})}\n\n"
+                # Split large chunks into words for a progressive streaming effect.
+                # Providers like Gemini may return the entire response in one event.
+                async for event in _stream_words(chunk):
+                    yield event
         except Exception as e:
             error_occurred = True
             error_msg = str(e)
-            full_content = error_msg
-            yield f"data: {json.dumps({'error': error_msg})}\n\n"
+            if "daily quota" in error_msg.lower() or "All Gemini models" in error_msg:
+                # All fallback models exhausted (daily limit)
+                full_content = "The AI assistant has reached its daily request limit across all available models. Please try again tomorrow."
+                async for event in _stream_words(full_content):
+                    yield event
+            elif "429" in error_msg:
+                # Single-model transient rate limit (safety net)
+                full_content = "I'm temporarily rate-limited by the AI provider. Please wait a moment and try again."
+                async for event in _stream_words(full_content):
+                    yield event
+            else:
+                full_content = error_msg
+                yield f"data: {json.dumps({'error': error_msg})}\n\n"
 
         # Save assistant response to conversation
         conversation["messages"].append({
