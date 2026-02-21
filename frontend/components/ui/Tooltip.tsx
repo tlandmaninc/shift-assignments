@@ -11,7 +11,7 @@ interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
-export function Tooltip({ children, content, className, position = 'top' }: TooltipProps) {
+export function Tooltip({ children, content, className, position = 'bottom' }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   const positionClasses = {
@@ -43,7 +43,7 @@ export function Tooltip({ children, content, className, position = 'top' }: Tool
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              'absolute z-50 px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg max-w-xs block',
+              'absolute z-50 px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg max-w-lg leading-relaxed block whitespace-normal break-words border border-slate-700 dark:border-slate-600',
               positionClasses[position],
               className
             )}

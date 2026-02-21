@@ -41,11 +41,12 @@ import {
   ReferenceLine,
   ReferenceArea,
   LabelList,
+  Label,
 } from 'recharts';
 import { Card, CardHeader, Badge, Tooltip as UITooltip } from '@/components/ui';
 import { historyApi, assignmentsApi } from '@/lib/api';
 import { cn, formatMonthYear } from '@/lib/utils';
-import { X, ChevronRight, Printer } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Printer } from 'lucide-react';
 import { printCalendarHtml } from '@/lib/printCalendar';
 import toast from 'react-hot-toast';
 import { useExchangeStore } from '@/lib/stores/exchangeStore';
@@ -74,18 +75,20 @@ type SortOption = 'shifts-desc' | 'shifts-asc' | 'name-asc' | 'name-desc';
 const TrendsTooltip = memo(({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-        <p className="font-semibold text-slate-900 dark:text-white mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-slate-600 dark:text-slate-400">{entry.name}:</span>
-            <span className="font-medium text-slate-900 dark:text-white">{entry.value}</span>
-          </div>
-        ))}
+      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-60 overflow-y-auto min-w-[180px]">
+        <p className="font-semibold text-slate-900 dark:text-white mb-2 text-sm">{label}</p>
+        {payload
+          .slice()
+          .sort((a: any, b: any) => (b.value ?? 0) - (a.value ?? 0))
+          .map((entry: any, index: number) => (
+            <div key={index} className="flex items-center justify-between gap-3 text-sm py-0.5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className="text-slate-600 dark:text-slate-400">{entry.name}</span>
+              </div>
+              <span className="font-medium text-slate-900 dark:text-white">{entry.value ?? 0}</span>
+            </div>
+          ))}
       </div>
     );
   }
@@ -109,6 +112,60 @@ const PieTooltipComponent = memo(({ active, payload, total }: any) => {
   return null;
 });
 PieTooltipComponent.displayName = 'PieTooltipComponent';
+
+// Memoized custom tooltip for employee distribution stacked bar chart
+const EmployeeDistributionTooltip = memo(({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const total = payload.reduce((sum: number, p: any) => sum + (p.value || 0), 0);
+    return (
+      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-52 overflow-y-auto">
+        <p className="font-semibold text-slate-900 dark:text-white mb-2 text-sm">{label}</p>
+        {payload.map((entry: any, index: number) =>
+          entry.value > 0 ? (
+            <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: entry.fill }} />
+                <span className="text-slate-600 dark:text-slate-400">{entry.name}</span>
+              </div>
+              <span className="font-medium text-slate-900 dark:text-white">{entry.value} shifts</span>
+            </div>
+          ) : null
+        )}
+        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between text-sm font-semibold">
+          <span className="text-slate-500 dark:text-slate-400">Total</span>
+          <span className="text-slate-900 dark:text-white">{total} shifts</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+});
+EmployeeDistributionTooltip.displayName = 'EmployeeDistributionTooltip';
+
+// Sunburst tooltip: distinguishes inner ring (type) from outer ring (employee)
+const SunburstTooltip = memo(({ active, payload, grandTotal }: any) => {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload;
+    const isOuter = 'shiftType' in d;
+    const pct = grandTotal > 0 ? ((d.value / grandTotal) * 100).toFixed(1) : '0';
+    return (
+      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 min-w-[160px]">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: d.fill, opacity: isOuter ? 0.65 : 1 }} />
+          <p className="font-semibold text-slate-900 dark:text-white text-sm">{d.name}</p>
+        </div>
+        {isOuter && (
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-1 pl-5">{d.shiftType} type</p>
+        )}
+        <p className="text-sm text-slate-700 dark:text-slate-300 pl-5">
+          {d.value} shifts · {pct}% of total
+        </p>
+      </div>
+    );
+  }
+  return null;
+});
+SunburstTooltip.displayName = 'SunburstTooltip';
 
 const getFairnessColor = (score: number) => {
   if (score >= 80) return 'text-emerald-500';
@@ -156,6 +213,7 @@ export default function HistoryPage() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [selectedShiftType, setSelectedShiftType] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
+  const [sunburstDrill, setSunburstDrill] = useState<string | null>(null); // null = top level, string = drilled type key
 
   // Available months for date range picker (sorted)
   const availableMonths = useMemo(() => {
@@ -314,24 +372,24 @@ export default function HistoryPage() {
       }));
   }, [monthlyData, selectedShiftType, filterByDateRange]);
 
-  // Memoized chart data: Distribution pie chart
+  // Memoized chart data: Distribution chart
+  // When All Types: per-employee stacked bar (ECT / Internal / ER per person)
+  // When All Types: stacked bar per employee; when specific type: per-employee pie
   const distributionChartData = useMemo(() => {
     if (!activeFairness?.employees) return [];
 
     if (!selectedShiftType) {
-      const typeData: Record<string, number> = {};
-      for (const emp of activeFairness.employees) {
-        if (emp.shifts_by_type) {
-          for (const [type, count] of Object.entries(emp.shifts_by_type)) {
-            typeData[type] = (typeData[type] || 0) + (count as number);
+      // Stacked bar: each employee broken down by shift type
+      return activeFairness.employees
+        .filter((emp: any) => emp.total_shifts > 0)
+        .sort((a: any, b: any) => b.total_shifts - a.total_shifts)
+        .map((emp: any) => {
+          const entry: any = { name: emp.name, total: emp.total_shifts };
+          for (const [type, count] of Object.entries(emp.shifts_by_type || {})) {
+            entry[getShiftTypeConfig(type).label] = count as number;
           }
-        }
-      }
-      return Object.entries(typeData).map(([type, value]) => ({
-        name: getShiftTypeConfig(type).label,
-        value,
-        color: getShiftTypeConfig(type).color,
-      }));
+          return entry;
+        });
     }
 
     return activeFairness.employees
@@ -653,7 +711,15 @@ export default function HistoryPage() {
               <BarChart3 className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-500">Avg Shifts/Employee</p>
+              <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                Avg Shifts/Employee
+                <UITooltip
+                  content="Mean number of shifts assigned per active employee. Higher values indicate more assignments overall."
+                  position="bottom"
+                >
+                  <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                </UITooltip>
+              </p>
               <p className="text-2xl font-bold">
                 {activeFairness?.average_shifts?.toFixed(1) || 0}
               </p>
@@ -667,7 +733,15 @@ export default function HistoryPage() {
               <TrendingUp className="w-6 h-6 text-violet-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-500">Std Deviation</p>
+              <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                Std Deviation
+                <UITooltip
+                  content="Measures how evenly shifts are spread across employees. Lower = more equitable. Calculated as the square root of variance from the mean."
+                  position="bottom"
+                >
+                  <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                </UITooltip>
+              </p>
               <p className="text-2xl font-bold">
                 {activeFairness?.std_deviation?.toFixed(2) || 0}
               </p>
@@ -685,6 +759,9 @@ export default function HistoryPage() {
                 <ArrowUp className="w-4 h-4 text-emerald-600" />
               </div>
               <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">Most Shifts</span>
+              <UITooltip content="Top 3 employees by total shift count in the selected period. A high value relative to peers may indicate disproportionate assignment load." position="bottom">
+                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+              </UITooltip>
             </div>
             <div className="space-y-2">
               {sortedEmployees.slice(0, 3).map((emp: any, i: number) => (
@@ -707,6 +784,9 @@ export default function HistoryPage() {
                 <ArrowDown className="w-4 h-4 text-amber-600" />
               </div>
               <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">Fewest Shifts</span>
+              <UITooltip content="Bottom 3 employees by total shift count. A large gap between the top and bottom performers signals inequity in the assignment schedule." position="bottom">
+                <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+              </UITooltip>
             </div>
             <div className="space-y-2">
               {[...sortedEmployees].reverse().slice(0, 3).map((emp: any, i: number) => (
@@ -729,13 +809,21 @@ export default function HistoryPage() {
       {/* Shift Gap Analysis */}
       {gapAnalysisData.length > 0 && (
         <Card>
-          <CardHeader
-            title="Shift Gap Analysis"
-            description={`Deviation from team average (${activeFairness?.average_shifts?.toFixed(1) || 0} shifts)`}
-          />
+          <div className="flex items-start justify-between mb-1">
+            <CardHeader
+              title="Shift Gap Analysis"
+              description={`Deviation from team average (${activeFairness?.average_shifts?.toFixed(1) || 0} shifts)`}
+            />
+            <UITooltip
+              content="Shows how each employee's total shifts compare to the team average. Green = within ±0.5, indigo = above average, amber = below average, red = extreme outlier (>3 shifts away)."
+              position="bottom"
+            >
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 mr-1 flex-shrink-0" />
+            </UITooltip>
+          </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 40 }}>
+              <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 56 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 12 }} className="text-slate-500" />
                 <YAxis
@@ -789,10 +877,18 @@ export default function HistoryPage() {
       {/* Fairness Over Time */}
       {fairnessTrendData.length > 1 && (
         <Card>
-          <CardHeader
-            title="Fairness Over Time"
-            description="Track fairness score and shift balance progression"
-          />
+          <div className="flex items-start justify-between mb-1">
+            <CardHeader
+              title="Fairness Over Time"
+              description="Track fairness score and shift balance progression"
+            />
+            <UITooltip
+              content="Green area: Fairness Score (0–100) computed monthly using MAD/Median method. Dashed purple line: Max-Min Gap = difference between the most and fewest shifts any employee received that month."
+              position="bottom"
+            >
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 mr-1 flex-shrink-0" />
+            </UITooltip>
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={fairnessTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -866,19 +962,25 @@ export default function HistoryPage() {
         <CardHeader
           title="Analytics Dashboard"
           description="Interactive visualizations of shift data over time"
+          action={
+            <UITooltip content="Four interactive chart views — use the tabs below to switch. All views respect the active shift type and date range filters." position="bottom">
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 flex-shrink-0" />
+            </UITooltip>
+          }
         />
 
         {/* Chart Navigation Tabs */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-2 mb-4 flex-wrap">
           {[
-            { id: 'trends' as ChartView, label: 'Employee Trends', icon: TrendingUp },
-            { id: 'monthly' as ChartView, label: 'Monthly Overview', icon: BarChart3 },
-            { id: 'distribution' as ChartView, label: 'Shifts Distribution', icon: PieChart },
-            { id: 'heatmap' as ChartView, label: 'Heatmap', icon: Grid3X3 },
+            { id: 'trends' as ChartView, label: 'Employee Trends', icon: TrendingUp, desc: 'Line chart: monthly shift count per employee. Hover to compare all staff on a given month.' },
+            { id: 'monthly' as ChartView, label: 'Monthly Overview', icon: BarChart3, desc: 'Stacked bar: total shifts by type each month. Right axis shows active employee count.' },
+            { id: 'distribution' as ChartView, label: 'Shift Sunburst', icon: PieChart, desc: 'Sunburst: inner ring = shift type totals, outer ring = each employee\'s contribution per type.' },
+            { id: 'heatmap' as ChartView, label: 'Heatmap', icon: Grid3X3, desc: 'Grid: darker cell = more shifts that month. Rows sorted by total. Hover a cell for the exact count.' },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveChart(tab.id)}
+              title={tab.desc}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                 activeChart === tab.id
                   ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
@@ -890,6 +992,15 @@ export default function HistoryPage() {
             </button>
           ))}
         </div>
+        {/* Per-chart description */}
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 min-h-[1rem]">
+          {activeChart === 'trends' && 'Each line represents one employee\'s monthly shift count. Hover to compare across all staff.'}
+          {activeChart === 'monthly' && 'Stacked bars show ECT, Internal, and ER shift counts per month. Hover a bar segment to see the exact count.'}
+          {activeChart === 'distribution' && (selectedShiftType
+            ? `Inner ring: total ${SHIFT_TYPES[selectedShiftType]?.label} shifts. Outer ring: each employee's share. Hover a segment to inspect.`
+            : 'Inner ring shows total shifts per type (ECT / Internal / ER). Outer ring breaks each type into individual employees.')}
+          {activeChart === 'heatmap' && 'Darker cells = more shifts that month. Hover a cell to see the exact count. Rows are sorted by total shifts.'}
+        </p>
 
         {/* Charts Container */}
         <AnimatePresence mode="wait">
@@ -917,7 +1028,7 @@ export default function HistoryPage() {
                         tick={{ fontSize: 12 }}
                         className="text-slate-500"
                       />
-                      <Tooltip content={<TrendsTooltip />} />
+                      <Tooltip content={<TrendsTooltip />} wrapperStyle={{ pointerEvents: 'auto' }} />
                       {employeeTrends?.trends?.map((emp: any, index: number) => (
                         <Line
                           key={emp.employee_id}
@@ -948,77 +1059,290 @@ export default function HistoryPage() {
               </div>
             )}
 
-            {/* Monthly Shifts Stacked Bar Chart */}
+            {/* Monthly Shifts — two synchronized panes + right legend */}
             {activeChart === 'monthly' && (
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyChartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-slate-500" />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} className="text-slate-500" />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--tooltip-bg, white)', border: '1px solid var(--tooltip-border, #e2e8f0)', borderRadius: '8px' }} />
-                    <Legend />
-                    {selectedShiftType ? (
-                      <Bar
-                        dataKey="shifts"
-                        name={`${getShiftTypeConfig(selectedShiftType).label} Shifts`}
-                        fill={getShiftTypeConfig(selectedShiftType).color}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    ) : (
-                      <>
-                        <Bar dataKey="ect" name="ECT" stackId="shifts" fill="#3B82F6" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="internal" name="Internal" stackId="shifts" fill="#10B981" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="er" name="ER" stackId="shifts" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                      </>
-                    )}
-                    <Bar dataKey="employees" name="Employees" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="flex gap-2">
+                {/* Two stacked chart panes */}
+                <div className="flex-1 flex flex-col gap-0">
+
+                  {/* Pane 1: Shift type stacked bars */}
+                  <div style={{ height: 210 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthlyChartData} syncId="monthly-sync" margin={{ top: 8, right: 8, left: 28, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+                        <XAxis dataKey="month" tick={false} axisLine={false} tickLine={false} />
+                        <YAxis
+                          allowDecimals={false}
+                          tick={{ fontSize: 11 }}
+                          className="text-slate-500"
+                          label={{ value: 'Shifts', angle: -90, position: 'insideLeft', offset: 8, dy: 20, style: { fontSize: 11, fill: '#94a3b8' } }}
+                        />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                          formatter={(value: any, name: any) => [`${value} shifts`, name]}
+                        />
+                        {selectedShiftType ? (
+                          <Bar dataKey="shifts" name={`${getShiftTypeConfig(selectedShiftType).label} Shifts`} fill={getShiftTypeConfig(selectedShiftType).color} radius={[4, 4, 0, 0]} />
+                        ) : (
+                          <>
+                            <Bar dataKey="ect" name="ECT" stackId="s" fill="#3B82F6" radius={[0, 0, 0, 0]} />
+                            <Bar dataKey="internal" name="Internal" stackId="s" fill="#10B981" radius={[0, 0, 0, 0]} />
+                            <Bar dataKey="er" name="ER" stackId="s" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                          </>
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Thin separator */}
+                  <div className="border-t border-slate-700/50 mx-8" />
+
+                  {/* Pane 2: Active Employees */}
+                  <div style={{ height: 130 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthlyChartData} syncId="monthly-sync" margin={{ top: 4, right: 8, left: 28, bottom: 28 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+                        <XAxis
+                          dataKey="month"
+                          tick={{ fontSize: 10 }}
+                          tickFormatter={(v: string) => v.split(' ')[0]}
+                          label={{ value: 'Month', position: 'insideBottom', offset: -14, style: { fontSize: 11, fill: '#94a3b8' } }}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          tickCount={4}
+                          tick={{ fontSize: 10 }}
+                          className="text-slate-500"
+                          label={{ value: 'Employees', angle: -90, position: 'insideLeft', offset: 8, dy: 32, style: { fontSize: 11, fill: '#94a3b8' } }}
+                        />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                          formatter={(value: any) => [`${value}`, 'Active Employees']}
+                        />
+                        <Bar dataKey="employees" name="Active Employees" fill="#8b5cf6" fillOpacity={0.65} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Right-side legend */}
+                <div className="flex flex-col pt-4 gap-1.5 min-w-[128px] pr-2">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Shift Types</p>
+                  {selectedShiftType ? (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: getShiftTypeConfig(selectedShiftType).color }} />
+                      <span className="text-xs text-slate-300">{getShiftTypeConfig(selectedShiftType).label}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 bg-blue-500" />
+                        <span className="text-xs text-slate-300">ECT</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 bg-red-500" />
+                        <span className="text-xs text-slate-300">ER</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 bg-emerald-500" />
+                        <span className="text-xs text-slate-300">Internal</span>
+                      </div>
+                    </>
+                  )}
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-3 mb-0.5">Metrics</p>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 bg-violet-500 opacity-65" />
+                    <span className="text-xs text-slate-300">Active Employees</span>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Distribution Pie Chart */}
-            {activeChart === 'distribution' && (
-              <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPie>
-                    <Pie
-                      data={distributionChartData}
-                      cx="50%"
-                      cy="40%"
-                      innerRadius={50}
-                      outerRadius={85}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
-                      labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
-                    >
-                      {distributionChartData.map((entry: any, index: number) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]}
-                          className="hover:opacity-80 transition-opacity cursor-pointer"
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<PieTooltipComponent total={distributionTotal} />} isAnimationActive={false} />
-                    <Legend
-                      layout="horizontal"
-                      align="center"
-                      verticalAlign="bottom"
-                      wrapperStyle={{ paddingTop: '8px', maxHeight: '60px', overflowY: 'auto' }}
-                      formatter={(value: string) => (
-                        <span className="text-xs text-slate-600 dark:text-slate-400">{value}</span>
-                      )}
-                    />
-                  </RechartsPie>
-                </ResponsiveContainer>
-              </div>
-            )}
+            {/* Shift Sunburst — interactive drill-down: top level shows shift types, drill into a type to see employees */}
+            {activeChart === 'distribution' && (() => {
+              const SHIFT_COLORS: Record<string, string> = { ECT: '#3b82f6', Internal: '#10b981', ER: '#ef4444' };
+              const RADIAN = Math.PI / 180;
+
+              const employees = (activeFairness?.employees || []).filter((emp: any) => emp.total_shifts > 0);
+              const relevantTypes = selectedShiftType
+                ? Object.entries(SHIFT_TYPES).filter(([k]) => k === selectedShiftType)
+                : Object.entries(SHIFT_TYPES);
+
+              // Inner ring data (shift types)
+              const typeData = relevantTypes.map(([key, config]: any) => {
+                const total = employees.reduce((sum: number, emp: any) => sum + ((emp.shifts_by_type || {})[key] || 0), 0);
+                return { name: config.label, value: total, fill: SHIFT_COLORS[key] || config.color, typeKey: key };
+              }).filter((d: any) => d.value > 0);
+
+              const grandTotal = typeData.reduce((s: number, d: any) => s + d.value, 0);
+
+              // Outer ring data (employees across all types, grouped by type)
+              const outerData = typeData.flatMap(({ typeKey, fill, name: typeName }: any) =>
+                employees
+                  .filter((emp: any) => ((emp.shifts_by_type || {})[typeKey] || 0) > 0)
+                  .map((emp: any) => ({
+                    name: emp.name,
+                    value: (emp.shifts_by_type || {})[typeKey] || 0,
+                    fill,
+                    shiftType: typeName,
+                  }))
+              );
+
+              // Drilled view data (employees of one specific type, sorted desc)
+              const drilledType = sunburstDrill ? typeData.find((d: any) => d.typeKey === sunburstDrill) : null;
+              const drilledData = drilledType
+                ? employees
+                    .filter((emp: any) => ((emp.shifts_by_type || {})[sunburstDrill!] || 0) > 0)
+                    .map((emp: any) => {
+                      const val = (emp.shifts_by_type || {})[sunburstDrill!] || 0;
+                      return { name: emp.name, value: val, fill: drilledType.fill };
+                    })
+                    .sort((a: any, b: any) => b.value - a.value)
+                    .map((d: any, i: number, arr: any[]) => ({
+                      ...d,
+                      opacity: 1 - (i / arr.length) * 0.5, // 1.0 → 0.5 gradient
+                    }))
+                : [];
+
+              // Custom SVG label — uses <tspan> for two-line text
+              const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
+                if (percent < 0.06) return null;
+                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                const pctText = `${(percent * 100).toFixed(0)}%`;
+                const showName = percent >= 0.10;
+                return (
+                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+                    {showName ? (
+                      <>
+                        <tspan x={x} dy="-0.6em">{name}</tspan>
+                        <tspan x={x} dy="1.3em">{pctText}</tspan>
+                      </>
+                    ) : (
+                      <tspan>{pctText}</tspan>
+                    )}
+                  </text>
+                );
+              };
+
+              // Center overlay rendered as absolutely-positioned div (more reliable than Recharts <Label> on dark bg)
+              const centerLabel = sunburstDrill
+                ? { line1: drilledType?.name ?? '', line2: `${drilledType?.value ?? 0} shifts` }
+                : { line1: String(grandTotal), line2: 'Total Shifts' };
+
+              return (
+                <div className="relative flex flex-col items-center">
+                  {/* Back button */}
+                  <div className="h-7 flex items-center">
+                    {sunburstDrill && (
+                      <button
+                        onClick={() => setSunburstDrill(null)}
+                        className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                      >
+                        <ChevronLeft className="w-4 h-4" /> Back to all types
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Chart */}
+                  <div className="relative w-full" style={{ height: 380 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPie>
+                        {!sunburstDrill ? (
+                          <>
+                            {/* Inner ring: shift type totals — click to drill in */}
+                            <Pie
+                              data={typeData}
+                              cx="50%" cy="50%"
+                              innerRadius={72} outerRadius={112}
+                              dataKey="value" paddingAngle={3}
+                              labelLine={false} label={renderCustomLabel}
+                              animationDuration={400} isAnimationActive={true}
+                              onClick={(data: any) => setSunburstDrill(data.typeKey)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {typeData.map((d: any, i: number) => <Cell key={`inner-${i}`} fill={d.fill} />)}
+                            </Pie>
+                            {/* Outer ring: employees per type */}
+                            <Pie
+                              data={outerData}
+                              cx="50%" cy="50%"
+                              innerRadius={120} outerRadius={158}
+                              dataKey="value" paddingAngle={1}
+                              label={false}
+                              animationDuration={400} isAnimationActive={true}
+                              style={{ cursor: 'default' }}
+                            >
+                              {outerData.map((d: any, i: number) => (
+                                <Cell key={`outer-${i}`} fill={d.fill} fillOpacity={0.6} />
+                              ))}
+                            </Pie>
+                          </>
+                        ) : (
+                          /* Drilled view: employees of selected type */
+                          <Pie
+                            data={drilledData}
+                            cx="50%" cy="50%"
+                            innerRadius={82} outerRadius={150}
+                            dataKey="value" paddingAngle={2}
+                            labelLine={false} label={renderCustomLabel}
+                            animationDuration={400} isAnimationActive={true}
+                          >
+                            {drilledData.map((d: any, i: number) => (
+                              <Cell key={`drilled-${i}`} fill={d.fill} fillOpacity={d.opacity} />
+                            ))}
+                          </Pie>
+                        )}
+                        <Tooltip content={<SunburstTooltip grandTotal={sunburstDrill ? (drilledType?.value || grandTotal) : grandTotal} />} />
+                      </RechartsPie>
+                    </ResponsiveContainer>
+
+                    {/* Center label — absolutely positioned over the donut hole */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-slate-100">{centerLabel.line1}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{centerLabel.line2}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 justify-center mt-3 pb-1">
+                    {(sunburstDrill ? drilledData : typeData).map((d: any) => (
+                      <div key={d.name} className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: d.fill, opacity: d.opacity ?? 1 }} />
+                        <span className="text-slate-300">{d.name}</span>
+                        <span className="text-slate-500">({d.value})</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Hint */}
+                  {!sunburstDrill && (
+                    <p className="text-xs text-slate-500 mt-1">Click a type segment to drill into employee breakdown</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Workload Heatmap */}
             {activeChart === 'heatmap' && (
+              <div>
+              {/* Color intensity legend */}
+              <div className="flex items-center gap-3 mb-3 justify-end">
+                <span className="text-xs text-slate-500 dark:text-slate-400">Fewer shifts</span>
+                <div className="flex gap-0.5">
+                  {[0.15, 0.3, 0.45, 0.6, 0.75].map((op) => (
+                    <div
+                      key={op}
+                      className="w-5 h-4 rounded-sm"
+                      style={{ backgroundColor: `rgba(99, 102, 241, ${op})` }}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-slate-500 dark:text-slate-400">More shifts</span>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-separate border-spacing-1">
                   <thead>
@@ -1092,6 +1416,7 @@ export default function HistoryPage() {
                   </tfoot>
                 </table>
               </div>
+              </div>
             )}
           </motion.div>
         </AnimatePresence>
@@ -1102,6 +1427,9 @@ export default function HistoryPage() {
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-4 h-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-600">Active Employees</span>
+              <UITooltip content="Employees who received at least one shift in the selected period. Excludes anyone with zero assignments." position="bottom">
+                <Info className="w-3 h-3 text-indigo-400 hover:text-indigo-600 cursor-help" />
+              </UITooltip>
             </div>
             <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-400">
               {activeFairness?.employees?.filter((e: any) => e.total_shifts > 0).length || 0}
@@ -1111,6 +1439,9 @@ export default function HistoryPage() {
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-emerald-600" />
               <span className="text-sm font-medium text-emerald-600">Total Shifts</span>
+              <UITooltip content="Sum of all shift assignments across employees and months matching the active shift type and date range filters." position="bottom">
+                <Info className="w-3 h-3 text-emerald-400 hover:text-emerald-600 cursor-help" />
+              </UITooltip>
             </div>
             <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
               {activeFairness?.employees?.reduce((a: number, e: any) => a + e.total_shifts, 0) || 0}
@@ -1120,6 +1451,9 @@ export default function HistoryPage() {
             <div className="flex items-center gap-2 mb-2">
               <LineChart className="w-4 h-4 text-violet-600" />
               <span className="text-sm font-medium text-violet-600">Months Tracked</span>
+              <UITooltip content="Number of distinct calendar months with at least one recorded shift, filtered by the selected date range." position="bottom">
+                <Info className="w-3 h-3 text-violet-400 hover:text-violet-600 cursor-help" />
+              </UITooltip>
             </div>
             <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">
               {filteredMonths.length || 0}
@@ -1130,12 +1464,20 @@ export default function HistoryPage() {
 
       {/* Employee Fairness Breakdown */}
       <Card>
-        <CardHeader
-          title="Employee Distribution"
-          description={selectedShiftType
-            ? `Shift distribution for ${SHIFT_TYPES[selectedShiftType].label} type`
-            : 'Shift distribution across all employees'}
-        />
+        <div className="flex items-start justify-between mb-1">
+          <CardHeader
+            title="Employee Distribution"
+            description={selectedShiftType
+              ? `Shift distribution for ${SHIFT_TYPES[selectedShiftType].label} type`
+              : 'Total shifts per employee — color segments show breakdown by type'}
+          />
+          <UITooltip
+            content="Progress bar length = employee's total shifts relative to the highest-performing employee. Color = above (green) or below (primary) team average."
+            position="bottom"
+          >
+            <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 mr-1 flex-shrink-0" />
+          </UITooltip>
+        </div>
 
         {/* Sorting Controls */}
         <div className="relative mb-4" ref={sortDropdownRef}>
@@ -1255,46 +1597,97 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </div>
-                <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${percentage}%` }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    className={`h-full rounded-full ${
-                      isAboveAverage
-                        ? 'bg-emerald-500'
-                        : 'bg-primary-500'
-                    }`}
-                  />
-                </div>
+                {!selectedShiftType && emp.shifts_by_type ? (
+                  /* Segmented bar: one segment per shift type */
+                  <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                    {Object.entries(SHIFT_TYPES).map(([key, config]) => {
+                      const count = emp.shifts_by_type[key] || 0;
+                      const segPct = activeFairness.max_shifts > 0
+                        ? (count / activeFairness.max_shifts) * 100
+                        : 0;
+                      if (segPct === 0) return null;
+                      return (
+                        <motion.div
+                          key={key}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${segPct}%` }}
+                          transition={{ duration: 0.5, delay: 0.1 }}
+                          className="h-full"
+                          style={{ backgroundColor: config.color }}
+                          title={`${config.label}: ${count}`}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percentage}%` }}
+                      transition={{ duration: 0.5, delay: 0.1 }}
+                      className={`h-full rounded-full ${
+                        isAboveAverage ? 'bg-emerald-500' : 'bg-primary-500'
+                      }`}
+                      style={selectedShiftType ? { backgroundColor: getShiftTypeConfig(selectedShiftType).color } : {}}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </Card>
 
-      {/* Monthly Summary KPIs (moved above Monthly History) */}
+      {/* Monthly Summary KPIs */}
       <div>
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Monthly Summary</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
-            <div className="text-center">
-              <p className="text-sm text-slate-500">Total Months</p>
-              <p className="text-3xl font-bold mt-1">
-                {filteredMonths.length || 0}
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <CalendarRange className="w-6 h-6 text-slate-500" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                  Total Months
+                  <UITooltip content="Number of calendar months with recorded shift data in the selected date range." position="bottom">
+                    <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                  </UITooltip>
+                </p>
+                <p className="text-2xl font-bold mt-0.5">{filteredMonths.length || 0}</p>
+              </div>
             </div>
           </Card>
           <Card>
-            <div className="text-center">
-              <p className="text-sm text-slate-500">Min Shifts (Employee)</p>
-              <p className="text-3xl font-bold mt-1">{activeFairness?.min_shifts || 0}</p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <ArrowDown className="w-6 h-6 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                  Min Shifts (Employee)
+                  <UITooltip content="The lowest total shift count any single employee received in the selected period. A large gap between min and max signals inequity." position="bottom">
+                    <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                  </UITooltip>
+                </p>
+                <p className="text-2xl font-bold mt-0.5 text-amber-600">{activeFairness?.min_shifts || 0}</p>
+              </div>
             </div>
           </Card>
           <Card>
-            <div className="text-center">
-              <p className="text-sm text-slate-500">Max Shifts (Employee)</p>
-              <p className="text-3xl font-bold mt-1">{activeFairness?.max_shifts || 0}</p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <ArrowUp className="w-6 h-6 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                  Max Shifts (Employee)
+                  <UITooltip content="The highest total shift count any single employee received. Compare with Min to assess the range of distribution." position="bottom">
+                    <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
+                  </UITooltip>
+                </p>
+                <p className="text-2xl font-bold mt-0.5 text-emerald-600">{activeFairness?.max_shifts || 0}</p>
+              </div>
             </div>
           </Card>
         </div>
@@ -1305,6 +1698,11 @@ export default function HistoryPage() {
         <CardHeader
           title="Monthly History"
           description="Past assignment summaries by month"
+          action={
+            <UITooltip content="Click any month row to open a full shift calendar with day-by-day assignments, color-coded by shift type. Includes a per-employee summary at the bottom." position="bottom">
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 flex-shrink-0" />
+            </UITooltip>
+          }
         />
         <div className="space-y-3" style={{ contentVisibility: 'auto' }}>
           {filteredMonths.length > 0 ? (

@@ -362,32 +362,55 @@ export function generateMockCalendarHtml(monthYear: string): string {
   <div class="summary"><h2>Shift Summary</h2><div class="summary-grid">${summaryHtml}</div></div>
 </div>
 <style>
-  .container{max-width:1200px;margin:0 auto}
+  *{box-sizing:border-box}
+  .container{max-width:1200px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
   .header{text-align:center;margin-bottom:1.5rem}
-  .header h1{font-size:2rem;font-weight:700;color:#1e3a5f;margin-bottom:0.25rem}
-  .header p{color:#64748b;font-size:1rem}
-  .calendar{border-radius:0.75rem;overflow:hidden;border:1px solid #e2e8f0}
-  .calendar-header{display:grid;grid-template-columns:repeat(7,1fr);background:#f1f5f9}
-  .day-header{padding:0.75rem;text-align:center;font-weight:600;color:#334155;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em}
-  .calendar-body{display:grid;grid-template-columns:repeat(7,1fr)}
-  .day-cell{min-height:100px;padding:0.5rem;border:1px solid #f1f5f9;position:relative}
-  .day-cell.other-month{background:#f8fafc}
-  .day-cell.weekend{background:#fef2f2}
-  .day-cell.has-shift{background:#eff6ff}
-  .day-number{font-size:0.8rem;font-weight:500;color:#64748b;margin-bottom:0.35rem}
-  .day-cell.today .day-number{background:#3b82f6;color:white;width:1.5rem;height:1.5rem;display:flex;align-items:center;justify-content:center;border-radius:50%}
-  .shift-badge{padding:0.2rem 0.4rem;border-radius:0.3rem;font-size:0.65rem;color:white;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:0.2rem}
-  .shift-badge .type-label{font-weight:700;margin-right:0.15rem;opacity:0.9}
-  .shift-badge .employee-name{font-weight:400}
-  .legend{margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:center}
-  .legend-item{display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.75rem;background:#f8fafc;border-radius:0.4rem}
-  .legend-color{width:0.85rem;height:0.85rem;border-radius:0.2rem}
-  .legend-name{font-size:0.8rem;color:#334155}
-  .summary{margin-top:1.5rem;background:#f8fafc;border-radius:0.75rem;padding:1.25rem}
-  .summary h2{font-size:1.1rem;margin-bottom:0.75rem;color:#1e293b}
-  .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem}
-  .summary-card{background:#f1f5f9;padding:0.75rem;border-radius:0.4rem;display:flex;justify-content:space-between;align-items:center}
-  .summary-card .name{font-weight:500;color:#1e293b;font-size:0.85rem}
-  .summary-card .count{background:#dbeafe;padding:0.2rem 0.6rem;border-radius:0.75rem;font-size:0.8rem;color:#3b82f6}
+  .header h1{font-size:1.85rem;font-weight:700;color:#1e293b;margin-bottom:0.25rem}
+  .header p{color:#64748b;font-size:0.95rem}
+  .calendar{border-radius:0.75rem;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+  .calendar-header{display:grid;grid-template-columns:repeat(7,1fr);background:#f8fafc;border-bottom:2px solid #e2e8f0}
+  .day-header{padding:0.65rem 0.5rem;text-align:center;font-weight:700;color:#475569;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em}
+  .day-header:first-child,.day-header:last-child{color:#94a3b8}
+  .calendar-body{display:grid;grid-template-columns:repeat(7,1fr);background:#fff}
+  .day-cell{min-height:96px;padding:0.45rem;border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;background:#fff;transition:background 0.15s}
+  .day-cell:hover{background:#f8fafc}
+  .day-cell.other-month{background:#fafafa;opacity:0.45}
+  .day-cell.weekend{background:#fdf9f7}
+  .day-cell.weekend:hover{background:#faf5f2}
+  .day-cell.has-shift{background:#fff}
+  .day-cell.has-shift.weekend{background:#fdf9f7}
+  .day-cell.today{background:#fffbeb}
+  .day-cell.today:hover{background:#fef3c7}
+  .day-number{font-size:0.76rem;font-weight:600;color:#94a3b8;margin-bottom:0.3rem;line-height:1.2}
+  .day-cell.has-shift .day-number{color:#475569}
+  .day-cell.today .day-number{display:inline-flex;align-items:center;justify-content:center;width:1.55rem;height:1.55rem;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border-radius:50%;font-weight:700;font-size:0.72rem}
+  .shift-badge{display:flex;align-items:center;gap:0.2rem;padding:0.18rem 0.38rem;border-radius:0.4rem;font-size:0.62rem;color:#fff;margin-bottom:0.18rem;overflow:hidden;max-width:100%}
+  .shift-badge .type-label{font-weight:800;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;flex-shrink:0;opacity:0.92}
+  .shift-badge .employee-name{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .legend{margin-top:1.25rem;display:flex;flex-wrap:wrap;gap:0.6rem;justify-content:center}
+  .legend-item{display:flex;align-items:center;gap:0.4rem;padding:0.35rem 0.7rem;background:#f8fafc;border-radius:0.5rem;border:1px solid #e2e8f0}
+  .legend-color{width:0.8rem;height:0.8rem;border-radius:0.25rem;flex-shrink:0}
+  .legend-name{font-size:0.78rem;color:#334155;font-weight:500}
+  .summary{margin-top:1.25rem;background:#f8fafc;border-radius:0.75rem;padding:1.1rem;border:1px solid #e2e8f0}
+  .summary h2{font-size:1rem;margin-bottom:0.65rem;color:#1e293b;font-weight:600}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0.6rem}
+  .summary-card{background:#fff;padding:0.6rem 0.75rem;border-radius:0.5rem;display:flex;justify-content:space-between;align-items:center;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+  .summary-card .name{font-weight:500;color:#1e293b;font-size:0.82rem}
+  .summary-card .count{background:#f0fdf4;border:1px solid #bbf7d0;padding:0.15rem 0.55rem;border-radius:999px;font-size:0.78rem;color:#16a34a;font-weight:600}
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: white !important; }
+    .print-hide, button { display: none !important; }
+    .shift-badge { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: white !important; }
+    .legend-color { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .day-cell { background: white !important; border: 1px solid #e2e8f0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .day-cell.weekend { background: #fdf9f7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .day-cell.today { background: #fffbeb !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .day-cell.today .day-number { background: linear-gradient(135deg,#3b82f6,#1d4ed8) !important; color: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .calendar-header { background: #f8fafc !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .day-header { background: #f8fafc !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .summary-card { border: 1px solid #e2e8f0 !important; }
+    .summary-card .count { background: #f0fdf4 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
 </style>`;
 }

@@ -1,4 +1,10 @@
+# Development Docker Compose for ECT Shift Assignment App
+# Usage: docker compose up --build
+# Hot-reload is enabled for both backend and frontend via volume mounts.
+
 services:
+  # FastAPI backend with Python 3.11
+  # Volume mounts enable live code reload during development
   backend:
     build: ./backend
     ports:
@@ -6,8 +12,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/data:/app/data
+      - ./backend/app:/app/app    # Mount app source for hot-reload
+      - ./backend/data:/app/data  # Persist local data files
     env_file:
       - ./backend/.env
     environment:
@@ -20,10 +26,16 @@ services:
       retries: 3
       start_period: 10s
 
+  # Next.js frontend with Node.js 20
+  # WATCHPACK_POLLING enables file-watching inside Docker on some OS
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app                # mount source for hot-reload
+      - /app/node_modules              # keep container's node_modules
+      - /app/.next                     # keep container's build cache
     environment:
       - BACKEND_URL=http://backend:8000
       - NEXT_PUBLIC_API_URL=http://localhost:8000
