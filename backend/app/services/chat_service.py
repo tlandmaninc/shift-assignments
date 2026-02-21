@@ -172,11 +172,11 @@ Fairness: {fairness['fairness_score']}%, Avg: {fairness['average_shifts']} shift
 
     def _build_system_prompt(self, context: str) -> str:
         """Build system prompt with context."""
-        return f"""You are a shift scheduling assistant. Answer briefly using this data:
+        return f"""You are a shift scheduling assistant. Use this data to answer questions:
 
 {context}
 
-Be concise. Answer in 1-2 sentences."""
+Answer clearly and completely. Use short paragraphs or bullet points when helpful."""
 
     async def check_health(self) -> dict:
         """Check if the AI provider is available and configured."""
@@ -223,7 +223,7 @@ Be concise. Answer in 1-2 sentences."""
         result = await self.provider.chat(
             messages=messages,
             system_prompt=system_prompt,
-            max_tokens=512,
+            max_tokens=2048,
         )
 
         return {
@@ -247,6 +247,6 @@ Be concise. Answer in 1-2 sentences."""
         async for chunk in self.provider.stream_chat(
             messages=messages,
             system_prompt=system_prompt,
-            max_tokens=512,
+            max_tokens=2048,
         ):
             yield chunk
