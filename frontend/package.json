@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest --passWithNoTests",
-    "test:coverage": "jest --coverage --passWithNoTests"
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
