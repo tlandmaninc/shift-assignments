@@ -22,12 +22,10 @@ Thank you for considering contributing to this project! This document explains h
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync --dev
 cp .env.example .env
 # Edit .env with your values
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend
@@ -93,7 +91,7 @@ test(employees): add merge endpoint tests
 1. **Ensure tests pass** before submitting:
    ```bash
    # Backend tests
-   cd backend && python -m pytest tests/ -v
+   cd backend && uv run python -m pytest tests/ -v
 
    # Frontend tests
    cd frontend && npm test -- --watchAll=false
@@ -121,7 +119,7 @@ test(employees): add merge endpoint tests
 ```bash
 # Backend
 cd backend
-python -m pytest tests/ -v
+uv run python -m pytest tests/ -v
 
 # Frontend
 cd frontend

@@ -1,7 +1,10 @@
 # Dockerfile for ECT Backend
 # Works with: Railway, Fly.io, Google Cloud Run, AWS ECS, etc.
 
-FROM python:3.11-slim
+FROM python:3.12-slim
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
@@ -9,18 +12,21 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies (cached layer)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY . .
 
 # Create data directory
 RUN mkdir -p /app/data
+
+# Make venv binaries available on PATH
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \

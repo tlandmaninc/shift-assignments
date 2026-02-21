@@ -3,7 +3,7 @@
 # Hot-reload is enabled for both backend and frontend via volume mounts.
 
 services:
-  # FastAPI backend with Python 3.11
+  # FastAPI backend with Python 3.12 (uv)
   # Volume mounts enable live code reload during development
   backend:
     build: ./backend

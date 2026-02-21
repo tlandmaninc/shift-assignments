@@ -53,13 +53,14 @@ If a file or function exceeds these limits, refactor by extracting smaller units
 | **Dates** | date-fns | 3.3.1 |
 | **Notifications** | React Hot Toast | 2.4.1 |
 | **Auth (phone)** | Firebase | 12.9.0 |
-| **Backend** | FastAPI + Python | 0.109.0 / 3.11+ |
+| **Backend** | FastAPI + Python | 0.109.0 / 3.12+ |
 | **Validation** | Pydantic | 2.5.3 |
 | **Data** | Pandas + NumPy | 2.2.0 / 1.26.3 |
 | **Auth (JWT)** | PyJWT | 2.8.0+ |
 | **Google APIs** | google-auth + google-api-python-client | 2.27 / 2.116 |
 | **Rate limiting** | slowapi | 0.1.9+ |
 | **AI (default)** | Google Gemini 2.5 Flash | — |
+| **Pkg manager** | uv (Python) | 0.6.x |
 | **Dev** | Docker Compose, Turbopack | — |
 | **Testing** | Jest (frontend) + pytest (backend) | — |
 | **CI/CD** | GitHub Actions | — |
@@ -91,8 +92,8 @@ make prod            # Start production (docker-compose.prod.yaml)
 # Backend
 cd backend
 cp .env.example .env       # fill in required values
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uv sync --dev
+uv run uvicorn app.main:app --reload --port 8000
 
 # Frontend
 cd frontend
@@ -114,8 +115,8 @@ docker compose logs -f             # Stream logs
 ```bash
 cd frontend && npx tsc --noEmit         # TypeScript check
 cd frontend && npm test -- --watchAll=false  # Jest
-cd backend && python -m pytest tests/ -v     # pytest
-cd backend && python -m pytest --cov=app     # with coverage
+cd backend && uv run python -m pytest tests/ -v     # pytest
+cd backend && uv run python -m pytest --cov=app     # with coverage
 ```
 
 > **WSL2 note**: Run all commands from WSL, not Windows CMD/PowerShell.
@@ -262,7 +263,8 @@ ECT/
 │   │   ├── schemas/             # Pydantic models
 │   │   └── data/               # JSON storage (gitignored, Docker volume)
 │   ├── tests/                   # pytest test suite
-│   ├── requirements.txt
+│   ├── pyproject.toml           # Python deps + project metadata
+│   ├── uv.lock                  # Locked dependency versions
 │   └── Dockerfile
 ├── frontend/
 │   ├── app/                     # Next.js App Router pages
@@ -391,8 +393,8 @@ NEXT_PUBLIC_FIREBASE_APP_ID=<app-id>
 
 ### Backend (pytest)
 ```bash
-cd backend && python -m pytest tests/ -v
-cd backend && python -m pytest --cov=app
+cd backend && uv run python -m pytest tests/ -v
+cd backend && uv run python -m pytest --cov=app
 ```
 Test files: `tests/test_auth.py`, `test_assignments.py`, `test_employees.py`, `test_forms.py`, `test_history.py`, `test_exchanges.py`, `test_chat.py`, `test_utils.py`
 
@@ -404,7 +406,7 @@ cd frontend && npm run test:coverage
 
 ### CI (GitHub Actions)
 - Trigger: push to `main`/`develop`, PR to `main`
-- Jobs: backend tests (Python 3.11), frontend tests + TypeScript check (Node 20), Docker build check
+- Jobs: backend tests (Python 3.12, uv), frontend tests + TypeScript check (Node 20), Docker build check
 
 ---
 

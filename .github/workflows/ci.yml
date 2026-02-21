@@ -14,16 +14,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          version: "0.6.x"
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
 
       - name: Install dependencies
         run: |
           cd backend
-          pip install -r requirements.txt
+          uv sync --frozen --dev
 
       - name: Run tests
         env:
@@ -37,7 +39,7 @@ jobs:
           ADMIN_EMAILS: admin@test.com
         run: |
           cd backend
-          python -m pytest tests/ -v --tb=short
+          uv run python -m pytest tests/ -v --tb=short
 
   frontend-tests:
     name: Frontend Tests (Node.js)

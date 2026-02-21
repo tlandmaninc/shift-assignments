@@ -15,14 +15,14 @@ This guide covers three ways to set up the ECT Shift Assignment App:
 Before starting, verify you have the following installed:
 
 ```bash
-python3 --version   # 3.11 or higher
-node --version      # 20.x or higher
-npm --version       # 9.x or higher
-git --version       # any recent version
+uv --version       # 0.6.x or higher
+node --version     # 20.x or higher
+npm --version      # 9.x or higher
+git --version      # any recent version
 ```
 
 If you need to install these:
-- **Python**: [python.org/downloads](https://python.org/downloads)
+- **uv**: [docs.astral.sh/uv/getting-started/installation](https://docs.astral.sh/uv/getting-started/installation/) (manages Python automatically)
 - **Node.js**: [nodejs.org](https://nodejs.org) (LTS recommended)
 - **Git**: [git-scm.com/downloads](https://git-scm.com/downloads)
 
@@ -40,14 +40,8 @@ Open a terminal and run:
 ```bash
 cd backend
 
-# Create and activate a Python virtual environment
-python3 -m venv venv
-source venv/bin/activate        # Linux / macOS
-# venv\Scripts\activate         # Windows CMD
-# venv\Scripts\Activate.ps1     # Windows PowerShell
-
-# Install Python dependencies
-pip install -r requirements.txt
+# Install Python + dependencies (uv handles venv creation automatically)
+uv sync --dev
 ```
 
 #### Configure Backend Environment
@@ -75,7 +69,7 @@ Open `backend/.env` in your editor and fill in the required values:
 #### Start the Backend
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 Verify it works:
@@ -298,7 +292,7 @@ GOOGLE_CLIENT_SECRET=your-client-secret
   ```bash
   python -c "import secrets; print(secrets.token_urlsafe(32))"
   ```
-- **ModuleNotFoundError**: Make sure you activated the virtual environment and ran `pip install -r requirements.txt`
+- **ModuleNotFoundError**: Make sure you ran `uv sync --dev` in the `backend/` directory
 - **Port already in use**: Another process is using port 8000. Stop it or use a different port:
   ```bash
   uvicorn app.main:app --reload --port 8001

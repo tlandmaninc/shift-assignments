@@ -33,13 +33,13 @@ prod-down: ## Stop production server
 test: test-backend test-frontend ## Run all tests
 
 test-backend: ## Run backend Python tests
-	cd backend && python -m pytest tests/ -v
+	cd backend && uv run python -m pytest tests/ -v
 
 test-frontend: ## Run frontend Jest tests
 	cd frontend && npm test -- --watchAll=false
 
 lint: ## Run linters
-	cd backend && python -m flake8 app/ --max-line-length=120 || true
+	cd backend && uv run python -m flake8 app/ --max-line-length=120 || true
 	cd frontend && npx tsc --noEmit
 
 clean: ## Remove generated files and caches
@@ -50,7 +50,7 @@ clean: ## Remove generated files and caches
 	@echo "Cleaned build artifacts"
 
 install-backend: ## Install backend Python dependencies
-	cd backend && pip install -r requirements.txt
+	cd backend && uv sync --dev
 
 install-frontend: ## Install frontend Node.js dependencies
 	cd frontend && npm install

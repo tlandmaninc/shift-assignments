@@ -151,7 +151,7 @@ Fill in the following settings:
 | **Branch** | `main` |
 | **Root Directory** | `backend` |
 | **Runtime** | `Python 3` |
-| **Build Command** | `pip install -r requirements.txt` |
+| **Build Command** | `pip install uv && uv sync --frozen --no-dev` |
 | **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | **Instance Type** | `Free` |
 
@@ -320,7 +320,7 @@ Expected response:
 
 1. Check the build logs in Render dashboard
 2. Common issues:
-   - Missing `requirements.txt` in backend folder
+   - Missing `pyproject.toml` in backend folder
    - Python version mismatch
    - Wrong root directory setting
 

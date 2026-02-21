@@ -1,7 +1,7 @@
 # ECT Shift Assignment App
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green.svg)](https://python.org)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-green.svg)](https://python.org)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
 
 A full-stack web application for managing shift assignments in medical departments (ECT, Internal Medicine, and ER). Features AI-powered scheduling, fair distribution tracking, shift exchange requests, and multilingual (Hebrew/English) support.
@@ -33,8 +33,8 @@ Choose your installation method:
 ```bash
 # Backend
 cd backend && cp .env.example .env   # edit .env with your keys
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uv sync --dev
+uv run uvicorn app.main:app --reload --port 8000
 
 # Frontend (separate terminal)
 cd frontend && cp .env.example .env.local
@@ -64,7 +64,7 @@ Open [http://localhost:3000](http://localhost:3000) to use the app. API docs at 
 
 ## Prerequisites
 
-- Python 3.11+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (manages Python automatically)
 - Node.js 20+
 - Google Cloud account (for OAuth -- [setup guide](docs/INSTALLATION.md#google-oauth-setup))
 - Google Gemini API key -- [free at aistudio.google.com](https://aistudio.google.com)
@@ -133,7 +133,8 @@ ECT/
 │   │   └── utils/               # Date utilities, name translator
 │   ├── tests/                   # pytest test suite
 │   ├── data/                    # JSON data files (gitignored)
-│   └── requirements.txt
+│   ├── pyproject.toml
+│   └── uv.lock
 ├── frontend/
 │   ├── app/                     # Next.js 14 App Router pages
 │   │   ├── page.tsx             # Landing page

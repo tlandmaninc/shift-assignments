@@ -22,34 +22,46 @@ echo "========================================"
 echo ""
 echo "${YELLOW}► Running backend tests (pytest)...${NC}"
 
-# Pick the first Python that actually has pytest installed
-PYTHON=""
-for candidate in \
-    "$BACKEND_DIR/.venv/bin/python" \
-    "$BACKEND_DIR/venv/bin/python" \
-    "$BACKEND_DIR/venv-wsl/bin/python" \
-    "$REPO_ROOT/venv/bin/python" \
-    "python3" \
-    "python"; do
-    if { [ -f "$candidate" ] || command -v "$candidate" &>/dev/null; } \
-       && "$candidate" -c "import pytest" &>/dev/null 2>&1; then
-        PYTHON="$candidate"
-        break
-    fi
-done
-
-if [ -z "$PYTHON" ]; then
-    echo "${RED}✗ Could not find a Python with pytest installed${NC}"
-    exit 1
-fi
-
 cd "$BACKEND_DIR"
-if $PYTHON -m pytest tests/ -v --tb=short; then
-    echo "${GREEN}✓ Backend tests passed${NC}"
-    BACKEND_RESULT=0
+
+# Prefer uv if available; fall back to a Python with pytest installed
+if command -v uv &>/dev/null; then
+    if uv run python -m pytest tests/ -v --tb=short; then
+        echo "${GREEN}✓ Backend tests passed${NC}"
+        BACKEND_RESULT=0
+    else
+        echo "${RED}✗ Backend tests FAILED${NC}"
+        BACKEND_RESULT=1
+    fi
 else
-    echo "${RED}✗ Backend tests FAILED${NC}"
-    BACKEND_RESULT=1
+    # Fallback: pick the first Python that has pytest installed
+    PYTHON=""
+    for candidate in \
+        "$BACKEND_DIR/.venv/bin/python" \
+        "$BACKEND_DIR/venv/bin/python" \
+        "$BACKEND_DIR/venv-wsl/bin/python" \
+        "$REPO_ROOT/venv/bin/python" \
+        "python3" \
+        "python"; do
+        if { [ -f "$candidate" ] || command -v "$candidate" &>/dev/null; } \
+           && "$candidate" -c "import pytest" &>/dev/null 2>&1; then
+            PYTHON="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$PYTHON" ]; then
+        echo "${RED}✗ Could not find uv or a Python with pytest installed${NC}"
+        exit 1
+    fi
+
+    if $PYTHON -m pytest tests/ -v --tb=short; then
+        echo "${GREEN}✓ Backend tests passed${NC}"
+        BACKEND_RESULT=0
+    else
+        echo "${RED}✗ Backend tests FAILED${NC}"
+        BACKEND_RESULT=1
+    fi
 fi
 
 # ── Frontend Tests (Jest) ───────────────────────────────────────────────────

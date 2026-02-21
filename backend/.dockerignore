@@ -12,4 +12,3 @@ tests/
 .venv
 venv
 venv-wsl
-=6.5.0
