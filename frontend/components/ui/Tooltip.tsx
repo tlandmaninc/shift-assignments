@@ -43,7 +43,7 @@ export function Tooltip({ children, content, className, position = 'bottom' }: T
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              'absolute z-50 px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg min-w-[260px] max-w-xl leading-relaxed block whitespace-normal break-words border border-slate-700 dark:border-slate-600',
+              'absolute z-50 px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg w-max max-w-[480px] leading-relaxed block whitespace-normal border border-slate-700 dark:border-slate-600',
               positionClasses[position],
               className
             )}
