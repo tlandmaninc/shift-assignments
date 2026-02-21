@@ -23,15 +23,28 @@ const CHART_COLORS = [
   '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
 ];
 
+const TOOLTIP_BOX =
+  'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[280px]';
+
 const PieTooltip = memo(({ active, payload, total }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0];
+    const color = data.payload?.fill ?? CHART_COLORS[0];
+    const pct = total > 0 ? ((data.value / total) * 100).toFixed(1) : '0';
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-        <p className="font-semibold text-slate-900 dark:text-white">{data.name}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          {data.value} shifts ({total > 0 ? ((data.value / total) * 100).toFixed(1) : 0}%)
-        </p>
+      <div className={TOOLTIP_BOX}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+          <span className="font-semibold text-slate-900 dark:text-white text-sm">{data.name}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 text-sm py-0.5">
+          <span className="text-slate-600 dark:text-slate-300">Shifts</span>
+          <span className="font-semibold tabular-nums" style={{ color }}>{data.value}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 text-sm py-0.5">
+          <span className="text-slate-600 dark:text-slate-300">Share</span>
+          <span className="font-semibold tabular-nums" style={{ color }}>{pct}%</span>
+        </div>
       </div>
     );
   }
@@ -43,22 +56,22 @@ const BarTooltip = memo(({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const total = payload.reduce((sum: number, p: any) => sum + (p.value || 0), 0);
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-52 overflow-y-auto">
+      <div className={`${TOOLTIP_BOX} max-h-64 overflow-y-auto`}>
         <p className="font-semibold text-slate-900 dark:text-white mb-2 text-sm">{label}</p>
         {payload.map((entry: any, index: number) =>
           entry.value > 0 ? (
             <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: entry.fill }} />
-                <span className="text-slate-600 dark:text-slate-400">{entry.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.fill }} />
+                <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
               </div>
-              <span className="font-medium text-slate-900 dark:text-white">{entry.value} shifts</span>
+              <span className="font-semibold tabular-nums" style={{ color: entry.fill }}>{entry.value}</span>
             </div>
           ) : null
         )}
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between text-sm font-semibold">
           <span className="text-slate-500 dark:text-slate-400">Total</span>
-          <span className="text-slate-900 dark:text-white">{total} shifts</span>
+          <span className="font-semibold tabular-nums text-slate-900 dark:text-white">{total}</span>
         </div>
       </div>
     );
@@ -135,7 +148,7 @@ export default function DistributionChart({ activeFairness, selectedShiftType }:
               tick={{ fontSize: 11 }}
               className="text-slate-500"
             />
-            <Tooltip content={<BarTooltip />} />
+            <Tooltip content={<BarTooltip />} wrapperStyle={{ pointerEvents: 'auto' }} />
             <Legend
               wrapperStyle={{ paddingTop: '8px' }}
               formatter={(value: string) => (
