@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+/** @type {import('next').NextConfig} */ // v2
 const nextConfig = {
   reactStrictMode: true,
   webpack: (config, { dev }) => {

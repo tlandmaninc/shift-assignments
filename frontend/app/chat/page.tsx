@@ -169,12 +169,15 @@ export default function ChatPage() {
           setLoading(false);
           setStreaming(false);
           streamingMessageId.current = null;
+          const errorMsg = error.includes('429')
+            ? 'AI service rate limit reached. Please wait a moment and try again.'
+            : `Sorry, an error occurred: ${error}`;
           setMessages((prev) => {
             const existing = prev.find((m) => m.id === assistantMsgId);
             if (existing) {
               return prev.map((m) =>
                 m.id === assistantMsgId
-                  ? { ...m, content: m.content || 'Sorry, an error occurred. Please try again.' }
+                  ? { ...m, content: m.content || errorMsg }
                   : m
               );
             }
@@ -183,7 +186,7 @@ export default function ChatPage() {
               {
                 id: assistantMsgId,
                 role: 'assistant' as const,
-                content: 'Sorry, an error occurred. Please try again.',
+                content: errorMsg,
                 timestamp: new Date(),
               },
             ];

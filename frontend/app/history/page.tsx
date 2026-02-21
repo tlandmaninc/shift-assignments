@@ -71,22 +71,25 @@ const CHART_COLORS = [
 type ChartView = 'trends' | 'monthly' | 'distribution' | 'heatmap';
 type SortOption = 'shifts-desc' | 'shifts-asc' | 'name-asc' | 'name-desc';
 
+// Shared chart tooltip container classes
+const TOOLTIP_BOX = 'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[280px]';
+
 // Memoized custom tooltip for line chart
 const TrendsTooltip = memo(({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-60 overflow-y-auto min-w-[180px]">
+      <div className={cn(TOOLTIP_BOX, 'max-h-64 overflow-y-auto')}>
         <p className="font-semibold text-slate-900 dark:text-white mb-2 text-sm">{label}</p>
         {payload
           .slice()
           .sort((a: any, b: any) => (b.value ?? 0) - (a.value ?? 0))
           .map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-3 text-sm py-0.5">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
-                <span className="text-slate-600 dark:text-slate-400">{entry.name}</span>
+            <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
               </div>
-              <span className="font-medium text-slate-900 dark:text-white">{entry.value ?? 0}</span>
+              <span className="font-semibold tabular-nums" style={{ color: entry.color }}>{entry.value ?? 0}</span>
             </div>
           ))}
       </div>
@@ -96,69 +99,24 @@ const TrendsTooltip = memo(({ active, payload, label }: any) => {
 });
 TrendsTooltip.displayName = 'TrendsTooltip';
 
-// Memoized custom tooltip for pie chart
-const PieTooltipComponent = memo(({ active, payload, total }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
-        <p className="font-semibold text-slate-900 dark:text-white">{data.name}</p>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          {data.value} shifts ({total > 0 ? ((data.value / total) * 100).toFixed(1) : 0}%)
-        </p>
-      </div>
-    );
-  }
-  return null;
-});
-PieTooltipComponent.displayName = 'PieTooltipComponent';
-
-// Memoized custom tooltip for employee distribution stacked bar chart
-const EmployeeDistributionTooltip = memo(({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const total = payload.reduce((sum: number, p: any) => sum + (p.value || 0), 0);
-    return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-52 overflow-y-auto">
-        <p className="font-semibold text-slate-900 dark:text-white mb-2 text-sm">{label}</p>
-        {payload.map((entry: any, index: number) =>
-          entry.value > 0 ? (
-            <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: entry.fill }} />
-                <span className="text-slate-600 dark:text-slate-400">{entry.name}</span>
-              </div>
-              <span className="font-medium text-slate-900 dark:text-white">{entry.value} shifts</span>
-            </div>
-          ) : null
-        )}
-        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between text-sm font-semibold">
-          <span className="text-slate-500 dark:text-slate-400">Total</span>
-          <span className="text-slate-900 dark:text-white">{total} shifts</span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-});
-EmployeeDistributionTooltip.displayName = 'EmployeeDistributionTooltip';
-
 // Sunburst tooltip: distinguishes inner ring (type) from outer ring (employee)
 const SunburstTooltip = memo(({ active, payload, grandTotal }: any) => {
   if (active && payload && payload.length) {
     const d = payload[0].payload;
     const isOuter = 'shiftType' in d;
     const pct = grandTotal > 0 ? ((d.value / grandTotal) * 100).toFixed(1) : '0';
+    const bulletColor = d.fill;
     return (
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 min-w-[160px]">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: d.fill, opacity: isOuter ? 0.65 : 1 }} />
-          <p className="font-semibold text-slate-900 dark:text-white text-sm">{d.name}</p>
+      <div className={TOOLTIP_BOX}>
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: bulletColor, opacity: isOuter ? 0.65 : 1 }} />
+          <p className="font-semibold text-sm" style={{ color: bulletColor }}>{d.name}</p>
         </div>
         {isOuter && (
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-1 pl-5">{d.shiftType} type</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-1 pl-[18px]">{d.shiftType} type</p>
         )}
-        <p className="text-sm text-slate-700 dark:text-slate-300 pl-5">
-          {d.value} shifts · {pct}% of total
+        <p className="text-sm text-slate-600 dark:text-slate-300 pl-[18px]">
+          <span className="font-semibold" style={{ color: bulletColor }}>{d.value}</span> shifts · {pct}% of total
         </p>
       </div>
     );
@@ -166,6 +124,125 @@ const SunburstTooltip = memo(({ active, payload, grandTotal }: any) => {
   return null;
 });
 SunburstTooltip.displayName = 'SunburstTooltip';
+
+// Gap Analysis tooltip: colored bullet per employee bar
+const GapAnalysisTooltip = memo(({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload;
+    const barColor = getGapBarColor(d.deviation);
+    const sign = d.deviation > 0 ? '+' : '';
+    return (
+      <div className={TOOLTIP_BOX}>
+        <p className="font-semibold text-slate-900 dark:text-white text-sm mb-2">{label}</p>
+        <div className="flex items-center justify-between gap-4 text-sm py-0.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: barColor }} />
+            <span className="text-slate-600 dark:text-slate-300">Deviation</span>
+          </div>
+          <span className="font-semibold tabular-nums" style={{ color: barColor }}>{sign}{d.deviation}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 text-sm py-0.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-slate-400" />
+            <span className="text-slate-600 dark:text-slate-300">Total shifts</span>
+          </div>
+          <span className="font-semibold tabular-nums text-slate-900 dark:text-white">{d.total}</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+});
+GapAnalysisTooltip.displayName = 'GapAnalysisTooltip';
+
+// Fairness Over Time tooltip: colored bullets for each metric
+const FairnessOverTimeTooltip = memo(({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const METRIC_META: Record<string, { label: string; color: string; suffix: string }> = {
+      fairness: { label: 'Fairness Score', color: '#22c55e', suffix: '%' },
+      gap: { label: 'Max-Min Gap', color: '#8b5cf6', suffix: '' },
+      stdDev: { label: 'Std Deviation', color: '#f59e0b', suffix: '' },
+    };
+    return (
+      <div className={TOOLTIP_BOX}>
+        <p className="font-semibold text-slate-900 dark:text-white text-sm mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => {
+          const meta = METRIC_META[entry.dataKey] || {
+            label: entry.name, color: entry.color || '#94a3b8', suffix: '',
+          };
+          return (
+            <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: meta.color }} />
+                <span className="text-slate-600 dark:text-slate-300">{meta.label}</span>
+              </div>
+              <span className="font-semibold tabular-nums" style={{ color: meta.color }}>
+                {entry.value ?? 0}{meta.suffix}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
+});
+FairnessOverTimeTooltip.displayName = 'FairnessOverTimeTooltip';
+
+// Monthly Overview Shifts pane tooltip: colored bullets per shift type
+const MonthlyShiftsTooltip = memo(({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const total = payload.reduce((s: number, p: any) => s + (p.value || 0), 0);
+    return (
+      <div className={TOOLTIP_BOX}>
+        <p className="font-semibold text-slate-900 dark:text-white text-sm mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.fill || entry.color }} />
+              <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
+            </div>
+            <span className="font-semibold tabular-nums" style={{ color: entry.fill || entry.color }}>
+              {entry.value} shifts
+            </span>
+          </div>
+        ))}
+        {payload.length > 1 && (
+          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between text-sm font-semibold">
+            <span className="text-slate-500 dark:text-slate-400">Total</span>
+            <span className="text-slate-900 dark:text-white">{total} shifts</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+});
+MonthlyShiftsTooltip.displayName = 'MonthlyShiftsTooltip';
+
+// Monthly Overview Employees pane tooltip
+const MonthlyEmployeesTooltip = memo(({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className={TOOLTIP_BOX}>
+        <p className="font-semibold text-slate-900 dark:text-white text-sm mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center justify-between gap-4 text-sm py-0.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.fill || entry.color }} />
+              <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
+            </div>
+            <span className="font-semibold tabular-nums" style={{ color: entry.fill || entry.color }}>
+              {entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+});
+MonthlyEmployeesTooltip.displayName = 'MonthlyEmployeesTooltip';
 
 const getFairnessColor = (score: number) => {
   if (score >= 80) return 'text-emerald-500';
@@ -682,7 +759,24 @@ export default function HistoryPage() {
                   </span>
                 )}
                 <UITooltip
-                  content="Score = 100 - (MAD / Median) x 100. Uses Median Absolute Deviation for robustness against outliers."
+                  content={
+                    <div className="space-y-1.5">
+                      <p><strong className="text-white">Score</strong> = 100 − (MAD / Median) × 100</p>
+                      <p className="text-xs text-slate-400">Uses Median Absolute Deviation for robustness against outliers.</p>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                        <span><strong style={{ color: '#22c55e' }}>≥80</strong> — Good</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                        <span><strong style={{ color: '#f59e0b' }}>60–79</strong> — Fair</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#ef4444' }} />
+                        <span><strong style={{ color: '#ef4444' }}>&lt;60</strong> — Needs improvement</span>
+                      </div>
+                    </div>
+                  }
                   position="bottom"
                 >
                   <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
@@ -714,7 +808,12 @@ export default function HistoryPage() {
               <p className="text-sm text-slate-500 inline-flex items-center gap-1">
                 Avg Shifts/Employee
                 <UITooltip
-                  content="Mean number of shifts assigned per active employee. Higher values indicate more assignments overall."
+                  content={
+                    <div className="flex items-start gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#3B82F6' }} />
+                      <span><strong style={{ color: '#3B82F6' }}>Mean</strong> shifts per active employee. Higher values indicate more overall assignments.</span>
+                    </div>
+                  }
                   position="bottom"
                 >
                   <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
@@ -736,7 +835,12 @@ export default function HistoryPage() {
               <p className="text-sm text-slate-500 inline-flex items-center gap-1">
                 Std Deviation
                 <UITooltip
-                  content="Measures how evenly shifts are spread across employees. Lower = more equitable. Calculated as the square root of variance from the mean."
+                  content={
+                    <div className="flex items-start gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#8b5cf6' }} />
+                      <span>How evenly shifts are distributed. <strong style={{ color: '#8b5cf6' }}>Lower = more equitable</strong>. Square root of variance from the mean.</span>
+                    </div>
+                  }
                   position="bottom"
                 >
                   <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
@@ -759,7 +863,18 @@ export default function HistoryPage() {
                 <ArrowUp className="w-4 h-4 text-emerald-600" />
               </div>
               <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">Most Shifts</span>
-              <UITooltip content="Top 3 employees by total shift count in the selected period. A high value relative to peers may indicate disproportionate assignment load." position="bottom">
+              <UITooltip
+                content={
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                      <span><strong style={{ color: '#22c55e' }}>Top 3</strong> employees by total shift count</span>
+                    </div>
+                    <p className="text-xs text-slate-400">A high value relative to peers may indicate disproportionate load.</p>
+                  </div>
+                }
+                position="bottom"
+              >
                 <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
               </UITooltip>
             </div>
@@ -784,7 +899,18 @@ export default function HistoryPage() {
                 <ArrowDown className="w-4 h-4 text-amber-600" />
               </div>
               <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">Fewest Shifts</span>
-              <UITooltip content="Bottom 3 employees by total shift count. A large gap between the top and bottom performers signals inequity in the assignment schedule." position="bottom">
+              <UITooltip
+                content={
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                      <span><strong style={{ color: '#f59e0b' }}>Bottom 3</strong> employees by total shift count</span>
+                    </div>
+                    <p className="text-xs text-slate-400">A large gap between top and bottom signals inequity.</p>
+                  </div>
+                }
+                position="bottom"
+              >
                 <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
               </UITooltip>
             </div>
@@ -809,18 +935,38 @@ export default function HistoryPage() {
       {/* Shift Gap Analysis */}
       {gapAnalysisData.length > 0 && (
         <Card>
-          <div className="flex items-start justify-between mb-1">
-            <CardHeader
-              title="Shift Gap Analysis"
-              description={`Deviation from team average (${activeFairness?.average_shifts?.toFixed(1) || 0} shifts)`}
-            />
-            <UITooltip
-              content="Shows how each employee's total shifts compare to the team average. Green = within ±0.5, indigo = above average, amber = below average, red = extreme outlier (>3 shifts away)."
-              position="bottom"
-            >
-              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 mr-1 flex-shrink-0" />
-            </UITooltip>
-          </div>
+          <CardHeader
+            title="Shift Gap Analysis"
+            description={`Deviation from team average (${activeFairness?.average_shifts?.toFixed(1) || 0} shifts)`}
+            tooltip={
+              <UITooltip
+                content={
+                  <div className="space-y-1.5">
+                    <p>Deviation from team average per employee:</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                      <span><strong style={{ color: '#22c55e' }}>Balanced</strong> — within ±0.5</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#6366f1' }} />
+                      <span><strong style={{ color: '#6366f1' }}>Over average</strong> — above team mean</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                      <span><strong style={{ color: '#f59e0b' }}>Under average</strong> — below team mean</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#ef4444' }} />
+                      <span><strong style={{ color: '#ef4444' }}>Extreme</strong> — &gt;3 shifts from average</span>
+                    </div>
+                  </div>
+                }
+                position="right"
+              >
+                <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help flex-shrink-0" />
+              </UITooltip>
+            }
+          />
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 56 }}>
@@ -833,11 +979,7 @@ export default function HistoryPage() {
                   className="text-slate-500"
                   width={110}
                 />
-                <Tooltip
-                  formatter={(value: number | undefined) => [`${(value ?? 0) > 0 ? '+' : ''}${value ?? 0}`, 'Deviation']}
-                  labelFormatter={(label) => label}
-                  contentStyle={{ backgroundColor: 'var(--tooltip-bg, white)', border: '1px solid var(--tooltip-border, #e2e8f0)', borderRadius: '8px' }}
-                />
+                <Tooltip content={<GapAnalysisTooltip />} />
                 <ReferenceLine x={0} stroke="#94a3b8" strokeWidth={2} />
                 <Bar dataKey="deviation" radius={[4, 4, 4, 4]}>
                   {gapAnalysisData.map((entry: any, index: number) => (
@@ -877,18 +1019,34 @@ export default function HistoryPage() {
       {/* Fairness Over Time */}
       {fairnessTrendData.length > 1 && (
         <Card>
-          <div className="flex items-start justify-between mb-1">
-            <CardHeader
-              title="Fairness Over Time"
-              description="Track fairness score and shift balance progression"
-            />
-            <UITooltip
-              content="Green area: Fairness Score (0–100) computed monthly using MAD/Median method. Dashed purple line: Max-Min Gap = difference between the most and fewest shifts any employee received that month."
-              position="bottom"
-            >
-              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 mr-1 flex-shrink-0" />
-            </UITooltip>
-          </div>
+          <CardHeader
+            title="Fairness Over Time"
+            description="Track fairness score and shift balance progression"
+            tooltip={
+              <UITooltip
+                content={
+                  <div className="space-y-1.5">
+                    <p>Monthly fairness progression:</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                      <span><strong style={{ color: '#22c55e' }}>Green area</strong> — Fairness Score (0–100), MAD/Median method</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#8b5cf6' }} />
+                      <span><strong style={{ color: '#8b5cf6' }}>Purple dashed line</strong> — Max-Min Gap (most − fewest shifts)</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-600">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0 opacity-0" />
+                      <span className="text-xs text-slate-400">Colored bands: <strong style={{ color: '#22c55e' }}>Good</strong> 80–100 · <strong style={{ color: '#f59e0b' }}>Fair</strong> 60–80 · <strong style={{ color: '#ef4444' }}>Needs work</strong> &lt;60</span>
+                    </div>
+                  </div>
+                }
+                position="right"
+              >
+                <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help flex-shrink-0" />
+              </UITooltip>
+            }
+          />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={fairnessTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -901,15 +1059,7 @@ export default function HistoryPage() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-slate-500" />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="text-slate-500" />
-                <Tooltip
-                  contentStyle={{ backgroundColor: 'var(--tooltip-bg, white)', border: '1px solid var(--tooltip-border, #e2e8f0)', borderRadius: '8px' }}
-                  formatter={((value: any, name: any) => {
-                    const v = value ?? 0;
-                    if (name === 'fairness') return [`${v}%`, 'Fairness Score'];
-                    if (name === 'gap') return [v, 'Max-Min Gap'];
-                    return [v, name];
-                  }) as any}
-                />
+                <Tooltip content={<FairnessOverTimeTooltip />} />
                 <ReferenceArea y1={80} y2={100} fill="#22c55e" fillOpacity={0.06} />
                 <ReferenceArea y1={60} y2={80} fill="#f59e0b" fillOpacity={0.06} />
                 <ReferenceArea y1={0} y2={60} fill="#ef4444" fillOpacity={0.06} />
@@ -962,9 +1112,33 @@ export default function HistoryPage() {
         <CardHeader
           title="Analytics Dashboard"
           description="Interactive visualizations of shift data over time"
-          action={
-            <UITooltip content="Four interactive chart views — use the tabs below to switch. All views respect the active shift type and date range filters." position="bottom">
-              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 flex-shrink-0" />
+          tooltip={
+            <UITooltip
+              content={
+                <div className="space-y-1.5">
+                  <p>Four interactive chart views:</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#6366f1' }} />
+                    <span><strong style={{ color: '#6366f1' }}>Employee Trends</strong> — monthly per-employee line chart</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#3B82F6' }} />
+                    <span><strong style={{ color: '#3B82F6' }}>Monthly Overview</strong> — stacked bars + employee count</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#8b5cf6' }} />
+                    <span><strong style={{ color: '#8b5cf6' }}>Shift Sunburst</strong> — drill-down donut chart</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#14b8a6' }} />
+                    <span><strong style={{ color: '#14b8a6' }}>Heatmap</strong> — intensity grid by employee × month</span>
+                  </div>
+                  <p className="text-xs text-slate-400">All views respect active shift type and date range filters.</p>
+                </div>
+              }
+              position="right"
+            >
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help flex-shrink-0" />
             </UITooltip>
           }
         />
@@ -1077,10 +1251,7 @@ export default function HistoryPage() {
                           className="text-slate-500"
                           label={{ value: 'Shifts', angle: -90, position: 'insideLeft', offset: 8, dy: 20, style: { fontSize: 11, fill: '#94a3b8' } }}
                         />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                          formatter={(value: any, name: any) => [`${value} shifts`, name]}
-                        />
+                        <Tooltip content={<MonthlyShiftsTooltip />} />
                         {selectedShiftType ? (
                           <Bar dataKey="shifts" name={`${getShiftTypeConfig(selectedShiftType).label} Shifts`} fill={getShiftTypeConfig(selectedShiftType).color} radius={[4, 4, 0, 0]} />
                         ) : (
@@ -1115,10 +1286,7 @@ export default function HistoryPage() {
                           className="text-slate-500"
                           label={{ value: 'Employees', angle: -90, position: 'insideLeft', offset: 8, dy: 32, style: { fontSize: 11, fill: '#94a3b8' } }}
                         />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                          formatter={(value: any) => [`${value}`, 'Active Employees']}
-                        />
+                        <Tooltip content={<MonthlyEmployeesTooltip />} />
                         <Bar dataKey="employees" name="Active Employees" fill="#8b5cf6" fillOpacity={0.65} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1427,7 +1595,15 @@ export default function HistoryPage() {
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-4 h-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-600">Active Employees</span>
-              <UITooltip content="Employees who received at least one shift in the selected period. Excludes anyone with zero assignments." position="bottom">
+              <UITooltip
+                content={
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#6366f1' }} />
+                    <span>Employees who received at least <strong style={{ color: '#6366f1' }}>one shift</strong> in the selected period. Excludes zero-assignment staff.</span>
+                  </div>
+                }
+                position="bottom"
+              >
                 <Info className="w-3 h-3 text-indigo-400 hover:text-indigo-600 cursor-help" />
               </UITooltip>
             </div>
@@ -1439,7 +1615,15 @@ export default function HistoryPage() {
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-emerald-600" />
               <span className="text-sm font-medium text-emerald-600">Total Shifts</span>
-              <UITooltip content="Sum of all shift assignments across employees and months matching the active shift type and date range filters." position="bottom">
+              <UITooltip
+                content={
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#22c55e' }} />
+                    <span>Sum of all <strong style={{ color: '#22c55e' }}>shift assignments</strong> across employees and months matching active filters.</span>
+                  </div>
+                }
+                position="bottom"
+              >
                 <Info className="w-3 h-3 text-emerald-400 hover:text-emerald-600 cursor-help" />
               </UITooltip>
             </div>
@@ -1451,7 +1635,15 @@ export default function HistoryPage() {
             <div className="flex items-center gap-2 mb-2">
               <LineChart className="w-4 h-4 text-violet-600" />
               <span className="text-sm font-medium text-violet-600">Months Tracked</span>
-              <UITooltip content="Number of distinct calendar months with at least one recorded shift, filtered by the selected date range." position="bottom">
+              <UITooltip
+                content={
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#8b5cf6' }} />
+                    <span>Distinct <strong style={{ color: '#8b5cf6' }}>calendar months</strong> with at least one recorded shift in the selected range.</span>
+                  </div>
+                }
+                position="bottom"
+              >
                 <Info className="w-3 h-3 text-violet-400 hover:text-violet-600 cursor-help" />
               </UITooltip>
             </div>
@@ -1464,20 +1656,33 @@ export default function HistoryPage() {
 
       {/* Employee Fairness Breakdown */}
       <Card>
-        <div className="flex items-start justify-between mb-1">
-          <CardHeader
-            title="Employee Distribution"
-            description={selectedShiftType
-              ? `Shift distribution for ${SHIFT_TYPES[selectedShiftType].label} type`
-              : 'Total shifts per employee — color segments show breakdown by type'}
-          />
-          <UITooltip
-            content="Progress bar length = employee's total shifts relative to the highest-performing employee. Color = above (green) or below (primary) team average."
-            position="bottom"
-          >
-            <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 mr-1 flex-shrink-0" />
-          </UITooltip>
-        </div>
+        <CardHeader
+          title="Employee Distribution"
+          description={selectedShiftType
+            ? `Shift distribution for ${SHIFT_TYPES[selectedShiftType].label} type`
+            : 'Total shifts per employee — color segments show breakdown by type'}
+          tooltip={
+            <UITooltip
+              content={
+                <div className="space-y-1.5">
+                  <p>Bar length = shifts relative to the top employee:</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                    <span><strong style={{ color: '#22c55e' }}>Green</strong> — above team average</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#6366f1' }} />
+                    <span><strong style={{ color: '#6366f1' }}>Indigo</strong> — below team average</span>
+                  </div>
+                  <p className="text-xs text-slate-400">When viewing all types, segments are color-coded by shift type.</p>
+                </div>
+              }
+              position="right"
+            >
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help flex-shrink-0" />
+            </UITooltip>
+          }
+        />
 
         {/* Sorting Controls */}
         <div className="relative mb-4" ref={sortDropdownRef}>
@@ -1640,7 +1845,31 @@ export default function HistoryPage() {
 
       {/* Monthly Summary KPIs */}
       <div>
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Monthly Summary</h3>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3 inline-flex items-center gap-1.5">
+          Monthly Summary
+          <UITooltip
+            content={
+              <div className="space-y-1.5">
+                <p>Key distribution metrics for the selected period:</p>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-400" />
+                  <span><strong className="text-white">Total Months</strong> — months with recorded data</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                  <span><strong style={{ color: '#f59e0b' }}>Min Shifts</strong> — fewest for any employee</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+                  <span><strong style={{ color: '#22c55e' }}>Max Shifts</strong> — most for any employee</span>
+                </div>
+              </div>
+            }
+            position="right"
+          >
+            <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help flex-shrink-0" />
+          </UITooltip>
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <div className="flex items-center gap-4">
@@ -1650,7 +1879,15 @@ export default function HistoryPage() {
               <div>
                 <p className="text-sm text-slate-500 inline-flex items-center gap-1">
                   Total Months
-                  <UITooltip content="Number of calendar months with recorded shift data in the selected date range." position="bottom">
+                  <UITooltip
+                    content={
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1 bg-slate-400" />
+                        <span><strong className="text-white">Calendar months</strong> with recorded shift data in the selected date range.</span>
+                      </div>
+                    }
+                    position="bottom"
+                  >
                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                   </UITooltip>
                 </p>
@@ -1666,7 +1903,15 @@ export default function HistoryPage() {
               <div>
                 <p className="text-sm text-slate-500 inline-flex items-center gap-1">
                   Min Shifts (Employee)
-                  <UITooltip content="The lowest total shift count any single employee received in the selected period. A large gap between min and max signals inequity." position="bottom">
+                  <UITooltip
+                    content={
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#f59e0b' }} />
+                        <span>The <strong style={{ color: '#f59e0b' }}>lowest</strong> total shift count any employee received. A large min–max gap signals inequity.</span>
+                      </div>
+                    }
+                    position="bottom"
+                  >
                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                   </UITooltip>
                 </p>
@@ -1682,7 +1927,15 @@ export default function HistoryPage() {
               <div>
                 <p className="text-sm text-slate-500 inline-flex items-center gap-1">
                   Max Shifts (Employee)
-                  <UITooltip content="The highest total shift count any single employee received. Compare with Min to assess the range of distribution." position="bottom">
+                  <UITooltip
+                    content={
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#22c55e' }} />
+                        <span>The <strong style={{ color: '#22c55e' }}>highest</strong> total shift count any employee received. Compare with Min to assess range.</span>
+                      </div>
+                    }
+                    position="bottom"
+                  >
                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                   </UITooltip>
                 </p>
@@ -1698,9 +1951,29 @@ export default function HistoryPage() {
         <CardHeader
           title="Monthly History"
           description="Past assignment summaries by month"
-          action={
-            <UITooltip content="Click any month row to open a full shift calendar with day-by-day assignments, color-coded by shift type. Includes a per-employee summary at the bottom." position="bottom">
-              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help mt-1 flex-shrink-0" />
+          tooltip={
+            <UITooltip
+              content={
+                <div className="space-y-1.5">
+                  <p>Click a month to open its shift calendar, color-coded by type:</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#3B82F6' }} />
+                    <span><strong style={{ color: '#3B82F6' }}>ECT</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#10B981' }} />
+                    <span><strong style={{ color: '#10B981' }}>Internal</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#EF4444' }} />
+                    <span><strong style={{ color: '#EF4444' }}>ER</strong></span>
+                  </div>
+                  <p className="text-xs text-slate-400">Includes a per-employee summary at the bottom.</p>
+                </div>
+              }
+              position="right"
+            >
+              <Info className="w-4 h-4 text-slate-400 hover:text-slate-600 cursor-help flex-shrink-0" />
             </UITooltip>
           }
         />

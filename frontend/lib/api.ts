@@ -392,7 +392,7 @@ export const chatApi = {
     onDone: () => void,
     onError: (error: string) => void,
   ): Promise<void> => {
-    const url = `${CHAT_BACKEND_URL}/api/chat/stream`;
+    const url = `${API_BASE}/chat/stream`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

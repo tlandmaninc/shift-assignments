@@ -35,13 +35,17 @@ interface CardHeaderProps {
   title: string;
   description?: string;
   action?: ReactNode;
+  tooltip?: ReactNode;
 }
 
-export function CardHeader({ title, description, action }: CardHeaderProps) {
+export function CardHeader({ title, description, action, tooltip }: CardHeaderProps) {
   return (
     <div className="flex items-start justify-between mb-4">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h3>
+          {tooltip}
+        </div>
         {description && (
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{description}</p>
         )}

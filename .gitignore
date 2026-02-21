@@ -6,41 +6,60 @@ __pycache__/
 .Python
 venv/
 ENV/
-.env
+.pytest_cache/
 
 # Node.js
 node_modules/
 .next/
 out/
-.env.local
 
-# IDE
+# ─── Environment / Secrets (CRITICAL) ─────────────────────
+.env
+.env.local
+.env.development.local
+.env.production.local
+backend/.env
+
+# ─── Sensitive Data ────────────────────────────────────────
+backend/data/*.json
+backend/data/audit.log
+backend/data/google_token.json
+backend/data/assignments/
+
+# ─── IDE ───────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# ─── OS ────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Data (remove these lines if you want to include sample data)
-backend/data/
-
-# Logs
+# ─── Logs ──────────────────────────────────────────────────
 *.log
 npm-debug.log*
 
-# Misc
+# ─── Build / Misc ─────────────────────────────────────────
 nul
 *.tsbuildinfo
+frontend/.next/
+frontend/node_modules/
 
-# Claude Code
+# ─── Screenshot artifacts (root-level only, not app assets) ──
+/*.png
+/*.jpg
+/*.jpeg
+
+# ─── Tool / Generated ─────────────────────────────────────
+.playwright-mcp/
+.mcp.json
 .claude/
 
-#Venv
+# ─── Bad file from mistyped pip command ────────────────────
+backend/=6.5.0
+
+# ─── Virtual Environments ─────────────────────────────────
 venv-wsl/
-venv/
 .venv/
-.venv-wsl/
 .venv-wsl/

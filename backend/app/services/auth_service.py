@@ -1,6 +1,7 @@
 """Authentication service for JWT and OAuth operations."""
 
 import hashlib
+import os
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
@@ -17,7 +18,7 @@ from ..schemas.auth import UserRole
 logger = logging.getLogger(__name__)
 
 # Admin email addresses (case-insensitive)
-ADMIN_EMAILS = ["tlandmaninc@gmail.com"]
+ADMIN_EMAILS = [e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
 
 # CSRF state storage (in-memory, single-server deployment)
 _oauth_states: dict[str, datetime] = {}
