@@ -201,7 +201,7 @@ async def generate_assignments(request: AssignmentGenerateRequest):
         shift_type=shift_type,
         shift_counts=shift_counts,
         calendar_html=calendar_html,
-        message=f"Successfully assigned {len(assignments)} shifts to {len(set(assignments.values()))} employees",
+        message=f"Successfully assigned {len(assignments)} shifts to {len({entry['employee_name'] for entries in assignments.values() for entry in entries})} employees",
     )
 
 
