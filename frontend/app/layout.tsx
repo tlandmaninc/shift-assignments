@@ -34,18 +34,18 @@ export default function RootLayout({
               children
             ) : (
               // Main app with layout
-              <div className="flex h-screen overflow-hidden">
-                <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+              <div className="flex flex-col h-screen overflow-hidden">
+                <Header
+                  darkMode={darkMode}
+                  onToggleDarkMode={() => setDarkMode(!darkMode)}
+                  sidebarOpen={sidebarOpen}
+                  onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                />
 
-                <div className="flex-1 flex flex-col overflow-auto">
-                  <Header
-                    darkMode={darkMode}
-                    onToggleDarkMode={() => setDarkMode(!darkMode)}
-                    sidebarOpen={sidebarOpen}
-                    onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-                  />
+                <div className="flex flex-1 overflow-hidden">
+                  <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
-                  <main className="flex-1 p-6">
+                  <main className="flex-1 overflow-auto p-6">
                     <div className="max-w-7xl mx-auto">
                       {children}
                     </div>

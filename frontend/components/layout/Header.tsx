@@ -71,17 +71,19 @@ export function Header({
   };
 
   return (
-    <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <header className="border-b border-slate-200 dark:border-slate-800">
       {/* Banner */}
-      <div className="w-full h-32 relative overflow-hidden">
-        <Image
-          src="/ect_banner.png"
-          alt="Shift Assignment Platform Banner"
-          fill
-          className="object-cover object-center"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/40 to-transparent flex items-center px-6">
+      <div
+        className="w-full h-32 relative overflow-hidden"
+        style={{
+          backgroundImage: 'url(/ect_banner.png)',
+          backgroundSize: '430% 100%',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#0f172a',
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/20 to-transparent flex items-center px-6">
           <div className="flex items-center gap-4 w-full">
             <button
               onClick={onToggleSidebar}
