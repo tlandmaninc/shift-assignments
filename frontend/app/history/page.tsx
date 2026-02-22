@@ -762,7 +762,7 @@ export default function HistoryPage() {
                   content={
                     <div className="space-y-1.5">
                       <p><strong className="text-white">Score</strong> = 100 − (MAD / Median) × 100</p>
-                      <p className="text-xs text-slate-400">Uses Median Absolute Deviation for robustness against outliers.</p>
+                      <p className="text-xs text-slate-400">MAD is calculated on each employee's total shift count. 100 = perfectly equal distribution; lower = less equal.</p>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
                         <span><strong style={{ color: '#22c55e' }}>≥80</strong> — Good</span>
@@ -1127,7 +1127,7 @@ export default function HistoryPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#8b5cf6' }} />
-                    <span><strong style={{ color: '#8b5cf6' }}>Shift Sunburst</strong> — drill-down donut chart</span>
+                    <span><strong style={{ color: '#8b5cf6' }}>Shift Distribution</strong> — drill-down donut chart</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#14b8a6' }} />
@@ -1148,8 +1148,8 @@ export default function HistoryPage() {
           {[
             { id: 'trends' as ChartView, label: 'Employee Trends', icon: TrendingUp, desc: 'Line chart: monthly shift count per employee. Hover to compare all staff on a given month.' },
             { id: 'monthly' as ChartView, label: 'Monthly Overview', icon: BarChart3, desc: 'Stacked bar: total shifts by type each month. Right axis shows active employee count.' },
-            { id: 'distribution' as ChartView, label: 'Shift Sunburst', icon: PieChart, desc: 'Sunburst: inner ring = shift type totals, outer ring = each employee\'s contribution per type.' },
-            { id: 'heatmap' as ChartView, label: 'Heatmap', icon: Grid3X3, desc: 'Grid: darker cell = more shifts that month. Rows sorted by total. Hover a cell for the exact count.' },
+            { id: 'distribution' as ChartView, label: 'Shift Distribution', icon: PieChart, desc: 'Sunburst: inner ring = shift type totals, outer ring = each employee\'s contribution per type.' },
+            { id: 'heatmap' as ChartView, label: 'Employees Shifts Heatmap', icon: Grid3X3, desc: 'Grid: darker cell = more shifts that month. Rows sorted by total. Hover a cell for the exact count.' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1518,11 +1518,16 @@ export default function HistoryPage() {
                       <th className="text-left p-2 text-slate-500 dark:text-slate-400 font-medium sticky left-0 bg-white dark:bg-slate-900 z-10 min-w-[120px]">
                         Employee
                       </th>
-                      {heatmapData.months.map((m: string) => (
-                        <th key={m} className="p-2 text-slate-500 dark:text-slate-400 text-center font-medium whitespace-nowrap">
-                          {formatMonthYear(m).split(' ')[0].slice(0, 3)}
-                        </th>
-                      ))}
+                      {heatmapData.months.map((m: string) => {
+                        const [yr, mo] = m.split('-');
+                        const label = new Date(parseInt(yr), parseInt(mo) - 1)
+                          .toLocaleDateString('en-US', { month: 'short' });
+                        return (
+                          <th key={m} className="p-2 text-slate-500 dark:text-slate-400 text-center font-medium whitespace-nowrap">
+                            {label} &lsquo;{yr.slice(2)}
+                          </th>
+                        );
+                      })}
                       <th className="p-2 text-slate-500 dark:text-slate-400 text-center font-medium">Total</th>
                     </tr>
                   </thead>
