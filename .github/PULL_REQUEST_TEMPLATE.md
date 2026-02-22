@@ -12,7 +12,7 @@ Brief description of what this PR does.
 - Be concise but complete
 
 ## Testing
-- [ ] Backend tests pass (`cd backend && python -m pytest`)
+- [ ] Backend tests pass (`cd backend && uv run python -m pytest`)
 - [ ] Frontend tests pass (`cd frontend && npm test`)
 - [ ] TypeScript check passes (`cd frontend && npx tsc --noEmit`)
 - [ ] Tested manually in browser

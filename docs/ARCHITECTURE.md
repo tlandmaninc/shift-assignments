@@ -7,7 +7,7 @@ This document describes the system design of the ECT Shift Assignment App.
 ```
 ┌──────────────────┐      ┌──────────────────┐      ┌────────────────┐
 │   Next.js 14     │ HTTP │   FastAPI         │      │  JSON Files    │
-│   React 18       │─────>│   Python 3.11     │─────>│  /backend/data │
+│   React 18       │─────>│   Python 3.12     │─────>│  /backend/data │
 │   TailwindCSS    │<─────│   Uvicorn ASGI    │<─────│                │
 │   Port 3000      │      │   Port 8000       │      │  employees     │
 └──────────────────┘      └────────┬──────────┘      │  forms         │

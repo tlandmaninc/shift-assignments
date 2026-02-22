@@ -15,7 +15,7 @@ This only needs to be done once per clone.
 ### Backend (pytest)
 ```bash
 cd backend
-python -m pytest tests/ -v
+uv run python -m pytest tests/ -v
 ```
 
 ### Frontend (Jest)
