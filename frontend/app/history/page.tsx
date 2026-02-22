@@ -811,7 +811,7 @@ export default function HistoryPage() {
                   content={
                     <div className="flex items-start gap-2">
                       <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#3B82F6' }} />
-                      <span><strong style={{ color: '#3B82F6' }}>Mean</strong> shifts per active employee. Higher values indicate more overall assignments.</span>
+                      <span><strong style={{ color: '#3B82F6' }}>Mean</strong> shifts per active employee.<br />Higher values indicate more overall assignments.</span>
                     </div>
                   }
                   position="bottom"
@@ -838,7 +838,7 @@ export default function HistoryPage() {
                   content={
                     <div className="flex items-start gap-2">
                       <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#8b5cf6' }} />
-                      <span>How evenly shifts are distributed. <strong style={{ color: '#8b5cf6' }}>Lower = more equitable</strong>. Square root of variance from the mean.</span>
+                      <span>How evenly shifts are distributed.<br /><strong style={{ color: '#8b5cf6' }}>Lower = more equitable</strong>.<br />Square root of variance from the mean.</span>
                     </div>
                   }
                   position="bottom"
@@ -1599,7 +1599,7 @@ export default function HistoryPage() {
                 content={
                   <div className="flex items-start gap-2">
                     <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#6366f1' }} />
-                    <span>Employees who received at least <strong style={{ color: '#6366f1' }}>one shift</strong> in the selected period. Excludes zero-assignment staff.</span>
+                    <span>Employees who received at least <strong style={{ color: '#6366f1' }}>one shift</strong> in the selected period.<br />Excludes zero-assignment staff.</span>
                   </div>
                 }
                 position="bottom"
@@ -1907,7 +1907,7 @@ export default function HistoryPage() {
                     content={
                       <div className="flex items-start gap-2">
                         <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#f59e0b' }} />
-                        <span>The <strong style={{ color: '#f59e0b' }}>lowest</strong> total shift count any employee received. A large min–max gap signals inequity.</span>
+                        <span>The <strong style={{ color: '#f59e0b' }}>lowest</strong> total shift count any employee received.<br />A large min–max gap signals inequity.</span>
                       </div>
                     }
                     position="bottom"
@@ -1931,7 +1931,7 @@ export default function HistoryPage() {
                     content={
                       <div className="flex items-start gap-2">
                         <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: '#22c55e' }} />
-                        <span>The <strong style={{ color: '#22c55e' }}>highest</strong> total shift count any employee received. Compare with Min to assess range.</span>
+                        <span>The <strong style={{ color: '#22c55e' }}>highest</strong> total shift count any employee received.<br />Compare with Min to assess range.</span>
                       </div>
                     }
                     position="bottom"

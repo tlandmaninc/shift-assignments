@@ -25,8 +25,12 @@ export default function MonthlySummaryCards({
             <p className="text-sm text-slate-500 inline-flex items-center gap-1">
               Total Months
               <UITooltip
-                content="Number of calendar months with recorded shift data in the selected date range."
-                position="top"
+                content={
+                  <div className="space-y-1">
+                    <p>Calendar months with recorded shift data in the selected range.</p>
+                  </div>
+                }
+                position="bottom"
               >
                 <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
               </UITooltip>
@@ -45,8 +49,16 @@ export default function MonthlySummaryCards({
             <p className="text-sm text-slate-500 inline-flex items-center gap-1">
               Min Shifts (Employee)
               <UITooltip
-                content="The lowest total shift count any single employee received in the selected period. A large gap between min and max signals inequity."
-                position="top"
+                content={
+                  <div className="space-y-1.5">
+                    <p>Lowest shift count for any employee in the selected period.</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+                      <span>Large <strong style={{ color: '#f59e0b' }}>min–max gap</strong> signals inequity</span>
+                    </div>
+                  </div>
+                }
+                position="bottom"
               >
                 <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
               </UITooltip>
@@ -65,8 +77,16 @@ export default function MonthlySummaryCards({
             <p className="text-sm text-slate-500 inline-flex items-center gap-1">
               Max Shifts (Employee)
               <UITooltip
-                content="The highest total shift count any single employee received. Compare with Min to assess the range of distribution."
-                position="top"
+                content={
+                  <div className="space-y-1.5">
+                    <p>Highest shift count for any employee in the selected period.</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#10b981' }} />
+                      <span>Compare with <strong style={{ color: '#10b981' }}>Min</strong> to assess distribution range</span>
+                    </div>
+                  </div>
+                }
+                position="bottom"
               >
                 <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
               </UITooltip>
