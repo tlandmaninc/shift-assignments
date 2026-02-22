@@ -2051,7 +2051,7 @@ export default function HistoryPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -2086,16 +2086,22 @@ export default function HistoryPage() {
               </div>
 
               {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+              <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
                 {calendarLoading ? (
                   <div className="flex items-center justify-center h-64">
                     <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
                   </div>
                 ) : (
                   <iframe
-                    srcDoc={calendarHtml}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700"
-                    style={{ height: 'calc(90vh - 140px)', minHeight: 400 }}
+                    srcDoc={calendarHtml
+                      ? calendarHtml.replace(
+                          '</style>',
+                          '.header { display: none; } body { padding: 0.75rem 1rem 1.25rem; }</style>'
+                        )
+                      : ''
+                    }
+                    className="w-full border-0 rounded-b-2xl"
+                    style={{ height: 'calc(90vh - 80px)', minHeight: 500 }}
                     title="Shift calendar"
                   />
                 )}
