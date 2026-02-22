@@ -745,7 +745,7 @@ export default function HistoryPage() {
         <Card className="md:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+              <span className="text-sm text-slate-500 inline-flex items-center gap-1">
                 Fairness Score
                 {selectedShiftType && (
                   <span
@@ -781,7 +781,7 @@ export default function HistoryPage() {
                 >
                   <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                 </UITooltip>
-              </p>
+              </span>
               <p
                 className={`text-4xl font-bold mt-1 ${getFairnessColor(
                   activeFairness?.fairness_score || 0
@@ -805,7 +805,7 @@ export default function HistoryPage() {
               <BarChart3 className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+              <span className="text-sm text-slate-500 inline-flex items-center gap-1">
                 Avg Shifts/Employee
                 <UITooltip
                   content={
@@ -818,7 +818,7 @@ export default function HistoryPage() {
                 >
                   <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                 </UITooltip>
-              </p>
+              </span>
               <p className="text-2xl font-bold">
                 {activeFairness?.average_shifts?.toFixed(1) || 0}
               </p>
@@ -832,7 +832,7 @@ export default function HistoryPage() {
               <TrendingUp className="w-6 h-6 text-violet-600" />
             </div>
             <div>
-              <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+              <span className="text-sm text-slate-500 inline-flex items-center gap-1">
                 Std Deviation
                 <UITooltip
                   content={
@@ -845,7 +845,7 @@ export default function HistoryPage() {
                 >
                   <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                 </UITooltip>
-              </p>
+              </span>
               <p className="text-2xl font-bold">
                 {activeFairness?.std_deviation?.toFixed(2) || 0}
               </p>
@@ -1877,7 +1877,7 @@ export default function HistoryPage() {
                 <CalendarRange className="w-6 h-6 text-slate-500" />
               </div>
               <div>
-                <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                <span className="text-sm text-slate-500 inline-flex items-center gap-1">
                   Total Months
                   <UITooltip
                     content={
@@ -1890,7 +1890,7 @@ export default function HistoryPage() {
                   >
                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                   </UITooltip>
-                </p>
+                </span>
                 <p className="text-2xl font-bold mt-0.5">{filteredMonths.length || 0}</p>
               </div>
             </div>
@@ -1901,7 +1901,7 @@ export default function HistoryPage() {
                 <ArrowDown className="w-6 h-6 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                <span className="text-sm text-slate-500 inline-flex items-center gap-1">
                   Min Shifts (Employee)
                   <UITooltip
                     content={
@@ -1914,7 +1914,7 @@ export default function HistoryPage() {
                   >
                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                   </UITooltip>
-                </p>
+                </span>
                 <p className="text-2xl font-bold mt-0.5 text-amber-600">{activeFairness?.min_shifts || 0}</p>
               </div>
             </div>
@@ -1925,7 +1925,7 @@ export default function HistoryPage() {
                 <ArrowUp className="w-6 h-6 text-emerald-500" />
               </div>
               <div>
-                <p className="text-sm text-slate-500 inline-flex items-center gap-1">
+                <span className="text-sm text-slate-500 inline-flex items-center gap-1">
                   Max Shifts (Employee)
                   <UITooltip
                     content={
@@ -1938,7 +1938,7 @@ export default function HistoryPage() {
                   >
                     <Info className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
                   </UITooltip>
-                </p>
+                </span>
                 <p className="text-2xl font-bold mt-0.5 text-emerald-600">{activeFairness?.max_shifts || 0}</p>
               </div>
             </div>
