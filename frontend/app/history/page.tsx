@@ -2092,9 +2092,11 @@ export default function HistoryPage() {
                     <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
                   </div>
                 ) : (
-                  <div
-                    className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700"
-                    dangerouslySetInnerHTML={{ __html: calendarHtml }}
+                  <iframe
+                    srcDoc={calendarHtml}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700"
+                    style={{ height: 'calc(90vh - 140px)', minHeight: 400 }}
+                    title="Shift calendar"
                   />
                 )}
               </div>

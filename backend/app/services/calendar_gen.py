@@ -25,10 +25,10 @@ CALENDAR_HTML_TEMPLATE = """
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #111827 100%);
             min-height: 100vh;
-            padding: 2rem;
-            color: #f8fafc;
+            padding: 1.5rem;
+            color: #f1f5f9;
         }
 
         .container {
@@ -38,44 +38,44 @@ CALENDAR_HTML_TEMPLATE = """
 
         .header {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.25rem;
         }
 
         .header h1 {
-            font-size: 2.5rem;
+            font-size: 1.75rem;
             font-weight: 700;
-            background: linear-gradient(90deg, #60a5fa, #a78bfa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 0.5rem;
+            color: #f8fafc;
+            margin-bottom: 0.25rem;
         }
 
         .header p {
             color: #94a3b8;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
+            letter-spacing: 0.02em;
         }
 
         .calendar {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
             backdrop-filter: blur(10px);
-            border-radius: 1rem;
+            border-radius: 0.75rem;
             overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
         .calendar-header {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .day-header {
-            padding: 1rem;
+            padding: 0.75rem 0.5rem;
             text-align: center;
             font-weight: 600;
-            color: #e2e8f0;
-            font-size: 0.875rem;
+            color: #f1f5f9;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
@@ -86,38 +86,38 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         .day-cell {
-            min-height: 110px;
-            padding: 0.75rem;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            min-height: 90px;
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
             transition: all 0.2s ease;
         }
 
         .day-cell:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.06);
         }
 
         .day-cell.other-month {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.12);
         }
 
         .day-cell.other-month .day-number {
-            color: #475569;
+            color: #64748b;
         }
 
         .day-cell.weekend {
-            background: rgba(239, 68, 68, 0.1);
+            background: rgba(239, 68, 68, 0.06);
         }
 
         .day-cell.has-shift {
-            background: rgba(59, 130, 246, 0.05);
+            background: rgba(96, 165, 250, 0.06);
         }
 
         .day-number {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #94a3b8;
-            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 0.375rem;
         }
 
         .day-cell.today .day-number {
@@ -140,14 +140,14 @@ CALENDAR_HTML_TEMPLATE = """
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-            margin-bottom: 0.25rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 0.2rem;
+            filter: brightness(1.2) saturate(1.25);
         }
 
         .shift-badge .type-label {
             font-weight: 700;
             margin-right: 0.25rem;
-            opacity: 0.9;
         }
 
         .shift-badge .employee-name {
@@ -159,10 +159,10 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         .legend {
-            margin-top: 2rem;
+            margin-top: 1.25rem;
             display: flex;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 0.75rem;
             justify-content: center;
         }
 
@@ -170,20 +170,21 @@ CALENDAR_HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: rgba(255, 255, 255, 0.05);
+            padding: 0.4rem 0.75rem;
+            background: rgba(255, 255, 255, 0.08);
             border-radius: 0.5rem;
         }
 
         .legend-color {
-            width: 1rem;
-            height: 1rem;
+            width: 0.875rem;
+            height: 0.875rem;
             border-radius: 0.25rem;
+            filter: brightness(1.2) saturate(1.25);
         }
 
         .legend-name {
-            font-size: 0.875rem;
-            color: #e2e8f0;
+            font-size: 0.825rem;
+            color: #f1f5f9;
         }
 
         .legend-count {
@@ -193,27 +194,27 @@ CALENDAR_HTML_TEMPLATE = """
         }
 
         .summary {
-            margin-top: 2rem;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 1rem;
-            padding: 1.5rem;
+            margin-top: 1.25rem;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
         }
 
         .summary h2 {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-            color: #e2e8f0;
+            font-size: 1.05rem;
+            margin-bottom: 0.75rem;
+            color: #f1f5f9;
         }
 
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.625rem;
         }
 
         .summary-card {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 1rem;
+            background: rgba(255, 255, 255, 0.06);
+            padding: 0.75rem 1rem;
             border-radius: 0.5rem;
             display: flex;
             justify-content: space-between;
@@ -222,14 +223,17 @@ CALENDAR_HTML_TEMPLATE = """
 
         .summary-card .name {
             font-weight: 500;
+            font-size: 0.875rem;
+            color: #e2e8f0;
         }
 
         .summary-card .count {
-            background: rgba(59, 130, 246, 0.2);
-            padding: 0.25rem 0.75rem;
+            background: rgba(96, 165, 250, 0.2);
+            padding: 0.2rem 0.625rem;
             border-radius: 1rem;
-            font-size: 0.875rem;
-            color: #60a5fa;
+            font-size: 0.8rem;
+            color: #93c5fd;
+            font-weight: 600;
         }
 
         @media print {
@@ -281,8 +285,7 @@ CALENDAR_HTML_TEMPLATE = """
             }
 
             .header h1 {
-                color: #1e3a5f;
-                -webkit-text-fill-color: #1e3a5f;
+                color: #1e293b;
             }
 
             .header p, .day-number, .legend-name {
