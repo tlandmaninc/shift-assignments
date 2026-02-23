@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
@@ -12,6 +12,14 @@ import { CalendarDays, ArrowRight, ArrowLeft, Phone, KeyRound } from 'lucide-rea
 type Step = 'choose' | 'phone' | 'otp';
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const { login, isAuthenticated, isLoading, refreshAuth } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();

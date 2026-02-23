@@ -7,8 +7,10 @@ RUN npm ci --ignore-scripts
 
 COPY . .
 
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=$BACKEND_URL
+RUN npm run build
+
 EXPOSE 3000
 
-# Production: build + start (used by docker-compose.prod.yaml)
-# Dev compose overrides CMD to skip the build step
-CMD ["sh", "-c", "npm run build && npx next start"]
+CMD ["npx", "next", "start"]

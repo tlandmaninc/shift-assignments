@@ -114,11 +114,13 @@ class ChatService:
     def _calculate_fairness_metrics(self, stats: list[dict]) -> dict:
         """Calculate fairness metrics from employee stats."""
         if not stats:
-            return {"fairness_score": 0, "average": 0, "std_dev": 0}
+            return {"fairness_score": 0, "average_shifts": 0, "std_deviation": 0,
+                    "min_shifts": 0, "max_shifts": 0}
 
         shifts = [s.get("total_shifts", 0) for s in stats if s.get("total_shifts", 0) > 0]
         if not shifts:
-            return {"fairness_score": 100, "average": 0, "std_dev": 0}
+            return {"fairness_score": 100, "average_shifts": 0, "std_deviation": 0,
+                    "min_shifts": 0, "max_shifts": 0}
 
         avg = sum(shifts) / len(shifts)
         variance = sum((x - avg) ** 2 for x in shifts) / len(shifts)

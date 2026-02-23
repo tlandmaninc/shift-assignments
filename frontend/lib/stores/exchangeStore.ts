@@ -126,7 +126,7 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
   setSelectedShiftDate: (date) => set({ selectedShiftDate: date }),
 
   // Mock data toggle
-  useMockData: true,
+  useMockData: false,
   setUseMockData: (mock) => set({ useMockData: mock }),
 
   // Refresh trigger

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import {
   Calendar as CalendarIcon,
@@ -50,6 +50,14 @@ const formatDateQuestion = (dateStr: string) => {
 };
 
 export default function FormsPage() {
+  return (
+    <Suspense>
+      <FormsPageInner />
+    </Suspense>
+  );
+}
+
+function FormsPageInner() {
   const { useMockData, setUseMockData } = useExchangeStore();
   const today = new Date();
   const defaultMonth = today.getMonth() + 2; // getMonth() is 0-indexed, +2 for next month

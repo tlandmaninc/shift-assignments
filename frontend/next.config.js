@@ -13,7 +13,7 @@ const nextConfig = {
   },
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
-    const cspScriptSrc = isProd ? "'self'" : "'self' 'unsafe-eval' 'unsafe-inline'";
+    const cspScriptSrc = isProd ? "'self' 'unsafe-inline'" : "'self' 'unsafe-eval' 'unsafe-inline'";
     const csp = [
       "default-src 'self'",
       `script-src ${cspScriptSrc}`,
