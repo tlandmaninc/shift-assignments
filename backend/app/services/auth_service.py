@@ -32,18 +32,27 @@ def generate_email_user_id(email: str) -> str:
 
 
 def get_user_role(email: str) -> UserRole:
-    """
-    Determine user role based on email address.
+    """Determine user role based on email address.
 
-    Args:
-        email: User's email address
-
-    Returns:
-        UserRole.ADMIN if email is in admin list, otherwise UserRole.BASIC
+    Auto-promotes the first user to admin if ADMIN_EMAILS is empty
+    and no admin users exist in storage (fresh deployment bootstrap).
     """
     email_lower = email.lower()
     admin_emails_lower = [e.lower() for e in ADMIN_EMAILS]
-    return UserRole.ADMIN if email_lower in admin_emails_lower else UserRole.BASIC
+    if email_lower in admin_emails_lower:
+        return UserRole.ADMIN
+
+    # Bootstrap: auto-promote first user if no admins configured anywhere
+    if not ADMIN_EMAILS:
+        from ..storage import storage
+        users = storage.get_auth_users()
+        if not any(u.get('role') == 'admin' for u in users):
+            logger.warning(
+                "No admin configured. Auto-promoting '%s' to admin.", email
+            )
+            return UserRole.ADMIN
+
+    return UserRole.BASIC
 
 
 def generate_oauth_state() -> str:

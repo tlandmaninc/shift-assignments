@@ -5,7 +5,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeftRight, Wifi, WifiOff, FlaskConical, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { useExchangeStore } from '@/lib/stores/exchangeStore';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { exchangeApi } from '@/lib/api';
 import { getMockIncomingCount } from '@/lib/mockData/exchangeMockData';
 import {
@@ -18,6 +21,15 @@ import {
 } from '@/components/exchange';
 
 export default function ShiftExchangePage() {
+  const router = useRouter();
+  const { canAccess, isLoading: accessLoading } = usePageAccess();
+
+  useEffect(() => {
+    if (!accessLoading && !canAccess('/shift-exchange')) {
+      toast.error('You do not have access to this page');
+      router.replace('/');
+    }
+  }, [accessLoading, canAccess, router]);
   const { user, isAdmin, isLoading } = useAuth();
   const {
     selectedMonth,

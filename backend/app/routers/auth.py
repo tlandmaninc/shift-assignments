@@ -79,11 +79,14 @@ def _try_auto_link_employee(user: dict) -> dict:
 ACCESS_TOKEN_COOKIE = "ect_access_token"
 REFRESH_TOKEN_COOKIE = "ect_refresh_token"
 
-# Google OAuth scopes for user authentication
+# Google OAuth scopes — includes Forms/Drive so admins don't need a second consent
 AUTH_SCOPES = [
     "openid",
     "email",
     "profile",
+    "https://www.googleapis.com/auth/forms.body",
+    "https://www.googleapis.com/auth/forms.responses.readonly",
+    "https://www.googleapis.com/auth/drive",
 ]
 
 
@@ -314,6 +317,11 @@ async def google_callback(
 
         # Determine user role based on email
         role = get_user_role(user_info['email'])
+
+        # Save Google API credentials for admin users (Forms/Drive access)
+        if role.value == 'admin' and credentials.refresh_token:
+            from ..services.google_credentials import save_credentials
+            save_credentials(credentials)
 
         # Create or update user in storage
         existing_user = storage.get_auth_user(user_info['id'])

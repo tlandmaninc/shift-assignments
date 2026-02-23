@@ -18,6 +18,7 @@ from .routers import (
     github_router,
     auth_router,
     exchanges_router,
+    settings_router,
 )
 
 # Rate limiter configuration
@@ -92,6 +93,7 @@ app.include_router(google_forms_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(github_router, prefix="/api")
 app.include_router(exchanges_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
 
 
 @app.get("/")

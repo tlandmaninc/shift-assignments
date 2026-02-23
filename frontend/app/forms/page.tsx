@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Calendar as CalendarIcon,
@@ -14,8 +14,6 @@ import {
   ToggleRight,
   ExternalLink,
   Loader2,
-  Link2,
-  Unlink,
   Trash2,
   FlaskConical,
   Radio,
@@ -24,7 +22,8 @@ import { Card, CardHeader, Button, Badge } from '@/components/ui';
 import { formsApi, googleApi } from '@/lib/api';
 import { cn, formatMonthYear, getMonthYearString } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { useExchangeStore } from '@/lib/stores/exchangeStore';
 import {
   mockGenerateDates,
@@ -50,15 +49,16 @@ const formatDateQuestion = (dateStr: string) => {
 };
 
 export default function FormsPage() {
-  return (
-    <Suspense>
-      <FormsPageInner />
-    </Suspense>
-  );
-}
-
-function FormsPageInner() {
+  const router = useRouter();
+  const { canAccess, isLoading: accessLoading } = usePageAccess();
   const { useMockData, setUseMockData } = useExchangeStore();
+
+  useEffect(() => {
+    if (!accessLoading && !canAccess('/forms')) {
+      toast.error('You do not have access to this page');
+      router.replace('/');
+    }
+  }, [accessLoading, canAccess, router]);
   const today = new Date();
   const defaultMonth = today.getMonth() + 2; // getMonth() is 0-indexed, +2 for next month
   const [year, setYear] = useState(defaultMonth > 12 ? today.getFullYear() + 1 : today.getFullYear());
@@ -74,7 +74,6 @@ function FormsPageInner() {
   const [shiftType, setShiftType] = useState<string>(DEFAULT_SHIFT_TYPE);
 
   // Google Forms integration
-  const searchParams = useSearchParams();
   const [googleAuth, setGoogleAuth] = useState<{
     authenticated: boolean;
     configured: boolean;
@@ -141,21 +140,6 @@ function FormsPageInner() {
     }
   }, [useMockData]);
 
-  // Handle OAuth callback
-  useEffect(() => {
-    const authResult = searchParams.get('google_auth');
-    if (authResult === 'success') {
-      toast.success('Connected to Google successfully!');
-      googleApi.getStatus().then(setGoogleAuth).catch(console.error);
-      // Clear URL params
-      window.history.replaceState({}, '', '/forms');
-    } else if (authResult === 'error') {
-      const message = searchParams.get('message') || 'Failed to connect to Google';
-      toast.error(message);
-      window.history.replaceState({}, '', '/forms');
-    }
-  }, [searchParams]);
-
   // Generate dates when settings change
   useEffect(() => {
     generateDates();
@@ -185,27 +169,6 @@ function FormsPageInner() {
       setGeneratedDates(result.included_dates);
     } catch (error) {
       console.error('Failed to generate dates:', error);
-    }
-  };
-
-  const handleConnectGoogle = async () => {
-    setGoogleLoading(true);
-    try {
-      const { authorization_url } = await googleApi.getAuthUrl();
-      window.location.href = authorization_url;
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to start Google authorization');
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleDisconnectGoogle = async () => {
-    try {
-      await googleApi.disconnect();
-      setGoogleAuth({ authenticated: false, configured: true, message: 'Disconnected' });
-      toast.success('Disconnected from Google');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to disconnect from Google');
     }
   };
 
@@ -535,36 +498,16 @@ function FormsPageInner() {
             {/* Google Connection Status */}
             {googleAuth?.configured && (
               <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${googleAuth.authenticated ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                    <span className="text-sm font-medium">
-                      {googleAuth.authenticated ? 'Google Connected' : 'Google Not Connected'}
-                    </span>
-                  </div>
-                  {googleAuth.authenticated ? (
-                    <button
-                      onClick={handleDisconnectGoogle}
-                      className="text-xs text-slate-500 hover:text-red-500 flex items-center gap-1"
-                    >
-                      <Unlink className="w-3 h-3" />
-                      Disconnect
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleConnectGoogle}
-                      disabled={googleLoading}
-                      className="text-xs text-primary-500 hover:text-primary-600 flex items-center gap-1"
-                    >
-                      {googleLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
-                      Connect
-                    </button>
-                  )}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${googleAuth.authenticated ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                  <span className="text-sm font-medium">
+                    {googleAuth.authenticated ? 'Google Connected' : 'Google Not Connected'}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   {googleAuth.authenticated
                     ? 'Forms can be created automatically'
-                    : 'Connect to auto-create Google Forms'}
+                    : 'Log out and log back in to enable Google Forms'}
                 </p>
               </div>
             )}
@@ -719,15 +662,9 @@ function FormsPageInner() {
                         Generate Google Form
                       </Button>
                     ) : googleAuth?.configured ? (
-                      <Button
-                        onClick={handleConnectGoogle}
-                        loading={googleLoading}
-                        variant="secondary"
-                        className="w-full"
-                      >
-                        <Link2 className="w-4 h-4" />
-                        Connect Google to Auto-Create
-                      </Button>
+                      <p className="text-xs text-slate-500 text-center py-1.5">
+                        Log out and log back in to enable Google Forms
+                      </p>
                     ) : (
                       <a
                         href="https://forms.google.com/create"

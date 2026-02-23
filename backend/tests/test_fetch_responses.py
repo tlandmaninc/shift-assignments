@@ -357,3 +357,19 @@ class TestFetchResponses:
                 assert updated_form.get("google_form_id") == "new_google_form_abc123"
         finally:
             storage.delete_form(form_id)
+
+
+class TestRemovedEndpoints:
+    """Verify the separate Google OAuth endpoints were removed."""
+
+    @pytest.mark.usefixtures("_mock_admin")
+    def test_authorize_returns_404(self, client):
+        """GET /api/google/authorize should no longer exist."""
+        resp = client.get("/api/google/authorize")
+        assert resp.status_code in (404, 405)
+
+    @pytest.mark.usefixtures("_mock_admin")
+    def test_callback_returns_404(self, client):
+        """GET /api/google/callback should no longer exist."""
+        resp = client.get("/api/google/callback", params={"code": "x", "state": "y"})
+        assert resp.status_code in (404, 405)

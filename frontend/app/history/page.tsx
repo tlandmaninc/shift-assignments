@@ -49,6 +49,8 @@ import { cn, formatMonthYear } from '@/lib/utils';
 import { X, ChevronRight, ChevronLeft, Printer } from 'lucide-react';
 import { printCalendarHtml } from '@/lib/printCalendar';
 import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { useExchangeStore } from '@/lib/stores/exchangeStore';
 import {
   generateMockHistory,
@@ -275,7 +277,16 @@ const getHeatCellStyle = (val: number, maxVal: number, shiftTypeColor?: string) 
 };
 
 export default function HistoryPage() {
+  const router = useRouter();
+  const { canAccess, isLoading: accessLoading } = usePageAccess();
   const { useMockData, setUseMockData } = useExchangeStore();
+
+  useEffect(() => {
+    if (!accessLoading && !canAccess('/history')) {
+      toast.error('You do not have access to this page');
+      router.replace('/');
+    }
+  }, [accessLoading, canAccess, router]);
   const [history, setHistory] = useState<any>(null);
   const [fairness, setFairness] = useState<any>(null);
   const [monthlyData, setMonthlyData] = useState<any>(null);

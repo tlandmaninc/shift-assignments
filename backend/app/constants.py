@@ -41,3 +41,16 @@ SHIFT_TYPE_CONFIG = {
 }
 
 DEFAULT_SHIFT_TYPE = "ect"
+
+# Page access control defaults.
+# Values: "admin" = admin only, "all" = any authenticated user.
+DEFAULT_PAGE_ACCESS = {
+    "forms": "admin",
+    "assignments": "admin",
+    "employees": "admin",
+    "history": "all",
+    "shift-exchange": "all",
+    "chat": "all",
+}
+
+CONFIGURABLE_PAGES = set(DEFAULT_PAGE_ACCESS.keys())

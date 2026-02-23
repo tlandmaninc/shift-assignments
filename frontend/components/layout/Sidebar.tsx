@@ -16,7 +16,7 @@ import {
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
 
 interface SidebarProps {
   open: boolean;
@@ -27,15 +27,14 @@ interface NavItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
-  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/profile', label: 'My Profile', icon: User },
   { href: '/forms', label: 'Form Generation', icon: FileText },
-  { href: '/assignments', label: 'Assignments', icon: Calendar, adminOnly: true },
-  { href: '/employees', label: 'Employees', icon: Users, adminOnly: true },
+  { href: '/assignments', label: 'Assignments', icon: Calendar },
+  { href: '/employees', label: 'Employees', icon: Users },
   { href: '/history', label: 'History', icon: History },
   { href: '/shift-exchange', label: 'Shift Exchange', icon: ArrowLeftRight },
   { href: '/chat', label: 'Chat', icon: MessageCircle },
@@ -43,7 +42,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar({ open, onToggle }: SidebarProps) {
   const pathname = usePathname();
-  const { isAdmin } = useAuth();
+  const { canAccess } = usePageAccess();
 
   return (
     <motion.aside
@@ -80,8 +79,7 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map((item) => {
-          // Hide admin-only items for basic users
-          if (item.adminOnly && !isAdmin) {
+          if (!canAccess(item.href)) {
             return null;
           }
 

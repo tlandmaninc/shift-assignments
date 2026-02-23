@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 from .config import settings
-from .constants import DEFAULT_SHIFT_TYPE
+from .constants import DEFAULT_SHIFT_TYPE, DEFAULT_PAGE_ACCESS
 from .utils.name_translator import (
     is_hebrew,
     translate_hebrew_to_english,
@@ -1055,6 +1055,25 @@ class Storage:
 
         self._save_json(settings.exchanges_file, {"exchanges": exchanges})
         return exchange
+
+    # ==================== Page Access ====================
+
+    def get_page_access(self) -> dict:
+        """Load page access config. Returns defaults if file doesn't exist."""
+        data = self._load_json(settings.data_dir / "page_access.json")
+        if not data:
+            return dict(DEFAULT_PAGE_ACCESS)
+        # Merge with defaults so new pages always have a value
+        merged = dict(DEFAULT_PAGE_ACCESS)
+        merged.update(data)
+        return merged
+
+    def save_page_access(self, config: dict) -> dict:
+        """Save page access config and return the merged result."""
+        merged = dict(DEFAULT_PAGE_ACCESS)
+        merged.update(config)
+        self._save_json(settings.data_dir / "page_access.json", merged)
+        return merged
 
 
 # Global storage instance

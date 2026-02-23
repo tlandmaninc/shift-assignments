@@ -6,6 +6,9 @@ import { Send, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui';
 import { MessageBubble, TypingIndicator, EmptyState, ChatHistoryPanel } from '@/components/chat';
 import { chatApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
+import toast from 'react-hot-toast';
 
 interface Message {
   id: string;
@@ -17,6 +20,16 @@ interface Message {
 type ConnectionStatus = 'checking' | 'connected' | 'disconnected';
 
 export default function ChatPage() {
+  const router = useRouter();
+  const { canAccess, isLoading: accessLoading } = usePageAccess();
+
+  useEffect(() => {
+    if (!accessLoading && !canAccess('/chat')) {
+      toast.error('You do not have access to this page');
+      router.replace('/');
+    }
+  }, [accessLoading, canAccess, router]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

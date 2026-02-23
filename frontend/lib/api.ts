@@ -244,8 +244,6 @@ export const googleApi = {
     message: string;
   }>('/google/status'),
 
-  getAuthUrl: () => fetchApi<{ authorization_url: string }>('/google/authorize'),
-
   disconnect: () => fetchApi<{ message: string }>('/google/disconnect', { method: 'POST' }),
 
   createForm: (data: {
@@ -269,6 +267,18 @@ export const googleApi = {
       '/google/fetch-responses',
       { method: 'POST', body: JSON.stringify({ form_id: formId }) }
     ),
+};
+
+// Settings API
+export const settingsApi = {
+  getPageAccess: () =>
+    fetchApi<Record<string, string>>('/settings/page-access'),
+
+  updatePageAccess: (config: Record<string, string>) =>
+    fetchApi<Record<string, string>>('/settings/page-access', {
+      method: 'PUT',
+      body: JSON.stringify({ config }),
+    }),
 };
 
 // Exchange API

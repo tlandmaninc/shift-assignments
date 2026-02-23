@@ -9,6 +9,7 @@ from .chat import router as chat_router
 from .github import router as github_router
 from .auth import router as auth_router
 from .exchanges import router as exchanges_router
+from .settings import router as settings_router
 
 __all__ = [
     "forms_router",
@@ -20,4 +21,5 @@ __all__ = [
     "github_router",
     "auth_router",
     "exchanges_router",
+    "settings_router",
 ]
