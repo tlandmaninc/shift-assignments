@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, Button, Badge, Input } from '@/components/ui';
 import { employeesApi } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import toast from 'react-hot-toast';
 
 interface DuplicatePair {
@@ -31,30 +31,18 @@ interface DuplicatePair {
 
 export default function EmployeesPage() {
   const router = useRouter();
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { canAccess, isLoading: accessLoading } = usePageAccess();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Redirect non-admin users
+  // Redirect users without access
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      router.push('/unauthorized');
+    if (!accessLoading && !canAccess('/employees')) {
+      toast.error('You do not have access to this page');
+      router.replace('/');
     }
-  }, [isAdmin, authLoading, router]);
+  }, [accessLoading, canAccess, router]);
 
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
-      </div>
-    );
-  }
-
-  // Don't render if not admin
-  if (!isAdmin) {
-    return null;
-  }
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [newEmployee, setNewEmployee] = useState({ name: '', email: '', is_new: true });

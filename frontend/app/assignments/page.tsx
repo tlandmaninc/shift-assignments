@@ -20,13 +20,20 @@ import {
 import { Card, CardHeader, Button, Badge } from '@/components/ui';
 import { formsApi, assignmentsApi, googleApi } from '@/lib/api';
 import { cn, formatMonthYear } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { SHIFT_TYPES, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 import toast from 'react-hot-toast';
 
 export default function AssignmentsPage() {
   const router = useRouter();
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { canAccess, isLoading: accessLoading } = usePageAccess();
+
+  useEffect(() => {
+    if (!accessLoading && !canAccess('/assignments')) {
+      toast.error('You do not have access to this page');
+      router.replace('/');
+    }
+  }, [accessLoading, canAccess, router]);
   const [forms, setForms] = useState<any[]>([]);
   const [selectedForm, setSelectedForm] = useState<any>(null);
   const [csvData, setCsvData] = useState('');
@@ -39,30 +46,9 @@ export default function AssignmentsPage() {
   const [fetchingResponses, setFetchingResponses] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
 
-  // Redirect non-admin users
-  useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      router.push('/unauthorized');
-    }
-  }, [isAdmin, authLoading, router]);
-
   useEffect(() => {
     formsApi.list().then(setForms).catch(console.error);
   }, []);
-
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
-      </div>
-    );
-  }
-
-  // Don't render if not admin
-  if (!isAdmin) {
-    return null;
-  }
 
   const handleFormSelect = (form: any) => {
     setSelectedForm(form);

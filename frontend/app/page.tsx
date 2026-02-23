@@ -12,27 +12,42 @@ import {
   CheckCircle2,
   Clock,
   Info,
+  Shield,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Badge, Tooltip } from '@/components/ui';
-import { historyApi, formsApi } from '@/lib/api';
+import { historyApi, formsApi, settingsApi } from '@/lib/api';
 import { formatMonthYear } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { DEFAULT_PAGE_ACCESS } from '@/lib/hooks/usePageAccess';
+import toast from 'react-hot-toast';
+
+const PAGE_LABELS: Record<string, string> = {
+  forms: 'Form Generation',
+  assignments: 'Assignments',
+  employees: 'Employees',
+  history: 'History',
+  'shift-exchange': 'Shift Exchange',
+  chat: 'Chat',
+};
 
 export default function Dashboard() {
+  const { isAdmin } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [recentForms, setRecentForms] = useState<any[]>([]);
   const [fairness, setFairness] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pageAccess, setPageAccess] = useState<Record<string, string> | null>(null);
+  const [savingAccess, setSavingAccess] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [historyData, formsData, fairnessData] = await Promise.all([
+        const [statsData, fairnessData] = await Promise.all([
           historyApi.get(),
-          formsApi.list(),
           historyApi.getFairness(),
         ]);
-        setStats(historyData);
-        setRecentForms(formsData.slice(0, 3));
+        setStats(statsData);
         setFairness(fairnessData);
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
@@ -42,6 +57,42 @@ export default function Dashboard() {
     }
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    formsApi.list()
+      .then(data => setRecentForms(data.slice(0, 3)))
+      .catch(error => console.error('Failed to load forms:', error));
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    settingsApi.getPageAccess()
+      .then(setPageAccess)
+      .catch(() => setPageAccess({ ...DEFAULT_PAGE_ACCESS }));
+  }, [isAdmin]);
+
+  const togglePageAccess = (page: string) => {
+    if (!pageAccess) return;
+    setPageAccess({
+      ...pageAccess,
+      [page]: pageAccess[page] === 'admin' ? 'all' : 'admin',
+    });
+  };
+
+  const savePageAccess = async () => {
+    if (!pageAccess) return;
+    setSavingAccess(true);
+    try {
+      const saved = await settingsApi.updatePageAccess(pageAccess);
+      setPageAccess(saved);
+      toast.success('Page access updated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update page access');
+    } finally {
+      setSavingAccess(false);
+    }
+  };
 
   const statCards = [
     {
@@ -272,6 +323,42 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      {/* Page Access Control (admin only) */}
+      {isAdmin && pageAccess && (
+        <Card>
+          <CardHeader
+            title="Page Access"
+            description="Control which pages are visible to non-admin users"
+            action={
+              <Button
+                size="sm"
+                onClick={savePageAccess}
+                loading={savingAccess}
+              >
+                <Shield className="w-4 h-4" />
+                Save
+              </Button>
+            }
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Object.keys(PAGE_LABELS).map((page) => (
+              <button
+                key={page}
+                onClick={() => togglePageAccess(page)}
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <span className="text-sm font-medium text-slate-900 dark:text-white">
+                  {PAGE_LABELS[page]}
+                </span>
+                <Badge variant={pageAccess[page] === 'all' ? 'success' : 'default'}>
+                  {pageAccess[page] === 'all' ? 'All Users' : 'Admin Only'}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
