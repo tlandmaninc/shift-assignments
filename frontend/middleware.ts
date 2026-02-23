@@ -7,6 +7,20 @@ const publicPaths = ['/login', '/unauthorized'];
 // Paths that should be proxied to the backend
 const apiPaths = ['/api'];
 
+// Admin-only paths requiring role check
+const adminPaths = ['/employees', '/forms', '/assignments'];
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payload = Buffer.from(parts[1], 'base64url').toString();
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -22,13 +36,22 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for auth cookie (note: can't verify JWT here, just check presence)
+  // Check for auth cookie
   const accessToken = request.cookies.get('ect_access_token');
 
   if (!accessToken) {
-    // Redirect to login
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Check admin role for admin-only paths
+  const isAdminPath = adminPaths.some(path => pathname.startsWith(path));
+  if (isAdminPath) {
+    const payload = decodeJwtPayload(accessToken.value);
+    if (!payload || payload.role !== 'admin') {
+      const unauthorizedUrl = new URL('/unauthorized', request.url);
+      return NextResponse.redirect(unauthorizedUrl);
+    }
   }
 
   return NextResponse.next();

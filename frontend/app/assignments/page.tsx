@@ -572,9 +572,12 @@ export default function AssignmentsPage() {
                 </div>
               }
             />
-            <div
-              className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700"
-              dangerouslySetInnerHTML={{ __html: assignmentResult.calendar_html }}
+            <iframe
+              srcDoc={assignmentResult.calendar_html}
+              sandbox=""
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700"
+              style={{ minHeight: '400px' }}
+              title="Calendar Preview"
             />
           </Card>
 

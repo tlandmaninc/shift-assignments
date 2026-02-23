@@ -1,6 +1,7 @@
 """Exchange router for shift swap requests and WebSocket notifications."""
 
 import asyncio
+import json
 import logging
 from typing import Optional
 
@@ -205,13 +206,26 @@ async def cancel_exchange(
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time exchange notifications."""
-    # Authenticate via query parameter token
-    token = websocket.query_params.get("token")
-    if not token:
+    await websocket.accept()
+
+    # Two-phase auth: wait for auth message instead of token in URL
+    try:
+        raw = await asyncio.wait_for(websocket.receive_text(), timeout=5)
+    except (asyncio.TimeoutError, WebSocketDisconnect):
+        await websocket.close(code=4001, reason="Auth timeout")
+        return
+
+    try:
+        auth_msg = json.loads(raw)
+    except (ValueError, TypeError):
+        await websocket.close(code=4001, reason="Invalid auth message")
+        return
+
+    if auth_msg.get("type") != "auth" or not auth_msg.get("token"):
         await websocket.close(code=4001, reason="Missing token")
         return
 
-    payload = verify_token(token, token_type="access")
+    payload = verify_token(auth_msg["token"], token_type="access")
     if not payload:
         await websocket.close(code=4001, reason="Invalid token")
         return
@@ -226,7 +240,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Keep connection alive, handle ping/pong
-            data = await asyncio.wait_for(websocket.receive_text(), timeout=60)
+            data = await asyncio.wait_for(websocket.receive_text(), timeout=35)
             if data == "ping":
                 await websocket.send_text("pong")
     except (WebSocketDisconnect, asyncio.TimeoutError, Exception):

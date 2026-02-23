@@ -30,6 +30,7 @@ services:
   # WATCHPACK_POLLING enables file-watching inside Docker on some OS
   frontend:
     build: ./frontend
+    command: ["npx", "next", "dev", "--turbopack"]
     ports:
       - "3000:3000"
     volumes:

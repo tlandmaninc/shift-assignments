@@ -1,15 +1,19 @@
 """History API router."""
 
 from typing import Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from ..schemas import HistoryResponse, FairnessMetrics, EmployeeStats
 from ..storage import storage
+from .auth import get_required_user
 
 router = APIRouter(prefix="/history", tags=["history"])
 
 
 @router.get("", response_model=HistoryResponse)
-async def get_history(shift_type: Optional[str] = Query(None)):
+async def get_history(
+    shift_type: Optional[str] = Query(None),
+    user: dict = Depends(get_required_user),
+):
     """Get historical assignment data, optionally filtered by shift type."""
     monthly = storage.get_monthly_summaries(shift_type=shift_type)
     employee_stats = storage.get_employee_stats(shift_type=shift_type)
@@ -33,7 +37,10 @@ async def get_history(shift_type: Optional[str] = Query(None)):
 
 
 @router.get("/fairness", response_model=FairnessMetrics)
-async def get_fairness_metrics(shift_type: Optional[str] = Query(None)):
+async def get_fairness_metrics(
+    shift_type: Optional[str] = Query(None),
+    user: dict = Depends(get_required_user),
+):
     """Get fairness metrics for shift distribution, optionally filtered by shift type."""
     stats = storage.get_employee_stats(shift_type=shift_type)
 
@@ -108,7 +115,10 @@ async def get_fairness_metrics(shift_type: Optional[str] = Query(None)):
 
 
 @router.get("/monthly")
-async def get_monthly_history(shift_type: Optional[str] = Query(None)):
+async def get_monthly_history(
+    shift_type: Optional[str] = Query(None),
+    user: dict = Depends(get_required_user),
+):
     """Get monthly breakdown of assignments, optionally filtered by shift type."""
     summaries = storage.get_monthly_summaries(shift_type=shift_type)
 
@@ -130,7 +140,10 @@ async def get_monthly_history(shift_type: Optional[str] = Query(None)):
 
 
 @router.get("/employee-trends")
-async def get_employee_trends(shift_type: Optional[str] = Query(None)):
+async def get_employee_trends(
+    shift_type: Optional[str] = Query(None),
+    user: dict = Depends(get_required_user),
+):
     """Get shift trends per employee over time, optionally filtered by shift type."""
     stats = storage.get_employee_stats(shift_type=shift_type)
     all_assignments = storage.get_assignments()

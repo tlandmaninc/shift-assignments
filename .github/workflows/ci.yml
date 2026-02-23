@@ -27,6 +27,12 @@ jobs:
           cd backend
           uv sync --frozen --dev
 
+      - name: Security audit (pip-audit)
+        run: |
+          cd backend
+          uv run pip install pip-audit
+          uv run pip-audit || true
+
       - name: Run tests
         env:
           SECRET_KEY: test-secret-key-for-ci-minimum-32-chars
@@ -59,6 +65,11 @@ jobs:
         run: |
           cd frontend
           npm ci
+
+      - name: Security audit (npm)
+        run: |
+          cd frontend
+          npm audit --audit-level=high || true
 
       - name: Run tests
         run: |

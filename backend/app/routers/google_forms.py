@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
@@ -18,6 +18,7 @@ from ..config import settings
 from ..audit import log_audit, AuditAction
 from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
 from ..storage import storage
+from .auth import require_admin
 
 # Rate limiter for sensitive endpoints
 limiter = Limiter(key_func=get_remote_address)
@@ -156,7 +157,7 @@ def save_credentials(creds):
 
 
 @router.get("/status")
-async def get_auth_status():
+async def get_auth_status(user: dict = Depends(require_admin)):
     """Check if Google is authenticated."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         return {
@@ -182,7 +183,7 @@ async def get_auth_status():
 
 @router.get("/authorize")
 @limiter.limit("5/minute")
-async def authorize(request: Request):
+async def authorize(request: Request, user: dict = Depends(require_admin)):
     """Start OAuth flow with rate limiting."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(
@@ -266,7 +267,7 @@ async def callback(code: str, state: str):
 
 
 @router.post("/disconnect")
-async def disconnect():
+async def disconnect(user: dict = Depends(require_admin)):
     """Disconnect Google account."""
     if os.path.exists(TOKEN_FILE):
         os.remove(TOKEN_FILE)
@@ -339,7 +340,11 @@ def clear_form_items(service, form_id: str) -> None:
 
 @router.post("/create-form")
 @limiter.limit("10/minute")
-async def create_google_form(request: Request, form_request: FormCreateRequest):
+async def create_google_form(
+    request: Request,
+    form_request: FormCreateRequest,
+    user: dict = Depends(require_admin),
+):
     """Create a Google Form with the specified questions. Rate limited."""
     shift_type = form_request.shift_type or DEFAULT_SHIFT_TYPE
     type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
@@ -533,7 +538,11 @@ async def create_google_form(request: Request, form_request: FormCreateRequest):
 
 @router.post("/fetch-responses")
 @limiter.limit("10/minute")
-async def fetch_google_form_responses(request: Request, body: FetchResponsesRequest):
+async def fetch_google_form_responses(
+    request: Request,
+    body: FetchResponsesRequest,
+    user: dict = Depends(require_admin),
+):
     """Fetch responses from a linked Google Form and return parsed availability data."""
     from ..services.csv_parser import parse_date_from_header
 

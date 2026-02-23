@@ -1,7 +1,7 @@
 """Forms API router."""
 
 from datetime import date
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from ..schemas import FormGenerateRequest, FormCreate, FormResponse
 from ..storage import storage
 from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
@@ -10,8 +10,9 @@ from ..utils.date_utils import (
     get_month_name,
     format_month_year,
 )
+from .auth import require_admin
 
-router = APIRouter(prefix="/forms", tags=["forms"])
+router = APIRouter(prefix="/forms", tags=["forms"], dependencies=[Depends(require_admin)])
 
 
 @router.get("", response_model=list[FormResponse])

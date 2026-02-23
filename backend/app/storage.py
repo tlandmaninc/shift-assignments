@@ -1,7 +1,9 @@
 """JSON-based storage service for all application data."""
 
+import fcntl
 import json
 import re
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
@@ -68,18 +70,33 @@ class Storage:
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         settings.assignments_dir.mkdir(parents=True, exist_ok=True)
 
+    @contextmanager
+    def _file_lock(self, path: Path, exclusive: bool = False):
+        """Acquire an advisory file lock for safe concurrent access."""
+        lock_path = path.with_suffix(path.suffix + '.lock')
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = open(lock_path, 'w')
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+
     def _load_json(self, path: Path) -> dict | list:
         """Load JSON from file, return empty dict/list if not exists."""
         if not path.exists():
             return {}
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with self._file_lock(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
 
     def _save_json(self, path: Path, data: dict | list):
         """Save data to JSON file."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, cls=JSONEncoder)
+        with self._file_lock(path, exclusive=True):
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, cls=JSONEncoder)
 
     # ==================== Employees ====================
 

@@ -37,7 +37,15 @@ def log_audit(action: str, details: dict[str, Any] | None = None) -> None:
     detail_str = ""
     if details:
         # Safely format details, avoiding sensitive data exposure
-        safe_details = {k: v for k, v in details.items() if k not in ("password", "token", "secret")}
+        SENSITIVE_KEYS = frozenset({
+            "password", "token", "secret", "access_token", "refresh_token",
+            "api_key", "credentials", "authorization", "firebase_token",
+            "id_token", "client_secret", "secret_key",
+        })
+        safe_details = {
+            k: "***REDACTED***" if k.lower() in SENSITIVE_KEYS else v
+            for k, v in details.items()
+        }
         detail_str = f" | {safe_details}"
 
     audit_logger.info(f"{action}{detail_str}")

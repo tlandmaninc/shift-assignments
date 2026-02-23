@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch
 
 
+@pytest.mark.usefixtures("mock_employee")
 class TestGetHistory:
     def test_returns_history(self, client):
         """GET /api/history returns monthly_assignments and employee_stats."""

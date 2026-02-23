@@ -47,13 +47,15 @@ export function useWebSocket(isAuthenticated: boolean, employeeId?: number) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
     const host = backendUrl.replace(/^https?:\/\//, '');
-    const wsUrl = `${protocol}//${host}/api/exchanges/ws?token=${token}`;
+    const wsUrl = `${protocol}//${host}/api/exchanges/ws`;
 
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        // Send auth token as first message instead of in URL
+        ws.send(JSON.stringify({ type: 'auth', token }));
         setWsConnected(true);
         reconnectAttemptRef.current = 0;
 

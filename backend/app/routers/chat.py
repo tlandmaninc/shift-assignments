@@ -4,8 +4,10 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from ..schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -17,8 +19,10 @@ from ..schemas.chat import (
 )
 from ..services.chat_service import ChatService
 from ..storage import storage
+from .auth import get_required_user, require_employee_or_admin
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+limiter = Limiter(key_func=get_remote_address)
 
 # Initialize chat service
 chat_service = ChatService(storage)
@@ -39,7 +43,11 @@ async def check_health():
 
 
 @router.get("/conversations", response_model=ConversationListResponse)
-async def list_conversations():
+@limiter.limit("30/minute")
+async def list_conversations(
+    request: Request,
+    user: dict = Depends(get_required_user),
+):
     """List all conversations (summaries only)."""
     summaries = storage.get_conversations()
     return ConversationListResponse(
@@ -48,7 +56,12 @@ async def list_conversations():
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
-async def get_conversation(conversation_id: str):
+@limiter.limit("30/minute")
+async def get_conversation(
+    request: Request,
+    conversation_id: str,
+    user: dict = Depends(get_required_user),
+):
     """Get full conversation with messages."""
     conv = storage.get_conversation(conversation_id)
     if not conv:
@@ -57,7 +70,12 @@ async def get_conversation(conversation_id: str):
 
 
 @router.delete("/conversations/{conversation_id}")
-async def delete_conversation(conversation_id: str):
+@limiter.limit("20/minute")
+async def delete_conversation(
+    request: Request,
+    conversation_id: str,
+    user: dict = Depends(require_employee_or_admin),
+):
     """Delete a conversation."""
     deleted = storage.delete_conversation(conversation_id)
     if not deleted:
@@ -90,20 +108,25 @@ def _resolve_conversation(request: ChatRequest) -> tuple[str, dict]:
 
 
 @router.post("/stream")
-async def stream_message(request: ChatRequest):
+@limiter.limit("20/minute")
+async def stream_message(
+    request: Request,
+    chat_request: ChatRequest = None,
+    user: dict = Depends(require_employee_or_admin),
+):
     """Stream a chat response using Server-Sent Events."""
-    conversation_id, conversation = _resolve_conversation(request)
+    conversation_id, conversation = _resolve_conversation(chat_request)
     now = datetime.now().isoformat()
 
     history = [
         {"role": msg.role, "content": msg.content}
-        for msg in request.conversation_history
+        for msg in chat_request.conversation_history
     ]
 
     # Save user message to conversation
     conversation["messages"].append({
         "role": "user",
-        "content": request.message,
+        "content": chat_request.message,
         "timestamp": now,
     })
 
@@ -125,7 +148,7 @@ async def stream_message(request: ChatRequest):
 
         try:
             async for chunk in chat_service.stream_chat(
-                message=request.message,
+                message=chat_request.message,
                 conversation_history=history,
             ):
                 full_content += chunk
@@ -172,24 +195,29 @@ async def stream_message(request: ChatRequest):
 
 
 @router.post("", response_model=ChatResponse)
-async def send_message(request: ChatRequest):
+@limiter.limit("20/minute")
+async def send_message(
+    request: Request,
+    chat_request: ChatRequest = None,
+    user: dict = Depends(require_employee_or_admin),
+):
     """Send a message and get AI response (non-streaming)."""
-    conversation_id, conversation = _resolve_conversation(request)
+    conversation_id, conversation = _resolve_conversation(chat_request)
     now = datetime.now().isoformat()
 
     history = [
         {"role": msg.role, "content": msg.content}
-        for msg in request.conversation_history
+        for msg in chat_request.conversation_history
     ]
 
     result = await chat_service.chat(
-        message=request.message,
+        message=chat_request.message,
         conversation_history=history,
     )
 
     conversation["messages"].append({
         "role": "user",
-        "content": request.message,
+        "content": chat_request.message,
         "timestamp": now,
     })
 

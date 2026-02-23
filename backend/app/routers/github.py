@@ -4,12 +4,13 @@ Provides endpoints for GitHub integration features.
 Currently returns placeholder responses until implementation is needed.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional
 from ..services.github_service import github_service
+from .auth import require_admin
 
-router = APIRouter(prefix="/github", tags=["github"])
+router = APIRouter(prefix="/github", tags=["github"], dependencies=[Depends(require_admin)])
 
 
 class GitHubStatusResponse(BaseModel):

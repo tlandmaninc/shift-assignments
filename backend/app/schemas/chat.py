@@ -15,7 +15,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Request to send a chat message."""
     message: str = Field(..., min_length=1, max_length=2000)
-    conversation_history: list[ChatMessage] = []
+    conversation_history: list[ChatMessage] = Field(default=[], max_length=50)
     conversation_id: Optional[str] = None
 
 

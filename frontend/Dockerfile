@@ -9,4 +9,6 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npx", "next", "dev", "--turbopack"]
+# Production: build + start (used by docker-compose.prod.yaml)
+# Dev compose overrides CMD to skip the build step
+CMD ["sh", "-c", "npm run build && npx next start"]

@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch
 
 
+@pytest.mark.usefixtures("mock_admin")
 class TestListForms:
     def test_returns_list(self, client):
         """GET /api/forms returns a list of forms."""
@@ -25,6 +26,7 @@ class TestListForms:
         assert len(data) == 1
 
 
+@pytest.mark.usefixtures("mock_admin")
 class TestGetForm:
     def test_missing_form_returns_404(self, client):
         """GET /api/forms/{id} returns 404 for non-existent form."""
@@ -49,6 +51,7 @@ class TestGetForm:
         assert resp.json()["id"] == 1
 
 
+@pytest.mark.usefixtures("mock_admin")
 class TestCreateForm:
     def test_create_form(self, client):
         """POST /api/forms/create creates a new form."""
@@ -86,6 +89,7 @@ class TestCreateForm:
         assert "already exists" in resp.json()["detail"]
 
 
+@pytest.mark.usefixtures("mock_admin")
 class TestDeleteForm:
     def test_delete_form(self, client):
         """DELETE /api/forms/{id} deletes the form."""
@@ -110,6 +114,7 @@ class TestDeleteForm:
         assert resp.status_code == 404
 
 
+@pytest.mark.usefixtures("mock_admin")
 class TestUpdateFormStatus:
     def test_update_status(self, client):
         """PUT /api/forms/{id}/status updates status."""

@@ -7,7 +7,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 # Allow OAuth over HTTP for local development (must be set before importing google_auth_oauthlib)
-if os.environ.get('ENVIRONMENT', 'development') == 'development':
+if os.environ.get('ENVIRONMENT') == 'development':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 # Relax token scope validation - Google returns long-form scopes (e.g.,

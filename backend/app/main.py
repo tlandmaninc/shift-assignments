@@ -33,18 +33,32 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=()"
+        )
+        if settings.environment == "production":
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "connect-src 'self' wss: ws:; "
+                "frame-ancestors 'none'"
+            )
         if settings.environment == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
+
+_is_production = settings.environment == "production"
 
 # Create FastAPI app
 app = FastAPI(
     title="ECT Shift Assignment API",
     description="API for managing ECT shift assignments, forms, and employee scheduling",
     version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url=None if _is_production else "/api/docs",
+    redoc_url=None if _is_production else "/api/redoc",
+    openapi_url=None if _is_production else "/api/openapi.json",
 )
 
 # Configure CORS - hardened configuration
@@ -94,7 +108,7 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint for monitoring and deployment platforms."""
-    return {"status": "healthy", "environment": settings.environment}
+    return {"status": "healthy"}
 
 
 @app.get("/api/config")
@@ -102,16 +116,20 @@ async def get_config():
     """Get frontend configuration."""
     return {
         "api_version": "1.0.0",
-        "environment": settings.environment,
     }
 
 
 # Exception handlers
 @app.exception_handler(ValueError)
 async def value_error_handler(request, exc):
+    msg = str(exc)
+    if settings.environment == "production" and (
+        "path" in msg.lower() or "directory" in msg.lower()
+    ):
+        msg = "Invalid input"
     return JSONResponse(
         status_code=400,
-        content={"detail": str(exc)},
+        content={"detail": msg},
     )
 
 

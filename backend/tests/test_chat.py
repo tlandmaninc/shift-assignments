@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
 
+@pytest.mark.usefixtures("mock_employee")
 class TestChatSendMessage:
     def test_post_chat_returns_response(self, client):
         """POST /api/chat returns a ChatResponse with mocked AI provider."""
@@ -73,6 +74,7 @@ class TestChatHealth:
         assert "provider" in data
 
 
+@pytest.mark.usefixtures("mock_employee")
 class TestConversations:
     def test_list_conversations(self, client):
         """GET /api/chat/conversations returns list."""
