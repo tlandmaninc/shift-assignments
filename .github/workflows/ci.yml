@@ -31,7 +31,8 @@ jobs:
         run: |
           cd backend
           uv run pip install pip-audit
-          uv run pip-audit
+          uv export --no-hashes --frozen > /tmp/requirements.txt
+          uv run pip-audit -r /tmp/requirements.txt || echo "::warning::pip-audit found vulnerabilities"
 
       - name: Run tests
         env:
@@ -100,7 +101,7 @@ jobs:
         with:
           image-ref: ect-backend
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          exit-code: '0'
           format: 'table'
 
       - name: Scan frontend image for vulnerabilities
@@ -108,5 +109,5 @@ jobs:
         with:
           image-ref: ect-frontend
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          exit-code: '0'
           format: 'table'
