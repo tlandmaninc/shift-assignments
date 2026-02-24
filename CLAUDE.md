@@ -305,7 +305,7 @@ GOOGLE_CLIENT_ID=<from console.cloud.google.com>
 GOOGLE_CLIENT_SECRET=<from console.cloud.google.com>
 
 # AI Provider (default: gemini)
-AI_PROVIDER=gemini                        # gemini | ollama | openai
+AI_PROVIDER=gemini                        # gemini | ollama | openai | groq | together | openrouter
 GEMINI_API_KEY=<from aistudio.google.com>
 GEMINI_MODEL=gemini-2.5-flash
 
@@ -313,10 +313,21 @@ GEMINI_MODEL=gemini-2.5-flash
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:3b
 
-# Optional: OpenAI-compatible (Groq, Together, OpenRouter)
+# Optional: OpenAI (paid)
 OPENAI_API_KEY=<key>
-OPENAI_BASE_URL=https://api.groq.com/openai/v1
-OPENAI_MODEL=llama-3.3-70b-versatile
+OPENAI_MODEL=gpt-4o-mini
+
+# Optional: Groq (FREE - https://console.groq.com)
+GROQ_API_KEY=<key>
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# Optional: Together AI (https://api.together.xyz)
+TOGETHER_API_KEY=<key>
+TOGETHER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+
+# Optional: OpenRouter (https://openrouter.ai)
+OPENROUTER_API_KEY=<key>
+OPENROUTER_MODEL=meta-llama/llama-3.2-3b-instruct:free
 
 # Optional: Firebase Phone OTP
 FIREBASE_SERVICE_ACCOUNT_BASE64=<base64 JSON>

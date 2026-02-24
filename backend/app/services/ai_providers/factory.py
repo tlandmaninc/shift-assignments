@@ -6,6 +6,9 @@ from .base import AIProvider
 from .ollama import OllamaProvider
 from .gemini import GeminiProvider
 from .openai import OpenAIProvider
+from .groq import GroqProvider
+from .together import TogetherProvider
+from .openrouter import OpenRouterProvider
 
 
 class AIProviderType(str, Enum):
@@ -26,19 +29,21 @@ def get_ai_provider(
     # Ollama settings
     ollama_url: str = "http://localhost:11434",
     ollama_model: str = "qwen2.5:3b",
-    # OpenAI-compatible settings
+    # OpenAI settings
     openai_api_key: Optional[str] = None,
-    openai_base_url: Optional[str] = None,
     openai_model: Optional[str] = None,
+    # Groq settings
+    groq_api_key: Optional[str] = None,
+    groq_model: str = "llama-3.3-70b-versatile",
+    # Together settings
+    together_api_key: Optional[str] = None,
+    together_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    # OpenRouter settings
+    openrouter_api_key: Optional[str] = None,
+    openrouter_model: str = "meta-llama/llama-3.2-3b-instruct:free",
 ) -> AIProvider:
     """
     Factory function to create the appropriate AI provider.
-
-    Priority for free deployment:
-    1. Gemini (free tier, recommended default)
-    2. Groq (free tier, very fast)
-    3. Ollama (local, free but requires local setup)
-    4. OpenAI/others (paid or limited free tiers)
 
     Args:
         provider_type: One of the AIProviderType values
@@ -46,9 +51,14 @@ def get_ai_provider(
         gemini_model: Gemini model to use
         ollama_url: URL for local Ollama server
         ollama_model: Ollama model to use
-        openai_api_key: API key for OpenAI-compatible APIs
-        openai_base_url: Base URL for OpenAI-compatible APIs
-        openai_model: Model for OpenAI-compatible APIs
+        openai_api_key: API key for OpenAI
+        openai_model: Model for OpenAI
+        groq_api_key: API key for Groq
+        groq_model: Model for Groq
+        together_api_key: API key for Together AI
+        together_model: Model for Together AI
+        openrouter_api_key: API key for OpenRouter
+        openrouter_model: Model for OpenRouter
 
     Returns:
         Configured AIProvider instance
@@ -68,33 +78,26 @@ def get_ai_provider(
         )
 
     elif provider_type == AIProviderType.GROQ:
-        return OpenAIProvider(
-            api_key=openai_api_key or "",
-            base_url=openai_base_url or "https://api.groq.com/openai/v1",
-            model=openai_model or "llama-3.3-70b-versatile",
-            provider_type="groq",
+        return GroqProvider(
+            api_key=groq_api_key or "",
+            model=groq_model,
         )
 
     elif provider_type == AIProviderType.TOGETHER:
-        return OpenAIProvider(
-            api_key=openai_api_key or "",
-            base_url=openai_base_url or "https://api.together.xyz/v1",
-            model=openai_model or "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-            provider_type="together",
+        return TogetherProvider(
+            api_key=together_api_key or "",
+            model=together_model,
         )
 
     elif provider_type == AIProviderType.OPENROUTER:
-        return OpenAIProvider(
-            api_key=openai_api_key or "",
-            base_url=openai_base_url or "https://openrouter.ai/api/v1",
-            model=openai_model or "meta-llama/llama-3.2-3b-instruct:free",
-            provider_type="openrouter",
+        return OpenRouterProvider(
+            api_key=openrouter_api_key or "",
+            model=openrouter_model,
         )
 
     elif provider_type == AIProviderType.OPENAI:
         return OpenAIProvider(
             api_key=openai_api_key or "",
-            base_url=openai_base_url or "https://api.openai.com/v1",
             model=openai_model or "gpt-4o-mini",
             provider_type="openai",
         )
@@ -128,7 +131,7 @@ def get_available_providers() -> dict:
             "free_tier": True,
             "free_limits": "14,400 requests/day, very fast",
             "setup_url": "https://console.groq.com",
-            "env_vars": ["OPENAI_API_KEY"],
+            "env_vars": ["GROQ_API_KEY"],
         },
         "ollama": {
             "name": "Ollama (Local)",
@@ -143,14 +146,14 @@ def get_available_providers() -> dict:
             "free_tier": True,
             "free_limits": "Some free models available",
             "setup_url": "https://openrouter.ai",
-            "env_vars": ["OPENAI_API_KEY"],
+            "env_vars": ["OPENROUTER_API_KEY"],
         },
         "together": {
             "name": "Together AI",
             "free_tier": True,
             "free_limits": "Free tier available",
             "setup_url": "https://api.together.xyz",
-            "env_vars": ["OPENAI_API_KEY"],
+            "env_vars": ["TOGETHER_API_KEY"],
         },
         "openai": {
             "name": "OpenAI",

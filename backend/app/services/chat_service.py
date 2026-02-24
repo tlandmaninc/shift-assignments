@@ -34,8 +34,13 @@ class ChatService:
                 ollama_url=settings.ollama_url,
                 ollama_model=settings.ollama_model,
                 openai_api_key=settings.openai_api_key,
-                openai_base_url=settings.openai_base_url or None,
-                openai_model=settings.openai_model or None,
+                openai_model=settings.openai_model,
+                groq_api_key=settings.groq_api_key,
+                groq_model=settings.groq_model,
+                together_api_key=settings.together_api_key,
+                together_model=settings.together_model,
+                openrouter_api_key=settings.openrouter_api_key,
+                openrouter_model=settings.openrouter_model,
             )
         return self._provider
 

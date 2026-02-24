@@ -1,4 +1,4 @@
-"""OpenAI-compatible AI provider (works with OpenAI, Groq, Together, etc.)."""
+"""OpenAI-compatible API provider."""
 
 import json
 import httpx
@@ -11,37 +11,9 @@ class OpenAIProvider(AIProvider):
     """
     Provider for OpenAI-compatible APIs.
 
-    This works with:
-    - OpenAI API (requires paid API key)
-    - Groq (free tier: 14,400 requests/day) - https://console.groq.com
-    - Together AI (free tier available) - https://api.together.xyz
-    - OpenRouter (pay-per-use, some free models) - https://openrouter.ai
-    - Local servers (LM Studio, text-generation-webui, etc.)
-
-    Free alternatives:
-    - Groq: Set base_url to "https://api.groq.com/openai/v1"
-    - Use models like "llama-3.3-70b-versatile" or "mixtral-8x7b-32768"
+    Serves as a base class for subclasses targeting specific
+    OpenAI-compatible services (Groq, Together, OpenRouter, etc.).
     """
-
-    # Common model mappings for different providers
-    PROVIDER_DEFAULTS = {
-        "openai": {
-            "base_url": "https://api.openai.com/v1",
-            "model": "gpt-4o-mini",
-        },
-        "groq": {
-            "base_url": "https://api.groq.com/openai/v1",
-            "model": "llama-3.3-70b-versatile",
-        },
-        "together": {
-            "base_url": "https://api.together.xyz/v1",
-            "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-        },
-        "openrouter": {
-            "base_url": "https://openrouter.ai/api/v1",
-            "model": "meta-llama/llama-3.2-3b-instruct:free",
-        },
-    }
 
     def __init__(
         self,

@@ -54,13 +54,21 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:3b"
 
-    # OpenAI-compatible Configuration (for Groq, Together, OpenRouter, OpenAI)
-    # Groq (FREE): https://console.groq.com
-    # Together: https://api.together.xyz
-    # OpenRouter: https://openrouter.ai
+    # OpenAI Configuration
     openai_api_key: str = ""
-    openai_base_url: str = ""
-    openai_model: str = ""
+    openai_model: str = "gpt-4o-mini"
+
+    # Groq Configuration (FREE - https://console.groq.com)
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+
+    # Together AI Configuration (https://api.together.xyz)
+    together_api_key: str = ""
+    together_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+
+    # OpenRouter Configuration (https://openrouter.ai)
+    openrouter_api_key: str = ""
+    openrouter_model: str = "meta-llama/llama-3.2-3b-instruct:free"
 
     # Firebase Authentication (for phone OTP)
     firebase_project_id: str = ""
