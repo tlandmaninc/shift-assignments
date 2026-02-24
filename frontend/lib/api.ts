@@ -24,10 +24,10 @@ async function fetchApi<T>(
     throw new Error('Session expired');
   }
 
-  // Handle 403 - redirect to unauthorized
+  // Handle 403 - let callers handle it (page access is enforced by usePageAccess hook)
   if (response.status === 403) {
-    window.location.href = '/unauthorized';
-    throw new Error('Access denied');
+    const error = await response.json().catch(() => ({ detail: 'Access denied' }));
+    throw new Error(error.detail || 'Access denied');
   }
 
   if (!response.ok) {
@@ -456,4 +456,7 @@ export const chatApi = {
 
   deleteConversation: (id: string) =>
     fetchApi<{ success: boolean }>(`/chat/conversations/${id}`, { method: 'DELETE' }),
+
+  grantConsent: () =>
+    fetchApi<{ success: boolean }>('/chat/consent', { method: 'POST' }),
 };

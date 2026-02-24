@@ -19,7 +19,7 @@ const nextConfig = {
       `script-src ${cspScriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
-      "connect-src 'self' wss: ws:",
+      isProd ? "connect-src 'self'" : "connect-src 'self' http://localhost:8000 ws://localhost:8000",
       "frame-ancestors 'none'",
     ].join('; ');
 

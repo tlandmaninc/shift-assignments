@@ -979,7 +979,7 @@ export default function HistoryPage() {
             }
           />
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 56 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 12 }} className="text-slate-500" />
@@ -1059,7 +1059,7 @@ export default function HistoryPage() {
             }
           />
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={fairnessTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="fairnessGradient" x1="0" y1="0" x2="0" y2="1">
@@ -1200,7 +1200,7 @@ export default function HistoryPage() {
             {activeChart === 'trends' && (
               <div className="flex flex-col">
                 <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <RechartsLine data={trendsChartData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
                       <XAxis
@@ -1252,7 +1252,7 @@ export default function HistoryPage() {
 
                   {/* Pane 1: Shift type stacked bars */}
                   <div style={{ height: 210 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={monthlyChartData} syncId="monthly-sync" margin={{ top: 8, right: 8, left: 28, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
                         <XAxis dataKey="month" tick={false} axisLine={false} tickLine={false} />
@@ -1281,7 +1281,7 @@ export default function HistoryPage() {
 
                   {/* Pane 2: Active Employees */}
                   <div style={{ height: 130 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={monthlyChartData} syncId="monthly-sync" margin={{ top: 4, right: 8, left: 28, bottom: 28 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
                         <XAxis
@@ -1426,7 +1426,7 @@ export default function HistoryPage() {
 
                   {/* Chart */}
                   <div className="relative w-full" style={{ height: 380 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <RechartsPie>
                         {!sunburstDrill ? (
                           <>

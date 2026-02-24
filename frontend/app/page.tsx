@@ -32,7 +32,7 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [recentForms, setRecentForms] = useState<any[]>([]);
   const [fairness, setFairness] = useState<any>(null);
@@ -40,7 +40,13 @@ export default function Dashboard() {
   const [pageAccess, setPageAccess] = useState<Record<string, string> | null>(null);
   const [savingAccess, setSavingAccess] = useState(false);
 
+  const canAccessHistory = isAdmin || !!user?.employee_id;
+
   useEffect(() => {
+    if (!canAccessHistory) {
+      setLoading(false);
+      return;
+    }
     async function loadData() {
       try {
         const [statsData, fairnessData] = await Promise.all([
@@ -56,7 +62,7 @@ export default function Dashboard() {
       }
     }
     loadData();
-  }, []);
+  }, [canAccessHistory]);
 
   useEffect(() => {
     if (!isAdmin) return;

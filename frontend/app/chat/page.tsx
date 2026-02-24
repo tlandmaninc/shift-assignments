@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Send, Loader2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Card } from '@/components/ui';
 import { MessageBubble, TypingIndicator, EmptyState, ChatHistoryPanel } from '@/components/chat';
 import { chatApi } from '@/lib/api';
@@ -38,6 +38,8 @@ export default function ChatPage() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [consentRequired, setConsentRequired] = useState(false);
+  const [grantingConsent, setGrantingConsent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamingMessageId = useRef<string | null>(null);
@@ -83,6 +85,19 @@ export default function ChatPage() {
       inputRef.current?.focus();
     }
   }, [connectionStatus]);
+
+  const handleGrantConsent = async () => {
+    setGrantingConsent(true);
+    try {
+      await chatApi.grantConsent();
+      setConsentRequired(false);
+      inputRef.current?.focus();
+    } catch (error) {
+      toast.error('Failed to grant consent');
+    } finally {
+      setGrantingConsent(false);
+    }
+  };
 
   const handleNewChat = useCallback(() => {
     setMessages([]);
@@ -207,10 +222,18 @@ export default function ChatPage() {
           inputRef.current?.focus();
         },
       );
-    } catch (error) {
+    } catch (error: any) {
       setLoading(false);
       setStreaming(false);
       streamingMessageId.current = null;
+      const msg = error?.message || '';
+      if (msg.toLowerCase().includes('consent')) {
+        setConsentRequired(true);
+        // Remove the user message since it wasn't processed
+        setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+        setInput(userMessage.content);
+        return;
+      }
       setMessages((prev) => {
         const existing = prev.find((m) => m.id === assistantMsgId);
         if (!existing) {
@@ -219,7 +242,7 @@ export default function ChatPage() {
             {
               id: assistantMsgId,
               role: 'assistant' as const,
-              content: 'Sorry, I encountered an error processing your request. Please try again.',
+              content: `Sorry, an error occurred: ${msg || 'Please try again.'}`,
               timestamp: new Date(),
             },
           ];
@@ -385,6 +408,32 @@ export default function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Consent Banner */}
+          {consentRequired && (
+            <div className="border-t border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 flex-shrink-0">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    AI Data Processing Consent Required
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    The AI assistant processes shift and scheduling data to answer your questions.
+                    By continuing, you consent to this data processing.
+                  </p>
+                </div>
+                <button
+                  onClick={handleGrantConsent}
+                  disabled={grantingConsent}
+                  className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors flex items-center gap-1.5 flex-shrink-0"
+                >
+                  {grantingConsent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  I Agree
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Input Area */}
           <div className="border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0">
             <div className="flex gap-2">
@@ -396,11 +445,11 @@ export default function ChatPage() {
                 onKeyPress={handleKeyPress}
                 placeholder="Ask about shifts, employees, or statistics..."
                 className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                disabled={loading || streaming}
+                disabled={loading || streaming || consentRequired}
               />
               <button
                 onClick={sendMessage}
-                disabled={loading || streaming || !input.trim()}
+                disabled={loading || streaming || !input.trim() || consentRequired}
                 className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
                 {loading || streaming ? (

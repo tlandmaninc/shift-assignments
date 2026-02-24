@@ -3,12 +3,13 @@
 
 services:
   backend:
+    container_name: ect-prod-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - ./backend/.env
     volumes:
@@ -29,6 +30,7 @@ services:
       - ect-network
 
   frontend:
+    container_name: ect-prod-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile

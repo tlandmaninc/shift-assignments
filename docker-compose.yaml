@@ -6,6 +6,7 @@ services:
   # FastAPI backend with Python 3.12 (uv)
   # Volume mounts enable live code reload during development
   backend:
+    container_name: ect-dev-backend
     build: ./backend
     ports:
       - "8000:8000"
@@ -29,6 +30,7 @@ services:
   # Next.js frontend with Node.js 20
   # WATCHPACK_POLLING enables file-watching inside Docker on some OS
   frontend:
+    container_name: ect-dev-frontend
     build: ./frontend
     command: ["npx", "next", "dev", "--turbopack"]
     ports:
