@@ -1,5 +1,6 @@
 """ECT Shift Assignment API - Main FastAPI Application."""
 
+import uuid
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,6 +9,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from .config import settings
+
+MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024  # 2 MB
 from .routers import (
     forms_router,
     assignments_router,
@@ -23,6 +26,30 @@ from .routers import (
 
 # Rate limiter configuration
 limiter = Limiter(key_func=get_remote_address)
+
+
+class RequestBodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose Content-Length exceeds the allowed maximum."""
+
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_REQUEST_BODY_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request too large"},
+            )
+        return await call_next(request)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a unique request ID to every request/response."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -67,6 +94,7 @@ _allowed_origins = [settings.frontend_url]
 if settings.environment == "development":
     _allowed_origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
 
+# Middleware stack (evaluated bottom-to-top: body size -> request ID -> CORS -> security headers)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
@@ -74,9 +102,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
-
-# Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(RequestBodySizeLimitMiddleware)
 
 # Configure rate limiting
 app.state.limiter = limiter
@@ -124,14 +152,16 @@ async def get_config():
 # Exception handlers
 @app.exception_handler(ValueError)
 async def value_error_handler(request, exc):
-    msg = str(exc)
-    if settings.environment == "production" and (
-        "path" in msg.lower() or "directory" in msg.lower()
-    ):
-        msg = "Invalid input"
+    import logging
+    if settings.environment == "production":
+        logging.getLogger(__name__).warning("ValueError: %s", exc)
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Invalid input"},
+        )
     return JSONResponse(
         status_code=400,
-        content={"detail": msg},
+        content={"detail": str(exc)},
     )
 
 

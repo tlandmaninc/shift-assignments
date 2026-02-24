@@ -1,6 +1,7 @@
 """CSV parsing service for availability data from Google Forms responses."""
 
 import csv
+import html
 import io
 import re
 from datetime import date
@@ -10,6 +11,14 @@ from typing import Optional
 MAX_CSV_SIZE = 1_000_000  # 1MB max
 MAX_ROWS = 1000
 MAX_COLUMNS = 100
+MAX_NAME_LENGTH = 100
+
+
+def sanitize_name(name: str) -> str:
+    """Sanitize an employee name: escape HTML, strip control chars, limit length."""
+    name = re.sub(r'[\x00-\x1f\x7f]', '', name)
+    name = html.escape(name)
+    return name[:MAX_NAME_LENGTH]
 
 
 def parse_date_from_header(header: str, included_dates: Optional[list[str]] = None) -> Optional[str]:
@@ -155,7 +164,7 @@ def parse_csv_responses(
         while len(row) < len(headers):
             row.append("")
 
-        name = row[1].strip()
+        name = sanitize_name(row[1].strip())
         if not name:
             continue
 

@@ -22,8 +22,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 # Copy application code
 COPY . .
 
-# Create data directory
-RUN mkdir -p /app/data
+# Create data directory with restricted permissions
+RUN mkdir -p /app/data && chmod 700 /app/data
 
 # Make venv binaries available on PATH
 ENV PATH="/app/.venv/bin:$PATH"

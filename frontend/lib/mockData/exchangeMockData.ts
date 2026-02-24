@@ -21,16 +21,16 @@ interface MockEmployee {
 }
 
 const EMPLOYEES: MockEmployee[] = [
-  { id: 1, name: 'Ahmad Al-Rashid', is_new: false },
-  { id: 2, name: 'Fatima Hassan', is_new: false },
-  { id: 3, name: 'Omar Khalil', is_new: false },
-  { id: 4, name: 'Layla Mansour', is_new: false },
-  { id: 5, name: 'Yusuf Nasser', is_new: false },
-  { id: 6, name: 'Hana Ibrahim', is_new: false },
-  { id: 7, name: 'Karim Saleh', is_new: false },
-  { id: 8, name: 'Nadia Farouk', is_new: false },
-  { id: 9, name: 'Tariq Bazzi', is_new: false },
-  { id: 10, name: 'Sara Jaber', is_new: true },
+  { id: 1, name: 'Employee A', is_new: false },
+  { id: 2, name: 'Employee B', is_new: false },
+  { id: 3, name: 'Employee C', is_new: false },
+  { id: 4, name: 'Employee D', is_new: false },
+  { id: 5, name: 'Employee E', is_new: false },
+  { id: 6, name: 'Employee F', is_new: false },
+  { id: 7, name: 'Employee G', is_new: false },
+  { id: 8, name: 'Employee H', is_new: false },
+  { id: 9, name: 'Employee I', is_new: false },
+  { id: 10, name: 'Employee J', is_new: true },
 ];
 
 /** The "current user" is always employee 1. */

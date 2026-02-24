@@ -11,6 +11,7 @@ from ..schemas import (
     EmployeeMergeAllResponse,
     TranslateAllResponse,
 )
+from ..audit import log_audit, AuditAction
 from ..storage import storage
 from .auth import require_admin
 
@@ -53,7 +54,10 @@ async def get_employee(employee_id: int):
 
 
 @router.post("", response_model=EmployeeResponse)
-async def create_employee(employee: EmployeeCreate):
+async def create_employee(
+    employee: EmployeeCreate,
+    user: dict = Depends(require_admin),
+):
     """Create a new employee."""
     # Check if employee with same name exists
     existing = storage.get_employee_by_name(employee.name)
@@ -71,12 +75,22 @@ async def create_employee(employee: EmployeeCreate):
         "color": employee.color,
     })
 
+    log_audit(AuditAction.EMPLOYEE_CREATE, {
+        "admin_email": user.get("email"),
+        "employee_id": saved.get("id"),
+        "employee_name": employee.name,
+    })
+
     saved["total_shifts"] = 0
     return saved
 
 
 @router.put("/{employee_id}", response_model=EmployeeResponse)
-async def update_employee(employee_id: int, update: EmployeeUpdate):
+async def update_employee(
+    employee_id: int,
+    update: EmployeeUpdate,
+    user: dict = Depends(require_admin),
+):
     """Update an employee."""
     employee = storage.get_employee(employee_id)
     if not employee:
@@ -96,6 +110,11 @@ async def update_employee(employee_id: int, update: EmployeeUpdate):
 
     saved = storage.save_employee(employee)
 
+    log_audit(AuditAction.EMPLOYEE_UPDATE, {
+        "admin_email": user.get("email"),
+        "employee_id": employee_id,
+    })
+
     # Add shift count
     shift_counts = storage.get_employee_shift_counts()
     saved["total_shifts"] = shift_counts.get(saved.get("name", ""), 0)
@@ -104,11 +123,19 @@ async def update_employee(employee_id: int, update: EmployeeUpdate):
 
 
 @router.delete("/{employee_id}")
-async def delete_employee(employee_id: int):
+async def delete_employee(
+    employee_id: int,
+    user: dict = Depends(require_admin),
+):
     """Delete (deactivate) an employee."""
     success = storage.delete_employee(employee_id)
     if not success:
         raise HTTPException(status_code=404, detail="Employee not found")
+
+    log_audit(AuditAction.EMPLOYEE_DELETE, {
+        "admin_email": user.get("email"),
+        "employee_id": employee_id,
+    })
 
     return {"success": True, "message": "Employee deactivated"}
 
@@ -172,7 +199,10 @@ async def find_duplicate_employees():
 
 
 @router.post("/merge", response_model=EmployeeMergeResult)
-async def merge_employees(request: EmployeeMergeRequest):
+async def merge_employees(
+    request: EmployeeMergeRequest,
+    user: dict = Depends(require_admin),
+):
     """
     Merge one employee into another.
 
@@ -185,6 +215,11 @@ async def merge_employees(request: EmployeeMergeRequest):
             target_id=request.target_id,
             keep_target_name=True
         )
+        log_audit(AuditAction.EMPLOYEE_MERGE, {
+            "admin_email": user.get("email"),
+            "source_id": request.source_id,
+            "target_id": request.target_id,
+        })
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -193,7 +228,9 @@ async def merge_employees(request: EmployeeMergeRequest):
 
 
 @router.post("/merge/all-hebrew", response_model=EmployeeMergeAllResponse)
-async def merge_all_hebrew_employees():
+async def merge_all_hebrew_employees(
+    user: dict = Depends(require_admin),
+):
     """
     Find all Hebrew employees with English equivalents and merge them.
 
@@ -205,25 +242,36 @@ async def merge_all_hebrew_employees():
     5. Deactivate the Hebrew name entries
     """
     result = storage.translate_and_merge_hebrew_employees()
+    log_audit(AuditAction.EMPLOYEE_MERGE, {
+        "admin_email": user.get("email"),
+        "action": "merge_all_hebrew",
+        "merges_performed": result.get("merges_performed", 0),
+    })
     return result
 
 
 @router.post("/translate/all-to-english", response_model=TranslateAllResponse)
-async def translate_all_to_english():
+async def translate_all_to_english(
+    user: dict = Depends(require_admin),
+):
     """
     Translate ALL Hebrew names to English throughout the entire system.
 
     This comprehensive operation will:
-    1. First merge any duplicate employees (Hebrew + English entries for same person)
+    1. First merge any duplicate employees (Hebrew + English entries)
     2. Rename remaining Hebrew employee names to English
     3. Update ALL history records with English names
     4. Update ALL monthly assignment files with English names
 
     Use this to fully convert the system to English names.
-    Names that cannot be translated (not in dictionary) will be reported as errors.
+    Names that cannot be translated (not in dictionary) will be reported.
     """
     try:
         result = storage.translate_all_hebrew_to_english()
+        log_audit(AuditAction.EMPLOYEE_TRANSLATE, {
+            "admin_email": user.get("email"),
+            "total_translations": result.get("total_translations", 0),
+        })
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

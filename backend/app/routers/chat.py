@@ -28,6 +28,24 @@ limiter = Limiter(key_func=get_remote_address)
 chat_service = ChatService(storage)
 
 
+def _check_conversation_access(conv: dict, user: dict) -> None:
+    """Raise 403 if the user does not own the conversation (admins bypass)."""
+    if user.get("role") == "admin":
+        return
+    if conv.get("user_id") and conv["user_id"] != user.get("id"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _require_ai_consent(user: dict) -> None:
+    """Raise 403 if user has not given AI data processing consent."""
+    user_id = user.get("id")
+    if not user_id or not storage.get_ai_consent(user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="AI data processing consent required",
+        )
+
+
 @router.get("/health", response_model=ChatHealthResponse)
 async def check_health():
     """Check if the AI provider is available and configured."""
@@ -48,14 +66,22 @@ async def list_conversations(
     request: Request,
     user: dict = Depends(get_required_user),
 ):
-    """List all conversations (summaries only)."""
+    """List conversations. Admins see all; others see only their own."""
     summaries = storage.get_conversations()
+    if user.get("role") != "admin":
+        user_id = user.get("id")
+        summaries = [
+            s for s in summaries if s.get("user_id") == user_id
+        ]
     return ConversationListResponse(
         conversations=[ConversationSummary(**s) for s in summaries]
     )
 
 
-@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationDetail,
+)
 @limiter.limit("30/minute")
 async def get_conversation(
     request: Request,
@@ -66,6 +92,7 @@ async def get_conversation(
     conv = storage.get_conversation(conversation_id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    _check_conversation_access(conv, user)
     return ConversationDetail(**conv)
 
 
@@ -77,13 +104,17 @@ async def delete_conversation(
     user: dict = Depends(require_employee_or_admin),
 ):
     """Delete a conversation."""
-    deleted = storage.delete_conversation(conversation_id)
-    if not deleted:
+    conv = storage.get_conversation(conversation_id)
+    if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    _check_conversation_access(conv, user)
+    storage.delete_conversation(conversation_id)
     return {"success": True}
 
 
-def _resolve_conversation(request: ChatRequest) -> tuple[str, dict]:
+def _resolve_conversation(
+    request: ChatRequest, user: dict
+) -> tuple[str, dict]:
     """Resolve or create a conversation for the request."""
     now = datetime.now().isoformat()
     conversation_id = request.conversation_id
@@ -91,7 +122,10 @@ def _resolve_conversation(request: ChatRequest) -> tuple[str, dict]:
     if conversation_id:
         conversation = storage.get_conversation(conversation_id)
         if not conversation:
-            raise HTTPException(status_code=404, detail="Conversation not found")
+            raise HTTPException(
+                status_code=404, detail="Conversation not found"
+            )
+        _check_conversation_access(conversation, user)
         return conversation_id, conversation
 
     conversation_id = f"conv_{uuid.uuid4().hex[:12]}"
@@ -101,10 +135,24 @@ def _resolve_conversation(request: ChatRequest) -> tuple[str, dict]:
     return conversation_id, {
         "id": conversation_id,
         "title": title,
+        "user_id": user.get("id"),
         "created_at": now,
         "updated_at": now,
         "messages": [],
     }
+
+
+@router.post("/consent")
+@limiter.limit("10/minute")
+async def grant_ai_consent(
+    request: Request,
+    user: dict = Depends(get_required_user),
+):
+    """Grant AI data processing consent for the current user."""
+    updated = storage.set_ai_consent(user["id"], True)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"success": True}
 
 
 @router.post("/stream")
@@ -115,7 +163,8 @@ async def stream_message(
     user: dict = Depends(require_employee_or_admin),
 ):
     """Stream a chat response using Server-Sent Events."""
-    conversation_id, conversation = _resolve_conversation(chat_request)
+    _require_ai_consent(user)
+    conversation_id, conversation = _resolve_conversation(chat_request, user)
     now = datetime.now().isoformat()
 
     history = [
@@ -202,7 +251,8 @@ async def send_message(
     user: dict = Depends(require_employee_or_admin),
 ):
     """Send a message and get AI response (non-streaming)."""
-    conversation_id, conversation = _resolve_conversation(chat_request)
+    _require_ai_consent(user)
+    conversation_id, conversation = _resolve_conversation(chat_request, user)
     now = datetime.now().isoformat()
 
     history = [

@@ -2,6 +2,7 @@
 
 import fcntl
 import json
+import os
 import re
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -92,11 +93,12 @@ class Storage:
                 return json.load(f)
 
     def _save_json(self, path: Path, data: dict | list):
-        """Save data to JSON file."""
+        """Save data to JSON file with restricted permissions."""
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._file_lock(path, exclusive=True):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, cls=JSONEncoder)
+            os.chmod(path, 0o600)
 
     # ==================== Employees ====================
 
@@ -152,6 +154,72 @@ class Storage:
                 self._save_json(settings.employees_file, {"employees": employees})
                 return True
         return False
+
+    def hard_delete_employee(self, employee_id: int) -> bool:
+        """Permanently remove an employee record (right to erasure)."""
+        employees = self.get_employees()
+        original_len = len(employees)
+        employees = [e for e in employees if e.get("id") != employee_id]
+        if len(employees) < original_len:
+            self._save_json(settings.employees_file, {"employees": employees})
+            return True
+        return False
+
+    def purge_user_data(self, user_id: str) -> dict:
+        """Remove all PII for a user across data files (right to erasure)."""
+        purged = {"users": False, "employees": False, "chat": 0, "exchanges": 0}
+
+        # 1. Remove from users.json
+        users_data = self._load_json(settings.users_file)
+        users = users_data.get("users", [])
+        user_record = None
+        for u in users:
+            if u.get("id") == user_id:
+                user_record = u
+                break
+        if user_record:
+            users = [u for u in users if u.get("id") != user_id]
+            self._save_json(settings.users_file, {"users": users})
+            purged["users"] = True
+
+        # 2. Hard-delete linked employee
+        employee_id = user_record.get("employee_id") if user_record else None
+        if employee_id is not None:
+            purged["employees"] = self.hard_delete_employee(employee_id)
+
+        # 3. Remove chat conversations owned by this user
+        chat_data = self._load_json(settings.chat_history_file)
+        conversations = chat_data.get("conversations", [])
+        before = len(conversations)
+        conversations = [
+            c for c in conversations if c.get("user_id") != user_id
+        ]
+        purged["chat"] = before - len(conversations)
+        if purged["chat"]:
+            self._save_json(
+                settings.chat_history_file, {"conversations": conversations}
+            )
+
+        # 4. Anonymize exchanges involving the linked employee
+        if employee_id is not None:
+            ex_data = self._load_json(settings.exchanges_file)
+            exchanges = ex_data.get("exchanges", [])
+            count = 0
+            for ex in exchanges:
+                changed = False
+                if ex.get("requester_employee_id") == employee_id:
+                    ex["requester_employee_name"] = "[deleted]"
+                    changed = True
+                if ex.get("target_employee_id") == employee_id:
+                    ex["target_employee_name"] = "[deleted]"
+                    changed = True
+                if changed:
+                    count += 1
+            purged["exchanges"] = count
+            if count:
+                self._save_json(settings.exchanges_file, {"exchanges": exchanges})
+
+        return purged
 
     def find_duplicate_employees(self) -> list[dict]:
         """
@@ -930,6 +998,21 @@ class Storage:
                 return user
         return None
 
+    def get_ai_consent(self, user_id: str) -> bool:
+        """Check whether a user has given AI data processing consent."""
+        user = self.get_auth_user(user_id)
+        if not user:
+            return False
+        return user.get("ai_consent", False) is True
+
+    def set_ai_consent(self, user_id: str, consent: bool) -> Optional[dict]:
+        """Set the ai_consent flag on a user record."""
+        user = self.get_auth_user(user_id)
+        if not user:
+            return None
+        user["ai_consent"] = consent
+        return self.save_auth_user(user)
+
     # ==================== Chat History ====================
 
     def get_conversations(self) -> list[dict]:
@@ -941,6 +1024,7 @@ class Storage:
             summaries.append({
                 "id": conv.get("id"),
                 "title": conv.get("title", "Untitled"),
+                "user_id": conv.get("user_id"),
                 "created_at": conv.get("created_at", ""),
                 "updated_at": conv.get("updated_at", ""),
                 "message_count": len(conv.get("messages", [])),

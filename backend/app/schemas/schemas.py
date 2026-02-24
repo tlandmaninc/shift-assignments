@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 # Employee Schemas
 class EmployeeBase(BaseModel):
     """Base employee schema."""
-    name: str = Field(..., min_length=1, max_length=255)
-    email: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=100)
+    email: Optional[str] = Field(None, max_length=254)
     is_new: bool = True
     color: Optional[str] = None
 
@@ -21,8 +21,8 @@ class EmployeeCreate(EmployeeBase):
 
 class EmployeeUpdate(BaseModel):
     """Schema for updating an employee."""
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    email: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email: Optional[str] = Field(None, max_length=254)
     is_active: Optional[bool] = None
     is_new: Optional[bool] = None
     color: Optional[str] = None
@@ -105,13 +105,13 @@ class TranslateAllResponse(BaseModel):
 class FormBase(BaseModel):
     """Base form schema."""
     month_year: str = Field(..., pattern=r"^\d{4}-\d{2}$")
-    title: str
+    title: str = Field(..., max_length=500)
 
 
 class FormCreate(BaseModel):
     """Schema for creating/saving a form record."""
     month_year: str = Field(..., pattern=r"^\d{4}-\d{2}$")
-    title: str
+    title: str = Field(..., max_length=500)
     included_dates: list[str] = []
     status: str = "active"
     shift_type: Optional[str] = "ect"
@@ -142,7 +142,7 @@ class FormGenerateRequest(BaseModel):
 # CSV/Availability Data Schemas
 class AvailabilityRow(BaseModel):
     """Single row of availability data from CSV/form responses."""
-    employee_name: str
+    employee_name: str = Field(..., max_length=100)
     is_first_month: bool = True
     availability: dict[str, bool]  # date_iso -> is_available
 

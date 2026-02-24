@@ -29,8 +29,9 @@ TOKEN_FILE = os.path.join(
 
 
 def _get_cipher() -> Fernet:
-    """Get Fernet cipher derived from the application secret key."""
-    key = hashlib.sha256(settings.secret_key.encode()).digest()
+    """Get Fernet cipher derived from the encryption key (falls back to secret key)."""
+    source_key = settings.encryption_key or settings.secret_key
+    key = hashlib.sha256(source_key.encode()).digest()
     return Fernet(base64.urlsafe_b64encode(key))
 
 

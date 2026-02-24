@@ -83,6 +83,7 @@ class TestConversations:
                 {
                     "id": "conv_abc",
                     "title": "Test",
+                    "user_id": "test_emp_id",
                     "created_at": "2026-02-20T00:00:00",
                     "updated_at": "2026-02-20T00:00:00",
                     "message_count": 2,
@@ -92,6 +93,7 @@ class TestConversations:
         assert resp.status_code == 200
         data = resp.json()
         assert "conversations" in data
+        assert len(data["conversations"]) == 1
 
     def test_get_conversation_not_found(self, client):
         """GET /api/chat/conversations/{id} returns 404."""
@@ -103,6 +105,10 @@ class TestConversations:
     def test_delete_conversation(self, client):
         """DELETE /api/chat/conversations/{id} returns success."""
         with patch("app.routers.chat.storage") as mock_storage:
+            mock_storage.get_conversation.return_value = {
+                "id": "conv_abc",
+                "user_id": "test_emp_id",
+            }
             mock_storage.delete_conversation.return_value = True
             resp = client.delete("/api/chat/conversations/conv_abc")
         assert resp.status_code == 200
@@ -111,6 +117,6 @@ class TestConversations:
     def test_delete_conversation_not_found(self, client):
         """DELETE /api/chat/conversations/{id} returns 404."""
         with patch("app.routers.chat.storage") as mock_storage:
-            mock_storage.delete_conversation.return_value = False
+            mock_storage.get_conversation.return_value = None
             resp = client.delete("/api/chat/conversations/nonexistent")
         assert resp.status_code == 404

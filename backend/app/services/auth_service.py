@@ -1,10 +1,14 @@
 """Authentication service for JWT and OAuth operations."""
 
+import fcntl
 import hashlib
+import json
 import os
 import secrets
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional, Tuple
 
 import jwt
@@ -18,10 +22,29 @@ from ..schemas.auth import UserRole
 logger = logging.getLogger(__name__)
 
 # Admin email addresses (case-insensitive)
-ADMIN_EMAILS = [e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
+ADMIN_EMAILS = [
+    e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
+]
 
-# CSRF state storage (in-memory, single-server deployment)
-_oauth_states: dict[str, datetime] = {}
+# Path to persisted OAuth states file
+_OAUTH_STATES_FILE = settings.data_dir / "oauth_states.json"
+
+# Token blacklist for revocation (jti -> expiry)
+_token_blacklist: dict[str, datetime] = {}
+
+
+def blacklist_token(jti: str, exp: datetime) -> None:
+    """Add a token JTI to the blacklist until its expiry."""
+    _token_blacklist[jti] = exp
+    _cleanup_blacklist()
+
+
+def _cleanup_blacklist() -> None:
+    """Remove expired entries from the blacklist."""
+    now = datetime.now(timezone.utc)
+    expired = [k for k, v in _token_blacklist.items() if v < now]
+    for k in expired:
+        _token_blacklist.pop(k, None)
 
 
 def generate_email_user_id(email: str) -> str:
@@ -55,49 +78,84 @@ def get_user_role(email: str) -> UserRole:
     return UserRole.BASIC
 
 
+def _load_oauth_states() -> dict[str, str]:
+    """Load OAuth states from JSON file, removing expired entries."""
+    path = _OAUTH_STATES_FILE
+    if not path.exists():
+        return {}
+    lock_path = path.with_suffix(".json.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_SH)
+        with open(path, "r", encoding="utf-8") as f:
+            states = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+    finally:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
+    # Clean expired
+    now = datetime.now().isoformat()
+    return {k: v for k, v in states.items() if v > now}
+
+
+def _save_oauth_states(states: dict[str, str]) -> None:
+    """Save OAuth states to JSON file with exclusive lock."""
+    path = _OAUTH_STATES_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_suffix(".json.lock")
+    lock_file = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(states, f)
+    finally:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
+
+
 def generate_oauth_state() -> str:
-    """
-    Generate a cryptographically secure state token for OAuth CSRF protection.
+    """Generate a cryptographically secure state token for OAuth CSRF protection.
 
-    State tokens expire after 10 minutes.
-
-    Returns:
-        A secure random state token
+    State tokens expire after 10 minutes and are persisted to disk.
     """
     state = secrets.token_urlsafe(32)
-    _oauth_states[state] = datetime.now() + timedelta(minutes=10)
+    expiry = (datetime.now() + timedelta(minutes=10)).isoformat()
 
-    logger.info(f"Generated OAuth state: {state[:10]}... (total states: {len(_oauth_states)})")
+    states = _load_oauth_states()
+    states[state] = expiry
+    _save_oauth_states(states)
 
-    # Clean up expired states
-    now = datetime.now()
-    expired = [k for k, v in _oauth_states.items() if v < now]
-    for k in expired:
-        _oauth_states.pop(k, None)
-
+    logger.info(
+        "Generated OAuth state: %s... (total states: %d)",
+        state[:10], len(states),
+    )
     return state
 
 
 def validate_oauth_state(state: str) -> bool:
-    """
-    Validate and consume an OAuth state token.
-
-    This is a one-time use validation - the token is removed after validation.
-
-    Args:
-        state: The state token to validate
-
-    Returns:
-        True if state is valid and not expired, False otherwise
-    """
-    logger.info(f"Validating OAuth state: {state[:10] if state else 'None'}... (stored states: {len(_oauth_states)})")
-
-    if not state or state not in _oauth_states:
-        logger.warning(f"State not found. Available states: {[s[:10] for s in _oauth_states.keys()]}")
+    """Validate and consume an OAuth state token (one-time use)."""
+    if not state:
         return False
 
-    expiry = _oauth_states.pop(state)
-    return datetime.now() < expiry
+    states = _load_oauth_states()
+
+    logger.info(
+        "Validating OAuth state: %s... (stored states: %d)",
+        state[:10], len(states),
+    )
+
+    if state not in states:
+        logger.warning(
+            "State not found. Available states: %s",
+            [s[:10] for s in states],
+        )
+        return False
+
+    expiry_str = states.pop(state)
+    _save_oauth_states(states)
+    return datetime.now() < datetime.fromisoformat(expiry_str)
 
 
 def verify_google_id_token(token: str) -> Optional[dict]:
@@ -160,41 +218,44 @@ def create_tokens(
     """
     now = datetime.now(timezone.utc)
 
-    # Access token (short-lived, 1 hour by default)
+    # Access token (short-lived, 1 hour)
     access_payload = {
         'sub': user_id,
         'email': email,
         'name': name,
         'role': role,
         'type': 'access',
+        'jti': uuid.uuid4().hex,
         'iat': now,
-        'exp': now + timedelta(minutes=60),  # 1 hour
+        'exp': now + timedelta(minutes=60),
     }
     if employee_id is not None:
         access_payload['employee_id'] = employee_id
 
+    signing_key = settings.jwt_signing_key or settings.secret_key
     access_token = jwt.encode(
         access_payload,
-        settings.secret_key,
+        signing_key,
         algorithm='HS256'
     )
 
-    # Refresh token (long-lived, 7 days by default)
+    # Refresh token (24 hours)
     refresh_payload = {
         'sub': user_id,
         'email': email,
         'name': name,
         'role': role,
         'type': 'refresh',
+        'jti': uuid.uuid4().hex,
         'iat': now,
-        'exp': now + timedelta(days=7),
+        'exp': now + timedelta(hours=24),
     }
     if employee_id is not None:
         refresh_payload['employee_id'] = employee_id
 
     refresh_token = jwt.encode(
         refresh_payload,
-        settings.secret_key,
+        signing_key,
         algorithm='HS256'
     )
 
@@ -213,15 +274,25 @@ def verify_token(token: str, token_type: str = 'access') -> Optional[dict]:
         Token payload dict if valid, None otherwise
     """
     try:
+        signing_key = settings.jwt_signing_key or settings.secret_key
         payload = jwt.decode(
             token,
-            settings.secret_key,
+            signing_key,
             algorithms=['HS256']
         )
 
         # Verify token type
         if payload.get('type') != token_type:
-            logger.warning(f"Token type mismatch: expected {token_type}, got {payload.get('type')}")
+            logger.warning(
+                "Token type mismatch: expected %s, got %s",
+                token_type, payload.get('type'),
+            )
+            return None
+
+        # Check blacklist
+        jti = payload.get('jti')
+        if jti and jti in _token_blacklist:
+            logger.debug("Token jti %s is blacklisted", jti)
             return None
 
         return payload
@@ -229,5 +300,5 @@ def verify_token(token: str, token_type: str = 'access') -> Optional[dict]:
         logger.debug("Token expired")
         return None
     except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid token: {e}")
+        logger.warning("Invalid token: %s", e)
         return None

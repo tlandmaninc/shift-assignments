@@ -28,6 +28,7 @@ from ..services.auth_service import (
     verify_google_id_token,
     create_tokens,
     verify_token,
+    blacklist_token,
     get_user_role,
     generate_email_user_id,
 )
@@ -53,24 +54,29 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _try_auto_link_employee(user: dict) -> dict:
-    """Try to auto-link user to an employee by matching email."""
-    if user.get("employee_id"):
-        return user  # Already linked
+    """Suggest an employee link for a user by matching email.
+
+    Sets ``suggested_employee_id`` on the user record instead of linking
+    automatically.  Actual linking requires explicit admin action via
+    ``POST /api/auth/link-employee``.
+    """
+    if user.get("employee_id") or user.get("suggested_employee_id"):
+        return user  # Already linked or suggestion already set
 
     email = user.get("email", "").lower()
     if not email:
         return user
 
-    # Check employee records for matching email
     employees = storage.get_employees()
     for emp in employees:
         emp_email = emp.get("email", "")
         if emp_email and emp_email.lower() == email and emp.get("is_active", True):
-            try:
-                user = storage.link_user_to_employee(user["id"], emp["id"])
-                logger.info(f"Auto-linked user {user['id']} to employee {emp['id']} ({emp.get('name')})")
-            except ValueError:
-                pass
+            user["suggested_employee_id"] = emp["id"]
+            user = storage.save_auth_user(user)
+            logger.info(
+                "Suggested employee link: user %s -> employee %d (%s)",
+                user["id"], emp["id"], emp.get("name"),
+            )
             break
 
     return user
@@ -111,7 +117,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
     """Set httpOnly secure cookies for authentication."""
     cookie_settings = _get_cookie_settings()
 
-    # Access token - 1 hour expiry
+    # Access token - 1 hour expiry (SameSite=Lax for OAuth redirect compat)
     response.set_cookie(
         key=ACCESS_TOKEN_COOKIE,
         value=access_token,
@@ -119,12 +125,13 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
         **cookie_settings
     )
 
-    # Refresh token - 7 days expiry
+    # Refresh token - 24 hour expiry (SameSite=Strict for CSRF protection)
+    refresh_settings = {**cookie_settings, "samesite": "strict"}
     response.set_cookie(
         key=REFRESH_TOKEN_COOKIE,
         value=refresh_token,
-        max_age=7 * 24 * 60 * 60,  # 7 days
-        **cookie_settings
+        max_age=24 * 60 * 60,  # 24 hours
+        **refresh_settings
     )
 
 
@@ -133,7 +140,8 @@ def clear_auth_cookies(response: Response):
     cookie_settings = _get_cookie_settings()
 
     response.delete_cookie(key=ACCESS_TOKEN_COOKIE, **cookie_settings)
-    response.delete_cookie(key=REFRESH_TOKEN_COOKIE, **cookie_settings)
+    refresh_settings = {**cookie_settings, "samesite": "strict"}
+    response.delete_cookie(key=REFRESH_TOKEN_COOKIE, **refresh_settings)
 
 
 async def get_current_user(request: Request) -> Optional[dict]:
@@ -478,17 +486,39 @@ async def verify_phone_auth(request: Request, body: PhoneAuthRequest, response: 
 
 
 @router.post("/logout")
-async def logout(response: Response, user: dict = Depends(get_current_user)):
-    """
-    Log out the current user.
-
-    Clears authentication cookies.
-    """
+async def logout(
+    request: Request,
+    response: Response,
+    user: dict = Depends(get_current_user),
+):
+    """Log out the current user. Blacklists tokens and clears cookies."""
     if user:
         log_audit(AuditAction.USER_LOGOUT, {
             "user_id": user['id'],
             "email": user['email'],
         })
+
+    # Blacklist the access token
+    access_tok = request.cookies.get(ACCESS_TOKEN_COOKIE)
+    if access_tok:
+        payload = verify_token(access_tok, token_type='access')
+        if payload and payload.get('jti'):
+            from datetime import datetime, timezone
+            blacklist_token(
+                payload['jti'],
+                datetime.fromtimestamp(payload['exp'], tz=timezone.utc),
+            )
+
+    # Blacklist the refresh token
+    refresh_tok = request.cookies.get(REFRESH_TOKEN_COOKIE)
+    if refresh_tok:
+        payload = verify_token(refresh_tok, token_type='refresh')
+        if payload and payload.get('jti'):
+            from datetime import datetime, timezone
+            blacklist_token(
+                payload['jti'],
+                datetime.fromtimestamp(payload['exp'], tz=timezone.utc),
+            )
 
     clear_auth_cookies(response)
     return {"success": True, "message": "Logged out successfully"}
@@ -521,6 +551,7 @@ async def get_auth_status(user: Optional[dict] = Depends(get_current_user)):
             picture=user.get('picture'),
             role=UserRole(user.get('role', 'basic')),
             employee_id=user.get('employee_id'),
+            suggested_employee_id=user.get('suggested_employee_id'),
             is_active=user.get('is_active', True),
         )
     )
@@ -546,11 +577,13 @@ async def link_employee(
 
 
 @router.post("/refresh")
+@limiter.limit("10/minute")
 async def refresh_tokens(request: Request, response: Response):
     """
     Refresh the access token using the refresh token.
 
-    Returns new tokens in cookies.
+    Implements token rotation: the old refresh token is blacklisted
+    and a new pair of tokens is issued.
     """
     refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
 
@@ -566,13 +599,24 @@ async def refresh_tokens(request: Request, response: Response):
     user = storage.get_auth_user(payload['sub'])
     if not user or not user.get('is_active', True):
         clear_auth_cookies(response)
-        raise HTTPException(status_code=401, detail="User not found or inactive")
+        raise HTTPException(
+            status_code=401, detail="User not found or inactive"
+        )
 
     # Re-check role in case admin list changed
     current_role = get_user_role(user['email'])
     if user.get('role') != current_role.value:
         user['role'] = current_role.value
         storage.save_auth_user(user)
+
+    # Blacklist the old refresh token (rotation)
+    old_jti = payload.get('jti')
+    if old_jti:
+        from datetime import datetime, timezone
+        blacklist_token(
+            old_jti,
+            datetime.fromtimestamp(payload['exp'], tz=timezone.utc),
+        )
 
     # Create new tokens
     access_token, new_refresh_token = create_tokens(

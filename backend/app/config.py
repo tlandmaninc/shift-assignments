@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str = Field(..., min_length=32)
+    jwt_signing_key: str = ""
+    encryption_key: str = ""
 
     @field_validator('secret_key')
     @classmethod

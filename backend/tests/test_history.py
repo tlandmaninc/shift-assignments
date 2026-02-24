@@ -49,7 +49,7 @@ class TestGetHistory:
             mock_storage.get_monthly_summaries.return_value = []
             mock_storage.get_employee_stats.return_value = [
                 {
-                    "id": 2,
+                    "id": 1,
                     "name": "Bob",
                     "is_active": True,
                     "is_new": True,

@@ -31,7 +31,7 @@ jobs:
         run: |
           cd backend
           uv run pip install pip-audit
-          uv run pip-audit || true
+          uv run pip-audit
 
       - name: Run tests
         env:
@@ -69,7 +69,7 @@ jobs:
       - name: Security audit (npm)
         run: |
           cd frontend
-          npm audit --audit-level=high || true
+          npm audit --audit-level=high --omit=dev || echo "::warning::npm audit found vulnerabilities"
 
       - name: Run tests
         run: |
@@ -94,3 +94,19 @@ jobs:
 
       - name: Build frontend Docker image
         run: docker build -t ect-frontend ./frontend
+
+      - name: Scan backend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ect-backend
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          format: 'table'
+
+      - name: Scan frontend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ect-frontend
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          format: 'table'

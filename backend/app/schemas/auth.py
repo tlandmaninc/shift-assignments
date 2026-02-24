@@ -44,6 +44,7 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     role: UserRole
     employee_id: Optional[int] = None
+    suggested_employee_id: Optional[int] = None
     is_active: bool = True
 
 

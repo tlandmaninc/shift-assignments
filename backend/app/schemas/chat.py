@@ -31,6 +31,7 @@ class ConversationSummary(BaseModel):
     """Summary of a conversation for listing."""
     id: str
     title: str
+    user_id: Optional[str] = None
     created_at: str
     updated_at: str
     message_count: int = 0
@@ -40,6 +41,7 @@ class ConversationDetail(BaseModel):
     """Full conversation with messages."""
     id: str
     title: str
+    user_id: Optional[str] = None
     created_at: str
     updated_at: str
     messages: list[ChatMessage] = []

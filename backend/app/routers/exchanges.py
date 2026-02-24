@@ -101,17 +101,21 @@ async def list_exchanges(
     user: dict = Depends(require_employee_or_admin),
 ):
     """List exchanges. Employees see only their own; admins see all."""
-    employee_id = user.get("employee_id")
     is_admin = user.get("role") == "admin"
+    employee_id = user.get("employee_id")
 
-    if is_admin and not employee_id:
-        exchanges = storage.get_exchanges(month_year=month_year, status=status)
-    else:
+    if is_admin:
+        exchanges = storage.get_exchanges(
+            month_year=month_year, status=status
+        )
+    elif employee_id:
         exchanges = storage.get_exchanges(
             month_year=month_year,
             employee_id=employee_id,
             status=status,
         )
+    else:
+        exchanges = []
 
     return {"exchanges": exchanges}
 
@@ -235,13 +239,31 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=4003, reason="No employee linked")
         return
 
-    await ws_manager.connect(websocket, employee_id)
+    # Re-validate that user still has this employee link
+    ws_user = storage.get_auth_user(payload.get("sub"))
+    if not ws_user or ws_user.get("employee_id") != employee_id:
+        await websocket.close(code=4003, reason="Employee link revoked")
+        return
+
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    accepted = await ws_manager.connect(websocket, employee_id, client_ip)
+    if not accepted:
+        await websocket.close(code=4429, reason="Connection limit exceeded")
+        return
 
     try:
         while True:
-            # Keep connection alive, handle ping/pong
-            data = await asyncio.wait_for(websocket.receive_text(), timeout=35)
+            data = await asyncio.wait_for(
+                websocket.receive_text(), timeout=35
+            )
             if data == "ping":
+                if not ws_manager.check_message_rate(websocket):
+                    await websocket.close(
+                        code=4429, reason="Message rate limit exceeded"
+                    )
+                    break
                 await websocket.send_text("pong")
     except (WebSocketDisconnect, asyncio.TimeoutError, Exception):
+        pass
+    finally:
         ws_manager.disconnect(websocket, employee_id)
