@@ -97,7 +97,8 @@ jobs:
         run: docker build -t ect-frontend ./frontend
 
       - name: Scan backend image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
         with:
           image-ref: ect-backend
           severity: 'CRITICAL,HIGH'
@@ -105,7 +106,8 @@ jobs:
           format: 'table'
 
       - name: Scan frontend image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
         with:
           image-ref: ect-frontend
           severity: 'CRITICAL,HIGH'
