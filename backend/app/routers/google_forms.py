@@ -25,6 +25,26 @@ router = APIRouter(prefix="/google", tags=["google"])
 
 GOOGLE_FORM_TEMPLATE_ID = settings.google_form_template_id
 
+NEW_EMPLOYEE_QUESTIONS = {
+    "ect": {
+        "title": "Is this your first month doing ECT shift?",
+        "yes_means_new": True,
+    },
+    "internal": {
+        "title": (
+            "Have you completed at least 2 Internal shift trainings?"
+        ),
+        "yes_means_new": False,
+    },
+    "er": {
+        "title": (
+            "Do you have at least 1 year of seniority and have you"
+            " completed all required ER training?"
+        ),
+        "yes_means_new": False,
+    },
+}
+
 
 class FormCreateRequest(BaseModel):
     form_id: int
@@ -211,7 +231,13 @@ async def create_google_form(
         requests_list.append({
             "createItem": {
                 "item": {
-                    "title": f"Is this your first month doing {type_label} shift?",
+                    "title": NEW_EMPLOYEE_QUESTIONS.get(
+                        shift_type,
+                        {
+                            "title": f"Is this your first month doing"
+                            f" {type_label} shift?"
+                        },
+                    )["title"],
                     "questionItem": {
                         "question": {
                             "required": True,
@@ -426,7 +452,18 @@ async def fetch_google_form_responses(
                 if role == "name":
                     employee_name = answer_value.strip()
                 elif role == "is_new":
-                    is_first_month = answer_value.strip().lower() == "yes"
+                    answered_yes = answer_value.strip().lower() == "yes"
+                    form_shift_type = form.get(
+                        "shift_type", DEFAULT_SHIFT_TYPE
+                    )
+                    q_config = NEW_EMPLOYEE_QUESTIONS.get(
+                        form_shift_type, {"yes_means_new": True}
+                    )
+                    is_first_month = (
+                        answered_yes
+                        if q_config["yes_means_new"]
+                        else not answered_yes
+                    )
                 else:
                     availability[role] = answer_value.strip().lower() == "available"
 
