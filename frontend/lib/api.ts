@@ -219,6 +219,20 @@ export const employeesApi = {
 
   translateAllToEnglish: () =>
     fetchApi<any>('/employees/translate/all-to-english', { method: 'POST' }),
+
+  toggleAdmin: (id: number, isAdmin: boolean) =>
+    fetchApi<any>(`/employees/${id}/admin`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_admin: isAdmin }),
+    }),
+
+  listUsers: () => fetchApi<any[]>('/employees/users/list'),
+
+  toggleUserAdmin: (userId: string, isAdmin: boolean) =>
+    fetchApi<any>(`/employees/users/${userId}/admin`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_admin: isAdmin }),
+    }),
 };
 
 // History API

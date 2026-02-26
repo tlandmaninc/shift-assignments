@@ -128,8 +128,8 @@ class TestGoogleCallbackCredentials:
             assert resp.status_code == 302
             mock_save.assert_called_once_with(mock_creds)
 
-    def test_admin_login_no_refresh_token_skips_save(self, client):
-        """Admin login without refresh_token should not call save_credentials."""
+    def test_admin_login_no_refresh_token_merges_stored(self, client):
+        """Admin login without refresh_token merges with stored credentials."""
         mock_creds = MagicMock()
         mock_creds.id_token = "mock-id-token"
         mock_creds.refresh_token = None
@@ -145,6 +145,9 @@ class TestGoogleCallbackCredentials:
         }
         from app.schemas.auth import UserRole
 
+        mock_stored = MagicMock()
+        mock_stored.refresh_token = "stored-refresh-token"
+
         with patch("app.routers.auth.settings") as mock_settings, \
              patch("app.routers.auth.validate_oauth_state", return_value=True), \
              patch("app.routers.auth.verify_google_id_token", return_value=user_info), \
@@ -152,7 +155,8 @@ class TestGoogleCallbackCredentials:
              patch("app.routers.auth.storage") as mock_storage, \
              patch("app.routers.auth.log_audit"), \
              patch("google_auth_oauthlib.flow.Flow.from_client_config", return_value=mock_flow), \
-             patch("app.services.google_credentials.save_credentials") as mock_save:
+             patch("app.services.google_credentials.save_credentials") as mock_save, \
+             patch("app.services.google_credentials.get_stored_credentials", return_value=mock_stored):
             mock_settings.google_client_id = "cid"
             mock_settings.google_client_secret = "csec"
             mock_settings.frontend_url = "http://localhost:3000"
@@ -169,7 +173,8 @@ class TestGoogleCallbackCredentials:
                 follow_redirects=False,
             )
             assert resp.status_code == 302
-            mock_save.assert_not_called()
+            mock_save.assert_called_once()
+            assert mock_creds.refresh_token == "stored-refresh-token"
 
     def test_basic_login_does_not_save_credentials(self, client):
         """Non-admin login should not call save_credentials."""

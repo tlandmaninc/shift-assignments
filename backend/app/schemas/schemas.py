@@ -40,6 +40,7 @@ class EmployeeResponse(BaseModel):
     created_at: Optional[str] = None
     merged_from_id: Optional[int] = None
     merged_from_name: Optional[str] = None
+    linked_user_role: Optional[str] = None
 
 
 class EmployeeDuplicate(BaseModel):

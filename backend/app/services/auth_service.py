@@ -54,15 +54,22 @@ def generate_email_user_id(email: str) -> str:
     return f"email_{email_hash}"
 
 
-def get_user_role(email: str) -> UserRole:
-    """Determine user role based on email address.
+def get_user_role(email: str, stored_role: Optional[str] = None) -> UserRole:
+    """Determine user role based on email address and stored role.
 
-    Auto-promotes the first user to admin if ADMIN_EMAILS is empty
-    and no admin users exist in storage (fresh deployment bootstrap).
+    Priority:
+    1. ADMIN_EMAILS env var always grants admin (bootstrap/override)
+    2. stored_role == 'admin' preserves dynamically-granted admin
+    3. Bootstrap: auto-promote first user if no admins exist
+    4. Default: BASIC
     """
     email_lower = email.lower()
     admin_emails_lower = [e.lower() for e in ADMIN_EMAILS]
     if email_lower in admin_emails_lower:
+        return UserRole.ADMIN
+
+    # Preserve dynamically-granted admin role
+    if stored_role == UserRole.ADMIN.value:
         return UserRole.ADMIN
 
     # Bootstrap: auto-promote first user if no admins configured anywhere

@@ -249,6 +249,11 @@ async def google_login(request: Request):
     # Use the frontend URL for the callback since Next.js will proxy it
     callback_uri = f"{settings.frontend_url}/api/auth/google/callback"
 
+    # Force consent if no Google credentials stored (to get refresh_token)
+    from ..services.google_credentials import get_stored_credentials
+    has_google_creds = get_stored_credentials() is not None
+    prompt = "select_account" if has_google_creds else "consent"
+
     # Build Google OAuth URL
     params = {
         "client_id": settings.google_client_id,
@@ -257,7 +262,7 @@ async def google_login(request: Request):
         "scope": " ".join(AUTH_SCOPES),
         "access_type": "offline",
         "state": state,
-        "prompt": "select_account",  # Always show account selector
+        "prompt": prompt,
     }
 
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
@@ -323,16 +328,25 @@ async def google_callback(
                 url=f"{frontend_url}/login?error=invalid_token"
             )
 
-        # Determine user role based on email
-        role = get_user_role(user_info['email'])
-
-        # Save Google API credentials for admin users (Forms/Drive access)
-        if role.value == 'admin' and credentials.refresh_token:
-            from ..services.google_credentials import save_credentials
-            save_credentials(credentials)
-
         # Create or update user in storage
         existing_user = storage.get_auth_user(user_info['id'])
+
+        # Determine user role (preserving dynamically-granted admin)
+        stored_role = existing_user.get('role') if existing_user else None
+        role = get_user_role(user_info['email'], stored_role=stored_role)
+
+        # Save Google API credentials for admin users (Forms/Drive access)
+        # Google only returns refresh_token on first auth or prompt=consent.
+        # On re-login, merge new access token with stored refresh_token.
+        if role.value == 'admin':
+            from ..services.google_credentials import save_credentials, get_stored_credentials
+            if credentials.refresh_token:
+                save_credentials(credentials)
+            else:
+                stored = get_stored_credentials()
+                if stored and stored.refresh_token:
+                    credentials.refresh_token = stored.refresh_token
+                    save_credentials(credentials)
         if existing_user:
             # Update existing user
             existing_user['name'] = user_info['name']
@@ -436,9 +450,9 @@ async def verify_phone_auth(request: Request, body: PhoneAuthRequest, response: 
     # 6. Create / update user
     user_id = generate_email_user_id(email)
     name = email.split("@")[0].replace(".", " ").title()
-    role = get_user_role(email)
-
     existing_user = storage.get_auth_user(user_id)
+    stored_role = existing_user.get('role') if existing_user else None
+    role = get_user_role(email, stored_role=stored_role)
     if existing_user:
         existing_user['email'] = email
         existing_user['phone_number'] = normalized_phone
@@ -603,8 +617,8 @@ async def refresh_tokens(request: Request, response: Response):
             status_code=401, detail="User not found or inactive"
         )
 
-    # Re-check role in case admin list changed
-    current_role = get_user_role(user['email'])
+    # Re-check role (preserving dynamically-granted admin)
+    current_role = get_user_role(user['email'], stored_role=user.get('role'))
     if user.get('role') != current_role.value:
         user['role'] = current_role.value
         storage.save_auth_user(user)

@@ -20,6 +20,7 @@ import {
 import { Card, CardHeader, Button, Badge, Input } from '@/components/ui';
 import { employeesApi } from '@/lib/api';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
+import { RegisteredUsers } from '@/components/employees/RegisteredUsers';
 import toast from 'react-hot-toast';
 
 interface DuplicatePair {
@@ -326,55 +327,31 @@ export default function EmployeesPage() {
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 dark:from-amber-900/20 dark:to-blue-900/20 border border-amber-200 dark:border-amber-800"
                 >
                   <div className="flex flex-wrap items-center gap-3 min-w-0">
-                    {/* Hebrew Employee */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white font-medium">
-                        {dup.hebrew_name.charAt(0)}
+                    {[
+                      { name: dup.hebrew_name, shifts: dup.hebrew_employee.total_shifts, bg: 'from-amber-500 to-amber-700', rtl: true },
+                      { name: dup.english_name, shifts: dup.english_employee.total_shifts, bg: 'from-blue-500 to-blue-700', rtl: false },
+                    ].map((entry, i) => (
+                      <div key={i} className="flex items-center gap-2 min-w-0">
+                        {i === 1 && <ArrowRight className="w-5 h-5 text-slate-400 shrink-0 hidden sm:block" />}
+                        <div className={`w-10 h-10 shrink-0 rounded-full bg-gradient-to-br ${entry.bg} flex items-center justify-center text-white font-medium`}>
+                          {entry.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 dark:text-white truncate" dir={entry.rtl ? 'rtl' : undefined}>
+                            {entry.name}
+                          </p>
+                          <p className="text-xs text-slate-500">{entry.shifts || 0} shifts</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-900 dark:text-white truncate" dir="rtl">
-                          {dup.hebrew_name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {dup.hebrew_employee.total_shifts || 0} shifts
-                        </p>
-                      </div>
-                    </div>
-
-                    <ArrowRight className="w-5 h-5 text-slate-400 shrink-0 hidden sm:block" />
-
-                    {/* English Employee */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-medium">
-                        {dup.english_name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-900 dark:text-white truncate">
-                          {dup.english_name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {dup.english_employee.total_shifts || 0} shifts
-                        </p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-
                   <Button
-                    onClick={() => handleMerge(
-                      dup.hebrew_employee.id,
-                      dup.english_employee.id,
-                      dup.hebrew_name,
-                      dup.english_name
-                    )}
+                    onClick={() => handleMerge(dup.hebrew_employee.id, dup.english_employee.id, dup.hebrew_name, dup.english_name)}
                     disabled={merging}
                     size="sm"
                     className="shrink-0 self-end sm:self-auto"
                   >
-                    {merging ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <GitMerge className="w-4 h-4" />
-                    )}
+                    {merging ? <RefreshCw className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}
                     Merge
                   </Button>
                 </motion.div>
@@ -384,7 +361,6 @@ export default function EmployeesPage() {
             <div className="py-8 text-center text-slate-500">
               <Languages className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p>No Hebrew-English duplicates found.</p>
-              <p className="text-sm">All employee records appear to be unique.</p>
             </div>
           )}
         </Card>
@@ -400,18 +376,10 @@ export default function EmployeesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">
-                  Name
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">
-                  Status
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-slate-500">
-                  Total Shifts
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">
-                  Actions
-                </th>
+                {['Name', 'Status', 'Total Shifts'].map((h) => (
+                  <th key={h} className="text-left py-3 px-4 text-sm font-medium text-slate-500">{h}</th>
+                ))}
+                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -514,6 +482,9 @@ export default function EmployeesPage() {
           </div>
         </Card>
       )}
+
+      {/* Registered Users */}
+      <RegisteredUsers />
 
       {/* Add Employee Modal */}
       {showAddModal && (

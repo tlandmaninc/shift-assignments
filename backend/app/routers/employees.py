@@ -33,10 +33,75 @@ async def list_employees(active_only: bool = True):
 
     # Add shift counts
     shift_counts = storage.get_employee_shift_counts()
+
+    # Build linked-user lookup for admin badge display
+    auth_users = storage.get_auth_users()
+    user_by_emp_id = {
+        u["employee_id"]: u
+        for u in auth_users
+        if u.get("employee_id") is not None
+    }
+
     for emp in employees:
         emp["total_shifts"] = shift_counts.get(emp.get("name", ""), 0)
+        linked = user_by_emp_id.get(emp["id"])
+        emp["linked_user_role"] = linked.get("role") if linked else None
 
     return employees
+
+
+@router.get("/users/list")
+async def list_auth_users():
+    """List all registered user accounts for admin management."""
+    users = storage.get_auth_users()
+    return [
+        {
+            "id": u.get("id"),
+            "name": u.get("name"),
+            "email": u.get("email"),
+            "role": u.get("role", "basic"),
+            "employee_id": u.get("employee_id"),
+            "last_login": u.get("last_login"),
+        }
+        for u in users
+        if u.get("is_active", True)
+    ]
+
+
+@router.put("/users/{user_id}/admin")
+async def toggle_user_admin(
+    user_id: str,
+    body: dict,
+    user: dict = Depends(require_admin),
+):
+    """Toggle admin status for any registered user."""
+    is_admin = body.get("is_admin")
+    if is_admin is None:
+        raise HTTPException(status_code=400, detail="is_admin field is required")
+
+    target_user = storage.get_auth_user(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not is_admin and target_user["id"] == user["id"]:
+        raise HTTPException(
+            status_code=400, detail="You cannot remove your own admin status"
+        )
+
+    new_role = "admin" if is_admin else (
+        "employee" if target_user.get("employee_id") else "basic"
+    )
+    target_user["role"] = new_role
+    storage.save_auth_user(target_user)
+
+    log_audit(AuditAction.ROLE_CHANGE, {
+        "admin_email": user.get("email"),
+        "target_user_email": target_user.get("email"),
+        "target_user_id": user_id,
+        "new_role": new_role,
+    })
+
+    return {"success": True, "user_id": user_id, "new_role": new_role}
 
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)
@@ -138,6 +203,42 @@ async def delete_employee(
     })
 
     return {"success": True, "message": "Employee deactivated"}
+
+
+@router.put("/{employee_id}/admin")
+async def toggle_employee_admin(
+    employee_id: int,
+    body: dict,
+    user: dict = Depends(require_admin),
+):
+    """Toggle admin status for an employee with a linked user account."""
+    is_admin = body.get("is_admin")
+    if is_admin is None:
+        raise HTTPException(status_code=400, detail="is_admin field is required")
+
+    linked_user = storage.get_user_by_employee_id(employee_id)
+    if not linked_user:
+        raise HTTPException(
+            status_code=400, detail="This employee has no linked user account"
+        )
+
+    if not is_admin and linked_user["id"] == user["id"]:
+        raise HTTPException(
+            status_code=400, detail="You cannot remove your own admin status"
+        )
+
+    new_role = "admin" if is_admin else "employee"
+    linked_user["role"] = new_role
+    storage.save_auth_user(linked_user)
+
+    log_audit(AuditAction.ROLE_CHANGE, {
+        "admin_email": user.get("email"),
+        "target_user_email": linked_user.get("email"),
+        "target_employee_id": employee_id,
+        "new_role": new_role,
+    })
+
+    return {"success": True, "employee_id": employee_id, "new_role": new_role}
 
 
 @router.get("/{employee_id}/assignments")
