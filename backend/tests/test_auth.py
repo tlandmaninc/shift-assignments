@@ -244,10 +244,8 @@ class TestRoleAccess:
                 return_value={"sub": "basic_id", "role": "basic", "type": "access"},
             ):
                 # Try to access admin-only employees endpoint
-                resp = client.get(
-                    "/api/employees",
-                    cookies={"ect_access_token": "fake"},
-                )
+                client.cookies.set("ect_access_token", "fake")
+                resp = client.get("/api/employees")
         assert resp.status_code == 403
 
     def test_require_employee_blocks_user_without_employee_id(self, client):
@@ -264,10 +262,8 @@ class TestRoleAccess:
                 "app.routers.auth.verify_token",
                 return_value={"sub": "no_emp_id", "role": "basic", "type": "access"},
             ):
-                resp = client.get(
-                    "/api/exchanges/my-shifts?month_year=2026-03",
-                    cookies={"ect_access_token": "fake"},
-                )
+                client.cookies.set("ect_access_token", "fake")
+                resp = client.get("/api/exchanges/my-shifts?month_year=2026-03")
         assert resp.status_code == 403
 
 

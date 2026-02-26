@@ -17,7 +17,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Install dependencies (cached layer)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project && \
+    uv run pip install --upgrade pip
 
 # Copy application code
 COPY . .

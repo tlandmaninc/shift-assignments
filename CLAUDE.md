@@ -53,8 +53,8 @@ If a file or function exceeds these limits, refactor by extracting smaller units
 | **Dates** | date-fns | 3.3.1 |
 | **Notifications** | React Hot Toast | 2.4.1 |
 | **Auth (phone)** | Firebase | 12.9.0 |
-| **Backend** | FastAPI + Python | 0.109.0 / 3.12+ |
-| **Validation** | Pydantic | 2.5.3 |
+| **Backend** | FastAPI + Python | 0.133.1 / 3.12+ |
+| **Validation** | Pydantic | 2.12.5 |
 | **Data** | Pandas + NumPy | 2.2.0 / 1.26.3 |
 | **Auth (JWT)** | PyJWT | 2.8.0+ |
 | **Google APIs** | google-auth + google-api-python-client | 2.27 / 2.116 |

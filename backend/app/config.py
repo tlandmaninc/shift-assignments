@@ -1,7 +1,7 @@
 """Application configuration using Pydantic Settings."""
 
 from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from functools import lru_cache
 from pathlib import Path
 
@@ -78,10 +78,11 @@ class Settings(BaseSettings):
     github_token: str = ""
     github_repo: str = ""
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @property
     def employees_file(self) -> Path:

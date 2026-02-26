@@ -30,7 +30,7 @@ jobs:
       - name: Security audit (pip-audit)
         run: |
           cd backend
-          uv run pip install pip-audit
+          uv run pip install --upgrade pip pip-audit
           uv export --no-hashes --frozen > /tmp/requirements.txt
           uv run pip-audit -r /tmp/requirements.txt || echo "::warning::pip-audit found vulnerabilities"
 
