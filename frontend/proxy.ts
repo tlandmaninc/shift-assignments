@@ -7,7 +7,7 @@ const publicPaths = ['/login', '/unauthorized'];
 // Paths that should be proxied to the backend
 const apiPaths = ['/api'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip API paths - let them pass through to next.config.js rewrites
