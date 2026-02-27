@@ -44,11 +44,13 @@ class EmployeeResponse(BaseModel):
 
 
 class EmployeeDuplicate(BaseModel):
-    """Schema for a duplicate employee pair."""
-    hebrew_employee: EmployeeResponse
-    english_employee: EmployeeResponse
-    hebrew_name: str
-    english_name: str
+    """Schema for a potential duplicate employee pair."""
+    employee_a: EmployeeResponse
+    employee_b: EmployeeResponse
+    name_a: str
+    name_b: str
+    similarity: float
+    match_type: str
 
 
 class EmployeeMergeRequest(BaseModel):

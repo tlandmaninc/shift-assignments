@@ -24,11 +24,24 @@ import { RegisteredUsers } from '@/components/employees/RegisteredUsers';
 import toast from 'react-hot-toast';
 
 interface DuplicatePair {
-  hebrew_employee: any;
-  english_employee: any;
-  hebrew_name: string;
-  english_name: string;
+  employee_a: any;
+  employee_b: any;
+  name_a: string;
+  name_b: string;
+  similarity: number;
+  match_type: string;
 }
+
+const isHebrew = (text: string) => /[\u0590-\u05FF]/.test(text);
+
+const matchTypeLabel: Record<string, string> = {
+  exact: 'Exact',
+  hebrew_english: 'Hebrew/English',
+  name_contained: 'Name Contained',
+  cross_language: 'Cross-Language',
+  token_overlap: 'Token Overlap',
+  fuzzy: 'Fuzzy Match',
+};
 
 export default function EmployeesPage() {
   const router = useRouter();
@@ -115,7 +128,7 @@ export default function EmployeesPage() {
       setDuplicates(dups);
       setShowDuplicatesSection(true);
       if (dups.length === 0) {
-        toast.success('No Hebrew-English duplicates found');
+        toast.success('No potential duplicates found');
       } else {
         toast.success(`Found ${dups.length} potential duplicate(s)`);
       }
@@ -125,7 +138,7 @@ export default function EmployeesPage() {
   };
 
   const handleMerge = async (sourceId: number, targetId: number, sourceName: string, targetName: string) => {
-    if (!confirm(`Merge "${sourceName}" into "${targetName}"? This will transfer all assignments and deactivate the Hebrew entry.`)) {
+    if (!confirm(`Merge "${sourceName}" into "${targetName}"? This will transfer all assignments and deactivate "${sourceName}".`)) {
       return;
     }
 
@@ -133,7 +146,9 @@ export default function EmployeesPage() {
     try {
       const result = await employeesApi.merge(sourceId, targetId);
       toast.success(result.message || 'Employees merged successfully');
-      setDuplicates(duplicates.filter(d => d.hebrew_employee.id !== sourceId));
+      setDuplicates(duplicates.filter(d =>
+        d.employee_a.id !== sourceId && d.employee_b.id !== sourceId
+      ));
       await loadEmployees();
     } catch (error: any) {
       toast.error(error.message || 'Failed to merge employees');
@@ -293,12 +308,12 @@ export default function EmployeesPage() {
         </Card>
       </div>
 
-      {/* Hebrew-English Duplicates Section */}
+      {/* Potential Duplicates Section */}
       {showDuplicatesSection && (
         <Card>
           <CardHeader
-            title={`Hebrew-English Duplicates (${duplicates.length})`}
-            description="Employees with both Hebrew and English entries that can be merged"
+            title={`Potential Duplicates (${duplicates.length})`}
+            description="Employee pairs that may be the same person — review and merge as needed"
             action={
               duplicates.length > 0 && (
                 <Button
@@ -320,7 +335,7 @@ export default function EmployeesPage() {
             <div className="space-y-3">
               {duplicates.map((dup, index) => (
                 <motion.div
-                  key={index}
+                  key={`${dup.employee_a.id}-${dup.employee_b.id}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
@@ -328,30 +343,49 @@ export default function EmployeesPage() {
                 >
                   <div className="flex flex-wrap items-center gap-3 min-w-0">
                     {[
-                      { name: dup.hebrew_name, shifts: dup.hebrew_employee.total_shifts, bg: 'from-amber-500 to-amber-700', rtl: true },
-                      { name: dup.english_name, shifts: dup.english_employee.total_shifts, bg: 'from-blue-500 to-blue-700', rtl: false },
+                      { name: dup.name_a, shifts: dup.employee_a.total_shifts },
+                      { name: dup.name_b, shifts: dup.employee_b.total_shifts },
                     ].map((entry, i) => (
                       <div key={i} className="flex items-center gap-2 min-w-0">
-                        {i === 1 && <ArrowRight className="w-5 h-5 text-slate-400 shrink-0 hidden sm:block" />}
-                        <div className={`w-10 h-10 shrink-0 rounded-full bg-gradient-to-br ${entry.bg} flex items-center justify-center text-white font-medium`}>
+                        {i === 1 && (
+                          <ArrowRight className="w-5 h-5 text-slate-400 shrink-0 hidden sm:block" />
+                        )}
+                        <div className={`w-10 h-10 shrink-0 rounded-full bg-gradient-to-br ${i === 0 ? 'from-amber-500 to-amber-700' : 'from-blue-500 to-blue-700'} flex items-center justify-center text-white font-medium`}>
                           {entry.name.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-white truncate" dir={entry.rtl ? 'rtl' : undefined}>
+                          <p
+                            className="font-medium text-slate-900 dark:text-white truncate"
+                            dir={isHebrew(entry.name) ? 'rtl' : undefined}
+                          >
                             {entry.name}
                           </p>
-                          <p className="text-xs text-slate-500">{entry.shifts || 0} shifts</p>
+                          <p className="text-xs text-slate-500">
+                            {entry.shifts || 0} shifts
+                          </p>
                         </div>
                       </div>
                     ))}
+                    <Badge variant="warning" size="sm">
+                      {Math.round(dup.similarity * 100)}%
+                      {' '}
+                      {matchTypeLabel[dup.match_type] || dup.match_type}
+                    </Badge>
                   </div>
                   <Button
-                    onClick={() => handleMerge(dup.hebrew_employee.id, dup.english_employee.id, dup.hebrew_name, dup.english_name)}
+                    onClick={() => handleMerge(
+                      dup.employee_a.id, dup.employee_b.id,
+                      dup.name_a, dup.name_b
+                    )}
                     disabled={merging}
                     size="sm"
                     className="shrink-0 self-end sm:self-auto"
                   >
-                    {merging ? <RefreshCw className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}
+                    {merging ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <GitMerge className="w-4 h-4" />
+                    )}
                     Merge
                   </Button>
                 </motion.div>
@@ -360,7 +394,7 @@ export default function EmployeesPage() {
           ) : (
             <div className="py-8 text-center text-slate-500">
               <Languages className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>No Hebrew-English duplicates found.</p>
+              <p>No potential duplicates found.</p>
             </div>
           )}
         </Card>

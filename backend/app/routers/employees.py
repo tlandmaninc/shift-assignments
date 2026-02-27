@@ -280,21 +280,19 @@ async def get_employee_stats(employee_id: int):
 @router.get("/duplicates/find", response_model=list[EmployeeDuplicate])
 async def find_duplicate_employees():
     """
-    Find potential duplicate employees (Hebrew/English pairs).
+    Find potential duplicate employees using multi-strategy matching.
 
-    Returns a list of employee pairs where a Hebrew name has a
-    matching English translation in the system.
+    Detects Hebrew↔English pairs, name containment, token overlap,
+    cross-language matches, and fuzzy similarity.
     """
     duplicates = storage.find_duplicate_employees()
 
-    # Add shift counts to employee objects
     shift_counts = storage.get_employee_shift_counts()
-
     for dup in duplicates:
-        heb_emp = dup["hebrew_employee"]
-        eng_emp = dup["english_employee"]
-        heb_emp["total_shifts"] = shift_counts.get(heb_emp.get("name", ""), 0)
-        eng_emp["total_shifts"] = shift_counts.get(eng_emp.get("name", ""), 0)
+        emp_a = dup["employee_a"]
+        emp_b = dup["employee_b"]
+        emp_a["total_shifts"] = shift_counts.get(emp_a.get("name", ""), 0)
+        emp_b["total_shifts"] = shift_counts.get(emp_b.get("name", ""), 0)
 
     return duplicates
 

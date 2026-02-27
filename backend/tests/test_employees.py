@@ -143,3 +143,25 @@ class TestFindDuplicates:
             resp = client.get("/api/employees/duplicates/find")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
+
+    def test_find_duplicates_returns_generic_format(self, client):
+        """Duplicates use employee_a/employee_b generic format."""
+        dup = {
+            "employee_a": {"id": 1, "name": "רועי", "is_active": True, "is_new": False},
+            "employee_b": {"id": 2, "name": "רועי ואקנין", "is_active": True, "is_new": False},
+            "name_a": "רועי",
+            "name_b": "רועי ואקנין",
+            "similarity": 0.90,
+            "match_type": "name_contained",
+        }
+        with patch("app.routers.employees.storage") as mock_storage:
+            mock_storage.find_duplicate_employees.return_value = [dup]
+            mock_storage.get_employee_shift_counts.return_value = {}
+            resp = client.get("/api/employees/duplicates/find")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert "employee_a" in data[0]
+        assert "employee_b" in data[0]
+        assert data[0]["similarity"] == 0.90
+        assert data[0]["match_type"] == "name_contained"

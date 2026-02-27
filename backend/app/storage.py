@@ -223,51 +223,17 @@ class Storage:
 
     def find_duplicate_employees(self) -> list[dict]:
         """
-        Find potential duplicate employees (Hebrew/English pairs).
+        Find potential duplicate employees using multi-strategy matching.
 
-        Returns a list of dicts with:
-        - hebrew_employee: the Hebrew name employee
-        - english_employee: the English name employee
-        - hebrew_name: Hebrew name string
-        - english_name: English name string
+        Strategies: Hebrew↔English dictionary, name containment,
+        cross-language containment, token overlap, fuzzy similarity.
+
+        Returns a list of dicts sorted by similarity descending.
         """
+        from app.utils.name_similarity import find_all_duplicates
+
         employees = self.get_employees()
-        duplicates = []
-        processed_ids = set()
-
-        for emp in employees:
-            if emp.get("id") in processed_ids:
-                continue
-
-            name = emp.get("name", "")
-            if not is_hebrew(name):
-                continue
-
-            # Try to translate Hebrew name to English
-            english_name = translate_hebrew_to_english(name)
-            if not english_name:
-                continue
-
-            # Look for an existing employee with the English name
-            for other_emp in employees:
-                if other_emp.get("id") == emp.get("id"):
-                    continue
-                if other_emp.get("id") in processed_ids:
-                    continue
-
-                other_name = other_emp.get("name", "")
-                if normalize_name(other_name) == normalize_name(english_name):
-                    duplicates.append({
-                        "hebrew_employee": emp,
-                        "english_employee": other_emp,
-                        "hebrew_name": name,
-                        "english_name": english_name,
-                    })
-                    processed_ids.add(emp.get("id"))
-                    processed_ids.add(other_emp.get("id"))
-                    break
-
-        return duplicates
+        return find_all_duplicates(employees)
 
     def merge_employees(
         self,

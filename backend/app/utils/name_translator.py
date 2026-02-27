@@ -21,6 +21,7 @@ HEBREW_TO_ENGLISH_NAMES = {
     "יעל מור שקד": "Yael Mor Shaked",
     "רועי ואקנין": "Roei Vaknin",
     "אסף איזנשטטר": "Asaf Eisenshteter",
+    "קורן דקל בנסון": "Koren Dekel Benson",
 
     # First names only
     "לידור": "Lidor",
@@ -36,6 +37,7 @@ HEBREW_TO_ENGLISH_NAMES = {
     "יעל": "Yael",
     "צליל": "Tzlil",
     "ליאור": "Lior",
+    "קורן": "Koren",
 }
 
 # Reverse mapping for English to Hebrew
