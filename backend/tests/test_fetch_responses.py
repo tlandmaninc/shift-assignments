@@ -1,6 +1,9 @@
 """Tests for the Google Form fetch-responses endpoint and full assignment journey."""
 
+import json
+import shutil
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
@@ -24,6 +27,34 @@ def _mock_admin():
     with patch("app.routers.auth.get_required_user", return_value={"role": "admin", "email": "admin@test.com"}):
         with patch("app.routers.auth.verify_token", return_value={"sub": "admin", "role": "admin", "type": "access"}):
             yield
+
+
+@pytest.fixture()
+def _isolated_data(tmp_path):
+    """Redirect settings.data_dir to a temp directory so tests don't pollute real data.
+
+    Copies forms.json and history.json from the real data dir so storage
+    helpers still find the files they expect, then restores originals on teardown.
+    """
+    from app.config import settings
+
+    real_data_dir = settings.data_dir
+    tmp_data = tmp_path / "data"
+    tmp_data.mkdir()
+    (tmp_data / "assignments").mkdir()
+
+    # Seed with existing JSON files that the storage layer reads
+    for name in ("forms.json", "history.json", "employees.json"):
+        src = real_data_dir / name
+        if src.exists():
+            shutil.copy2(src, tmp_data / name)
+        else:
+            (tmp_data / name).write_text("{}")
+
+    original = settings.data_dir
+    settings.data_dir = tmp_data
+    yield tmp_data
+    settings.data_dir = original
 
 
 @pytest.fixture()
@@ -200,7 +231,7 @@ def _mock_valid_credentials():
 class TestFetchResponses:
     """Tests for POST /api/google/fetch-responses."""
 
-    @pytest.mark.usefixtures("_mock_admin")
+    @pytest.mark.usefixtures("_mock_admin", "_isolated_data")
     def test_full_assignment_journey_via_google_form_fetch(self, client, form_with_google_id):
         """
         End-to-end test: fetch responses from Google Form, validate, then generate assignments.

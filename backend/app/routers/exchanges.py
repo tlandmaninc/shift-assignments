@@ -26,10 +26,12 @@ router = APIRouter(prefix="/exchanges", tags=["exchanges"])
 @router.get("/my-shifts")
 async def get_my_shifts(
     month_year: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
-    user: dict = Depends(require_employee),
+    user: dict = Depends(require_employee_or_admin),
 ):
     """Get the authenticated employee's shifts for a given month."""
-    employee_id = user["employee_id"]
+    employee_id = user.get("employee_id")
+    if not employee_id:
+        return {"shifts": [], "month_year": month_year}
     shifts = exchange_service.get_employee_shifts(employee_id, month_year)
     return {"shifts": shifts, "month_year": month_year}
 
@@ -37,13 +39,13 @@ async def get_my_shifts(
 @router.get("/schedule")
 async def get_month_schedule(
     month_year: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
-    user: dict = Depends(require_employee),
+    user: dict = Depends(require_employee_or_admin),
 ):
     """Get the full month schedule with all employees' assignments.
 
     Returns a dict of date -> list of assignment entries for calendar rendering.
     """
-    employee_id = user["employee_id"]
+    employee_id = user.get("employee_id")
     schedule = exchange_service.get_month_schedule(employee_id, month_year)
     return schedule
 

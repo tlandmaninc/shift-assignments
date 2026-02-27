@@ -133,6 +133,11 @@ class TestGoogleCallbackCredentials:
         mock_creds = MagicMock()
         mock_creds.id_token = "mock-id-token"
         mock_creds.refresh_token = None
+        mock_creds.token = "access-token"
+        mock_creds.token_uri = "https://oauth2.googleapis.com/token"
+        mock_creds.client_id = "cid"
+        mock_creds.client_secret = "csec"
+        mock_creds.scopes = ["openid"]
 
         mock_flow = MagicMock()
         mock_flow.credentials = mock_creds
@@ -174,7 +179,8 @@ class TestGoogleCallbackCredentials:
             )
             assert resp.status_code == 302
             mock_save.assert_called_once()
-            assert mock_creds.refresh_token == "stored-refresh-token"
+            saved_creds = mock_save.call_args[0][0]
+            assert saved_creds.refresh_token == "stored-refresh-token"
 
     def test_basic_login_does_not_save_credentials(self, client):
         """Non-admin login should not call save_credentials."""

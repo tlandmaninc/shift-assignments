@@ -54,14 +54,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _try_auto_link_employee(user: dict) -> dict:
-    """Suggest an employee link for a user by matching email.
+    """Auto-link a user to an employee profile by matching email.
 
-    Sets ``suggested_employee_id`` on the user record instead of linking
-    automatically.  Actual linking requires explicit admin action via
-    ``POST /api/auth/link-employee``.
+    When the user's email matches an active employee record exactly
+    (case-insensitive), the user is linked directly via
+    ``storage.link_user_to_employee``.
     """
-    if user.get("employee_id") or user.get("suggested_employee_id"):
-        return user  # Already linked or suggestion already set
+    if user.get("employee_id"):
+        return user  # Already linked
 
     email = user.get("email", "").lower()
     if not email:
@@ -71,12 +71,17 @@ def _try_auto_link_employee(user: dict) -> dict:
     for emp in employees:
         emp_email = emp.get("email", "")
         if emp_email and emp_email.lower() == email and emp.get("is_active", True):
-            user["suggested_employee_id"] = emp["id"]
-            user = storage.save_auth_user(user)
-            logger.info(
-                "Suggested employee link: user %s -> employee %d (%s)",
-                user["id"], emp["id"], emp.get("name"),
-            )
+            try:
+                user = storage.link_user_to_employee(user["id"], emp["id"])
+                logger.info(
+                    "Auto-linked user %s -> employee %d (%s)",
+                    user["id"], emp["id"], emp.get("name"),
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Auto-link failed for user %s -> employee %d: %s",
+                    user["id"], emp["id"], exc,
+                )
             break
 
     return user
@@ -339,13 +344,22 @@ async def google_callback(
         # Google only returns refresh_token on first auth or prompt=consent.
         # On re-login, merge new access token with stored refresh_token.
         if role.value == 'admin':
+            from google.oauth2.credentials import Credentials as OAuthCredentials
             from ..services.google_credentials import save_credentials, get_stored_credentials
             if credentials.refresh_token:
                 save_credentials(credentials)
             else:
                 stored = get_stored_credentials()
                 if stored and stored.refresh_token:
-                    credentials.refresh_token = stored.refresh_token
+                    # Credentials.refresh_token is read-only; build a new object
+                    credentials = OAuthCredentials(
+                        token=credentials.token,
+                        refresh_token=stored.refresh_token,
+                        token_uri=credentials.token_uri,
+                        client_id=credentials.client_id,
+                        client_secret=credentials.client_secret,
+                        scopes=credentials.scopes,
+                    )
                     save_credentials(credentials)
         if existing_user:
             # Update existing user

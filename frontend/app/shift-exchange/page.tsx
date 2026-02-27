@@ -43,7 +43,7 @@ export default function ShiftExchangePage() {
   const [activeTab, setActiveTab] = useState('shifts');
   const [incomingCount, setIncomingCount] = useState(0);
 
-  const isEmployee = useMockData || !!user?.employee_id;
+  const isEmployee = useMockData || !!user?.employee_id || isAdmin;
 
   // Fetch incoming request count for badge
   useEffect(() => {

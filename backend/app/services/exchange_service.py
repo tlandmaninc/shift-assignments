@@ -159,7 +159,7 @@ class ExchangeService:
 
         return shifts
 
-    def get_month_schedule(self, employee_id: int, month_year: str) -> dict:
+    def get_month_schedule(self, employee_id: Optional[int], month_year: str) -> dict:
         """Build a full month schedule suitable for the calendar UI.
 
         Returns ``{month_year, employee_id, assignments}`` where *assignments*
