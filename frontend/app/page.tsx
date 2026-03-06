@@ -35,6 +35,7 @@ export default function Dashboard() {
   const { isAdmin, user, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [recentForms, setRecentForms] = useState<any[]>([]);
+  const [activeFormsCount, setActiveFormsCount] = useState(0);
   const [fairness, setFairness] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pageAccess, setPageAccess] = useState<Record<string, string> | null>(null);
@@ -70,7 +71,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isAdmin) return;
     formsApi.list()
-      .then(data => setRecentForms(data.slice(0, 3)))
+      .then(data => {
+        setRecentForms(data.slice(0, 3));
+        setActiveFormsCount(data.filter((f: any) => f.status === 'active').length);
+      })
       .catch(error => console.error('Failed to load forms:', error));
   }, [isAdmin]);
 
@@ -120,7 +124,7 @@ export default function Dashboard() {
     },
     {
       title: 'Active Forms',
-      value: recentForms.filter((f) => f.status === 'active').length,
+      value: activeFormsCount,
       icon: FileText,
       color: 'from-amber-400 to-amber-500 dark:from-amber-500 dark:to-amber-600',
       change: 'Pending responses',
