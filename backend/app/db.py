@@ -90,6 +90,35 @@ def db_save(key: str, data: dict | list) -> None:
         pool.putconn(conn)
 
 
+def db_exists(key: str) -> bool:
+    """Check whether a key exists in data_store."""
+    pool = get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM data_store WHERE key = %s", (key,)
+            )
+            return cur.fetchone() is not None
+    finally:
+        pool.putconn(conn)
+
+
+def db_list_keys(prefix: str) -> list[str]:
+    """Return all keys that start with *prefix*."""
+    pool = get_pool()
+    conn = pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT key FROM data_store WHERE key LIKE %s",
+                (prefix + "%",),
+            )
+            return [row[0] for row in cur.fetchall()]
+    finally:
+        pool.putconn(conn)
+
+
 def db_delete(key: str) -> None:
     """Delete a row by key."""
     pool = get_pool()

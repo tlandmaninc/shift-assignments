@@ -32,7 +32,7 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [recentForms, setRecentForms] = useState<any[]>([]);
   const [fairness, setFairness] = useState<any>(null);
@@ -43,10 +43,13 @@ export default function Dashboard() {
   const canAccessHistory = isAdmin || !!user?.employee_id;
 
   useEffect(() => {
+    // Wait for auth to resolve before deciding whether to fetch data
+    if (authLoading) return;
     if (!canAccessHistory) {
       setLoading(false);
       return;
     }
+    setLoading(true);
     async function loadData() {
       try {
         const [statsData, fairnessData] = await Promise.all([
@@ -62,7 +65,7 @@ export default function Dashboard() {
       }
     }
     loadData();
-  }, [canAccessHistory]);
+  }, [authLoading, canAccessHistory]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -131,6 +134,14 @@ export default function Dashboard() {
       tooltip: 'Score = 100 − (MAD ÷ Median) × 100. Uses Median Absolute Deviation for robustness against outliers.',
     },
   ];
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

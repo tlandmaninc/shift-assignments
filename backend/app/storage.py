@@ -345,6 +345,10 @@ class Storage:
 
     def _update_monthly_assignments(self, old_name: str, new_name: str):
         """Update all monthly assignment files to replace old_name with new_name."""
+        if settings.database_url:
+            self._update_monthly_assignments_db(old_name, new_name)
+            return
+
         assignments_dir = settings.assignments_dir
         if not assignments_dir.exists():
             return
@@ -360,49 +364,87 @@ class Storage:
                 if not assignment_file.exists():
                     continue
 
-                data = self._load_json(assignment_file)
-                modified = False
+                self._update_single_month_file(
+                    assignment_file, old_name, new_name,
+                )
 
-                # Update assignments dict
-                if "assignments" in data:
-                    for date_str, emp_name in list(data["assignments"].items()):
-                        if emp_name == old_name:
-                            data["assignments"][date_str] = new_name
+    def _update_monthly_assignments_db(self, old_name: str, new_name: str):
+        """DB variant: iterate assignment keys stored in PostgreSQL."""
+        from .db import db_list_keys, db_load, db_save
+
+        keys = db_list_keys("assignments/")
+        for key in keys:
+            data = db_load(key)
+            if not data:
+                continue
+            modified = self._patch_month_data(data, old_name, new_name)
+            if modified:
+                db_save(key, data)
+
+    @staticmethod
+    def _patch_month_data(
+        data: dict, old_name: str, new_name: str,
+    ) -> bool:
+        """Apply name substitution to a single month's assignment data.
+
+        Returns True if any field was changed.
+        """
+        modified = False
+
+        # Update assignments dict
+        if "assignments" in data:
+            for date_str, value in list(data["assignments"].items()):
+                if isinstance(value, str) and value == old_name:
+                    data["assignments"][date_str] = new_name
+                    modified = True
+                elif isinstance(value, list):
+                    for entry in value:
+                        if isinstance(entry, dict) and entry.get(
+                            "employee_name"
+                        ) == old_name:
+                            entry["employee_name"] = new_name
                             modified = True
 
-                # Update shift_counts dict
-                if "shift_counts" in data:
-                    if old_name in data["shift_counts"]:
-                        old_count = data["shift_counts"].pop(old_name)
-                        data["shift_counts"][new_name] = (
-                            data["shift_counts"].get(new_name, 0) + old_count
-                        )
-                        modified = True
+        # Update shift_counts dict
+        if "shift_counts" in data:
+            if old_name in data["shift_counts"]:
+                old_count = data["shift_counts"].pop(old_name)
+                data["shift_counts"][new_name] = (
+                    data["shift_counts"].get(new_name, 0) + old_count
+                )
+                modified = True
 
-                # Update employees list
-                if "employees" in data:
-                    source_emp = None
-                    target_emp = None
-                    for emp in data["employees"]:
-                        if emp.get("name") == old_name:
-                            source_emp = emp
-                        elif emp.get("name") == new_name:
-                            target_emp = emp
+        # Update employees list
+        if "employees" in data:
+            source_emp = None
+            target_emp = None
+            for emp in data["employees"]:
+                if emp.get("name") == old_name:
+                    source_emp = emp
+                elif emp.get("name") == new_name:
+                    target_emp = emp
 
-                    if source_emp:
-                        if target_emp:
-                            # Merge shift counts
-                            target_emp["shifts"] = (
-                                target_emp.get("shifts", 0) + source_emp.get("shifts", 0)
-                            )
-                            data["employees"].remove(source_emp)
-                        else:
-                            # Just rename
-                            source_emp["name"] = new_name
-                        modified = True
+            if source_emp:
+                if target_emp:
+                    target_emp["shifts"] = (
+                        target_emp.get("shifts", 0)
+                        + source_emp.get("shifts", 0)
+                    )
+                    data["employees"].remove(source_emp)
+                else:
+                    source_emp["name"] = new_name
+                modified = True
 
-                if modified:
-                    self._save_json(assignment_file, data)
+        return modified
+
+    def _update_single_month_file(
+        self, assignment_file: Path, old_name: str, new_name: str,
+    ):
+        """Update a single local month assignment file."""
+        data = self._load_json(assignment_file)
+        modified = self._patch_month_data(data, old_name, new_name)
+        if modified:
+            self._save_json(assignment_file, data)
 
     def translate_and_merge_hebrew_employees(self) -> dict:
         """
@@ -670,7 +712,8 @@ class Storage:
         # Ensure path is within assignments directory
         validate_path_within_directory(output_dir, settings.assignments_dir)
 
-        output_dir.mkdir(parents=True, exist_ok=True)
+        if not settings.database_url:
+            output_dir.mkdir(parents=True, exist_ok=True)
 
         assignment_data = {
             "month_year": month_year,
@@ -712,8 +755,14 @@ class Storage:
         # Ensure path is within assignments directory
         validate_path_within_directory(path, settings.assignments_dir)
 
-        if not path.exists():
-            return None
+        if settings.database_url:
+            from .db import db_exists
+            key = self._path_to_key(path)
+            if not db_exists(key):
+                return None
+        else:
+            if not path.exists():
+                return None
 
         data = self._load_json(path)
         return self._normalize_assignments(data)
