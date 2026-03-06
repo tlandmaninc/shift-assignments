@@ -1,6 +1,7 @@
 """ECT Shift Assignment API - Main FastAPI Application."""
 
 import uuid
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -67,10 +68,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if settings.environment == "production":
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self'; "
+                "script-src 'self' https://www.gstatic.com/recaptcha/"
+                " https://www.google.com/recaptcha/; "
                 "style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: https:; "
-                "connect-src 'self' wss: ws:; "
+                "connect-src 'self' wss: ws:"
+                " https://identitytoolkit.googleapis.com"
+                " https://securetoken.googleapis.com"
+                " https://www.googleapis.com"
+                " https://firebase.googleapis.com; "
+                "frame-src https://www.google.com/recaptcha/"
+                " https://*.firebaseapp.com; "
                 "frame-ancestors 'none'"
             )
         if settings.environment == "production":
@@ -79,11 +87,22 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 _is_production = settings.environment == "production"
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialise PostgreSQL table when DATABASE_URL is configured."""
+    if settings.database_url:
+        from .db import init_db
+        init_db()
+    yield
+
+
 # Create FastAPI app
 app = FastAPI(
     title="ECT Shift Assignment API",
     description="API for managing ECT shift assignments, forms, and employee scheduling",
     version="1.0.0",
+    lifespan=lifespan,
     docs_url=None if _is_production else "/api/docs",
     redoc_url=None if _is_production else "/api/redoc",
     openapi_url=None if _is_production else "/api/openapi.json",

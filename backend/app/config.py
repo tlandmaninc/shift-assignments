@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
 
+    # Database (optional — when set, uses PostgreSQL instead of JSON files)
+    database_url: str = ""
+
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent
     data_dir: Path = base_dir / "data"

@@ -61,10 +61,11 @@ class JSONEncoder(json.JSONEncoder):
 
 
 class Storage:
-    """JSON file-based storage for all application data."""
+    """Storage for all application data (JSON files or PostgreSQL)."""
 
     def __init__(self):
-        self._ensure_data_dir()
+        if not settings.database_url:
+            self._ensure_data_dir()
 
     def _ensure_data_dir(self):
         """Ensure data directories exist."""
@@ -84,8 +85,28 @@ class Storage:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
             lock_file.close()
 
+    def _path_to_key(self, path: Path) -> str:
+        """Convert a file path to a DB key."""
+        try:
+            rel = path.relative_to(settings.data_dir)
+        except ValueError:
+            rel = Path(path.name)
+        key = str(rel).replace("\\", "/")
+        # Normalise assignment paths: YYYY/MM/assignment.json -> assignments/YYYY-MM
+        if key.startswith("assignments/") and key.endswith("/assignment.json"):
+            parts = key.split("/")  # ["assignments", YYYY, MM, "assignment.json"]
+            if len(parts) == 4:
+                return f"assignments/{parts[1]}-{parts[2]}"
+        # Strip .json suffix for top-level files
+        if key.endswith(".json"):
+            key = key[:-5]
+        return key
+
     def _load_json(self, path: Path) -> dict | list:
-        """Load JSON from file, return empty dict/list if not exists."""
+        """Load JSON data from DB or file."""
+        if settings.database_url:
+            from .db import db_load
+            return db_load(self._path_to_key(path))
         if not path.exists():
             return {}
         with self._file_lock(path):
@@ -93,7 +114,11 @@ class Storage:
                 return json.load(f)
 
     def _save_json(self, path: Path, data: dict | list):
-        """Save data to JSON file with restricted permissions."""
+        """Save JSON data to DB or file."""
+        if settings.database_url:
+            from .db import db_save
+            db_save(self._path_to_key(path), data)
+            return
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._file_lock(path, exclusive=True):
             with open(path, "w", encoding="utf-8") as f:

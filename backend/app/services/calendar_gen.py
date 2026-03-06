@@ -505,7 +505,7 @@ class CalendarGenerator:
         month: int,
         assignments: dict,
         month_count: dict[str, int],
-    ) -> Path:
+    ) -> Path | None:
         """
         Generate and save HTML calendar.
 
@@ -516,8 +516,12 @@ class CalendarGenerator:
             month_count: Dict of employee_name -> shift count
 
         Returns:
-            Path to saved HTML file
+            Path to saved HTML file, or None when using DB (calendar is
+            regenerated on-the-fly from assignment data).
         """
+        if settings.database_url:
+            return None
+
         html = self.generate_calendar(year, month, assignments, month_count)
 
         # Create directory structure
@@ -537,7 +541,7 @@ class CalendarGenerator:
         assignments: dict,
         month_count: dict[str, int],
         employees: list[dict],
-    ) -> Path:
+    ) -> Path | None:
         """
         Save assignment data as JSON.
 
@@ -549,11 +553,8 @@ class CalendarGenerator:
             employees: List of employee data
 
         Returns:
-            Path to saved JSON file
+            Path to saved JSON file, or None when using DB.
         """
-        output_dir = settings.assignments_dir / str(year) / f"{month:02d}"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         data = {
             "year": year,
             "month": month,
@@ -570,6 +571,14 @@ class CalendarGenerator:
             ],
             "total_shifts": len(assignments),
         }
+
+        if settings.database_url:
+            from ..db import db_save
+            db_save(f"assignments/{year}-{month:02d}", data)
+            return None
+
+        output_dir = settings.assignments_dir / str(year) / f"{month:02d}"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         json_path = output_dir / "assignment.json"
         json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")

@@ -36,8 +36,7 @@ def _get_cipher() -> Fernet:
 
 
 def save_credentials(creds) -> None:
-    """Save OAuth credentials to file with encryption."""
-    os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+    """Save OAuth credentials with encryption (to DB or file)."""
     token_data = {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -45,23 +44,42 @@ def save_credentials(creds) -> None:
     }
     cipher = _get_cipher()
     encrypted = cipher.encrypt(json.dumps(token_data).encode())
+
+    if settings.database_url:
+        from ..db import db_save
+        db_save("google_token", {"encrypted": base64.b64encode(encrypted).decode()})
+        return
+
+    os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
     with open(TOKEN_FILE, "wb") as f:
         f.write(encrypted)
 
 
 def get_stored_credentials():
     """Load stored OAuth credentials with decryption and auto-refresh."""
-    if not os.path.exists(TOKEN_FILE):
-        return None
-    try:
+    encrypted_data = None
+
+    if settings.database_url:
+        from ..db import db_load
+        row = db_load("google_token")
+        if not row or "encrypted" not in row:
+            return None
+        encrypted_data = base64.b64decode(row["encrypted"])
+    else:
+        if not os.path.exists(TOKEN_FILE):
+            return None
         with open(TOKEN_FILE, "rb") as f:
             encrypted_data = f.read()
 
+    try:
         cipher = _get_cipher()
         try:
             decrypted = cipher.decrypt(encrypted_data)
             token_data = json.loads(decrypted.decode())
         except InvalidToken:
+            if settings.database_url:
+                logger.warning("Invalid encrypted token in DB")
+                return None
             logger.warning("Found unencrypted token file, will encrypt on next save")
             with open(TOKEN_FILE, "r") as f:
                 token_data = json.load(f)
@@ -89,7 +107,8 @@ def get_stored_credentials():
                 save_credentials(creds)
             except Exception as refresh_err:
                 logger.error(f"Failed to refresh Google token: {refresh_err}")
-                os.remove(TOKEN_FILE)
+                if not settings.database_url:
+                    os.remove(TOKEN_FILE)
                 return None
 
         return creds

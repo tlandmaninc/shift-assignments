@@ -86,29 +86,39 @@ def get_user_role(email: str, stored_role: Optional[str] = None) -> UserRole:
 
 
 def _load_oauth_states() -> dict[str, str]:
-    """Load OAuth states from JSON file, removing expired entries."""
-    path = _OAUTH_STATES_FILE
-    if not path.exists():
-        return {}
-    lock_path = path.with_suffix(".json.lock")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_file = open(lock_path, "w")
-    try:
-        fcntl.flock(lock_file, fcntl.LOCK_SH)
-        with open(path, "r", encoding="utf-8") as f:
-            states = json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return {}
-    finally:
-        fcntl.flock(lock_file, fcntl.LOCK_UN)
-        lock_file.close()
+    """Load OAuth states, removing expired entries."""
+    if settings.database_url:
+        from ..db import db_load
+        states = db_load("oauth_states")
+        if not isinstance(states, dict):
+            return {}
+    else:
+        path = _OAUTH_STATES_FILE
+        if not path.exists():
+            return {}
+        lock_path = path.with_suffix(".json.lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = open(lock_path, "w")
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_SH)
+            with open(path, "r", encoding="utf-8") as f:
+                states = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
     # Clean expired
     now = datetime.now().isoformat()
     return {k: v for k, v in states.items() if v > now}
 
 
 def _save_oauth_states(states: dict[str, str]) -> None:
-    """Save OAuth states to JSON file with exclusive lock."""
+    """Save OAuth states to DB or JSON file."""
+    if settings.database_url:
+        from ..db import db_save
+        db_save("oauth_states", states)
+        return
     path = _OAUTH_STATES_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = path.with_suffix(".json.lock")

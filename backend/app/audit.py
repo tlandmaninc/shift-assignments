@@ -11,16 +11,22 @@ from .config import settings
 audit_logger = logging.getLogger("audit")
 audit_logger.setLevel(logging.INFO)
 
-# Create file handler for audit log
-_audit_log_path = settings.data_dir / "audit.log"
-_audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-
-_file_handler = logging.FileHandler(_audit_log_path, encoding="utf-8")
-_file_handler.setFormatter(logging.Formatter(
+_formatter = logging.Formatter(
     "%(asctime)s | %(levelname)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-))
-audit_logger.addHandler(_file_handler)
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+if settings.database_url:
+    # Cloud: log to stdout (Render captures stdout)
+    _handler = logging.StreamHandler()
+else:
+    # Local: log to file
+    _audit_log_path = settings.data_dir / "audit.log"
+    _audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+    _handler = logging.FileHandler(_audit_log_path, encoding="utf-8")
+
+_handler.setFormatter(_formatter)
+audit_logger.addHandler(_handler)
 
 # Prevent propagation to root logger
 audit_logger.propagate = False

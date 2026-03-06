@@ -1,0 +1,74 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'render.yaml'
+      - 'docker-compose*.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.6.x"
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: cd backend && uv sync --frozen --dev
+
+      - name: Security audit (pip-audit)
+        run: |
+          cd backend
+          uv run pip install --upgrade pip pip-audit
+          uv export --no-hashes --frozen > /tmp/requirements.txt
+          uv run pip-audit -r /tmp/requirements.txt || echo "::warning::pip-audit found vulnerabilities"
+
+      - name: Run tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci-minimum-32-chars
+          ENVIRONMENT: test
+          AI_PROVIDER: gemini
+          GEMINI_API_KEY: test-key
+          GOOGLE_CLIENT_ID: test-client-id
+          GOOGLE_CLIENT_SECRET: test-secret
+          FRONTEND_URL: http://localhost:3000
+          ADMIN_EMAILS: admin@test.com
+        run: cd backend && uv run python -m pytest tests/ -v --tb=short
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Trigger Render dev deploy
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_DEV }}"
+
+      - name: Dev deployment summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Backend Dev Deployment Triggered
+
+          Verify the dev backend is running correctly:
+
+          - [Health check](https://shift-assignments-backend-dev.onrender.com/health)
+          - [API docs](https://shift-assignments-backend-dev.onrender.com/api/docs)
+
+          > Render free tier may take 1-2 minutes to deploy.
+
+          Once verified, go to **Actions → Deploy to Production → Run workflow** to promote to prod.
+          EOF

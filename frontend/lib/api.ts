@@ -349,11 +349,7 @@ export const exchangeApi = {
     }),
 };
 
-// Chat API - uses direct backend URL for send() to avoid proxy timeout with slow LLM inference
-const CHAT_BACKEND_URL = typeof window !== 'undefined'
-  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
-  : '';
-
+// Chat API
 export interface ConversationSummary {
   id: string;
   title: string;
@@ -380,7 +376,7 @@ export const chatApi = {
     error: string | null;
   }>('/chat/health'),
 
-  send: async (data: {
+  send: (data: {
     message: string;
     conversation_history?: { role: string; content: string }[];
     conversation_id?: string;
@@ -389,21 +385,10 @@ export const chatApi = {
     message: { role: string; content: string; timestamp?: string };
     conversation_id?: string;
     error?: string;
-  }> => {
-    // Call backend directly to avoid Next.js proxy timeout for slow LLM responses
-    const url = `${CHAT_BACKEND_URL}/api/chat`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `HTTP error ${response.status}`);
-    }
-    return response.json();
-  },
+  }> => fetchApi('/chat', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
   sendStream: async (
     data: {

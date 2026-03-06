@@ -30,6 +30,8 @@ dependencies = [
     "PyJWT~=2.10",
     # Firebase Authentication (for phone OTP)
     "firebase-admin>=6.5.0",
+    # PostgreSQL (for cloud deployment with Neon)
+    "psycopg2-binary>=2.9",
 ]
 
 [dependency-groups]
