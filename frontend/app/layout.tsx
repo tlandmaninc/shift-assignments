@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { WebSocketProvider } from '@/components/exchange/WebSocketProvider';
+import { Analytics } from '@vercel/analytics/next';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 
@@ -63,6 +64,7 @@ export default function RootLayout({
             />
           </WebSocketProvider>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
