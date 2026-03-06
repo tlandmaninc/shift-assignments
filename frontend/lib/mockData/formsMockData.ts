@@ -2,9 +2,18 @@
  * Mock data generators for the Forms page.
  * Provides deterministic mock form data so the Forms page can work
  * without a running backend.
+ *
+ * WARNING: This module must NEVER be used in production.
+ * All exported functions throw if called when NODE_ENV === 'production'.
  */
 
 import { SHIFT_TYPES } from '../constants/shiftTypes';
+
+function assertNotProduction() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Mock data must not be used in production');
+  }
+}
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -62,6 +71,7 @@ export function mockGenerateDates(data: {
   included_dates: string[];
   shift_type?: string;
 }) {
+  assertNotProduction();
   const dates = generateEligibleDates(
     data.year,
     data.month,
@@ -113,6 +123,7 @@ function ensureSeeded() {
 
 /** Mock: list existing forms (replaces formsApi.list). */
 export function mockListForms() {
+  assertNotProduction();
   ensureSeeded();
   return [...mockForms];
 }
@@ -126,6 +137,7 @@ export function mockCreateForm(data: {
   included_dates: string[];
   shift_type?: string;
 }) {
+  assertNotProduction();
   ensureSeeded();
   const monthYear = `${data.year}-${String(data.month).padStart(2, '0')}`;
 
@@ -165,6 +177,7 @@ export function mockCreateForm(data: {
 
 /** Mock: delete a form (replaces formsApi.delete). */
 export function mockDeleteForm(formId: number) {
+  assertNotProduction();
   ensureSeeded();
   mockForms = mockForms.filter((f) => f.id !== formId);
   return { success: true };

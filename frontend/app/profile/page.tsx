@@ -12,8 +12,12 @@ import { useExchangeStore } from '@/lib/stores/exchangeStore';
 
 /**
  * Generate mock upcoming shifts for the current and next month.
+ * Only used in development — throws in production.
  */
 function generateMockShifts(employeeName: string): ShiftAssignment[] {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Mock data must not be used in production');
+  }
   const shifts: ShiftAssignment[] = [];
   const now = new Date();
   const today = now.toISOString().split('T')[0];

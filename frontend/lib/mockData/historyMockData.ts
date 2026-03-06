@@ -1,10 +1,19 @@
 /**
  * Mock data generators for the History & Analytics page.
  * Uses the same employee roster from exchangeMockData for consistency.
+ *
+ * WARNING: This module must NEVER be used in production.
+ * All exported functions throw if called when NODE_ENV === 'production'.
  */
 
 import { generateMonthAssignments } from './exchangeMockData';
 import { SHIFT_TYPES } from '../constants/shiftTypes';
+
+function assertNotProduction() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Mock data must not be used in production');
+  }
+}
 
 const SHIFT_TYPE_KEYS = Object.keys(SHIFT_TYPES);
 
@@ -56,6 +65,7 @@ function countByType(
  * Shape matches what historyApi.get() returns.
  */
 export function generateMockHistory() {
+  assertNotProduction();
   const months = getRecentMonths(6);
   const monthlyAssignments = months.map((monthYear) => {
     const [yearStr, monthStr] = monthYear.split('-');
@@ -89,6 +99,7 @@ export function generateMockHistory() {
  * When shiftType is provided, only counts shifts of that type.
  */
 export function generateMockFairness(shiftType?: string | null) {
+  assertNotProduction();
   const months = getRecentMonths(6);
 
   // Tally up total shifts per employee across all months
@@ -186,6 +197,7 @@ export function generateMockFairness(shiftType?: string | null) {
  * Shape matches what historyApi.getMonthly() returns.
  */
 export function generateMockMonthlyData() {
+  assertNotProduction();
   const months = getRecentMonths(6);
 
   const monthsData = months.map((monthYear) => {
@@ -223,6 +235,7 @@ export function generateMockMonthlyData() {
  * Includes per-type monthly counts.
  */
 export function generateMockEmployeeTrends() {
+  assertNotProduction();
   const months = getRecentMonths(6);
 
   const trends = EMPLOYEES.map((emp) => {
@@ -269,6 +282,7 @@ export function generateMockEmployeeTrends() {
  * Mirrors the backend CalendarGenerator output so the history modal works in mock mode.
  */
 export function generateMockCalendarHtml(monthYear: string): string {
+  assertNotProduction();
   const [yearStr, monthStr] = monthYear.split('-');
   const year = parseInt(yearStr);
   const month = parseInt(monthStr);

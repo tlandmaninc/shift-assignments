@@ -54,6 +54,8 @@ const getCurrentMonth = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 };
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
 export const useExchangeStore = create<ExchangeState>((set, get) => ({
   // WebSocket
   wsConnected: false,
@@ -125,9 +127,12 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
   selectedShiftDate: null,
   setSelectedShiftDate: (date) => set({ selectedShiftDate: date }),
 
-  // Mock data toggle
+  // Mock data toggle — always disabled in production
   useMockData: false,
-  setUseMockData: (mock) => set({ useMockData: mock }),
+  setUseMockData: (mock) => {
+    if (IS_PRODUCTION) return;
+    set({ useMockData: mock });
+  },
 
   // Refresh trigger
   refreshTrigger: 0,

@@ -2,6 +2,9 @@
  * Mock data generator for shift exchange UI development.
  * Produces deterministic, realistic simulated data so the UI can be
  * evaluated without a running backend.
+ *
+ * WARNING: This module must NEVER be used in production.
+ * All exported functions throw if called when NODE_ENV === 'production'.
  */
 
 import {
@@ -12,6 +15,12 @@ import {
   EmployeeAvailability,
   EnhancedSwapCandidate,
 } from '../types/exchange';
+
+function assertNotProduction() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Mock data must not be used in production');
+  }
+}
 
 // ── Employee roster ──────────────────────────────────────────────────
 interface MockEmployee {
@@ -94,6 +103,7 @@ export function generateMonthAssignments(
   year: number,
   month: number
 ): Map<string, { name: string; id: number; shift_type: string }[]> {
+  assertNotProduction();
   const key = `${year}-${String(month).padStart(2, '0')}`;
   if (assignmentCache.has(key)) return assignmentCache.get(key)!;
 
@@ -227,6 +237,7 @@ export function generateFormResponses(
   year: number,
   month: number
 ): EmployeeAvailability[] {
+  assertNotProduction();
   const key = `${year}-${String(month).padStart(2, '0')}`;
   if (availabilityCache.has(key)) return availabilityCache.get(key)!;
 
@@ -377,6 +388,7 @@ export function generateMockCandidates(
   year: number,
   month: number
 ): EnhancedSwapCandidate[] {
+  assertNotProduction();
   const assignments = generateMonthAssignments(year, month);
   const formResponses = generateFormResponses(year, month);
 
@@ -432,6 +444,7 @@ export function generateMockCandidates(
 
 // ── Month schedule builder ───────────────────────────────────────────
 export function generateMonthSchedule(year: number, month: number): MonthSchedule {
+  assertNotProduction();
   const key = `${year}-${String(month).padStart(2, '0')}`;
   if (scheduleCache.has(key)) return scheduleCache.get(key)!;
 
@@ -489,6 +502,7 @@ export function generateMonthSchedule(year: number, month: number): MonthSchedul
 
 // ── Mock exchanges ───────────────────────────────────────────────────
 export function generateMockExchanges(monthYear: string): ExchangeRequest[] {
+  assertNotProduction();
   if (exchangeCache.has(monthYear)) return exchangeCache.get(monthYear)!;
 
   const [yearStr, monthStr] = monthYear.split('-');
@@ -617,6 +631,7 @@ export function generateMockExchanges(monthYear: string): ExchangeRequest[] {
 
 // ── Mutation helpers (update cached exchanges in-place) ──────────────
 export function mockAcceptExchange(monthYear: string, exchangeId: number): void {
+  assertNotProduction();
   const exchanges = generateMockExchanges(monthYear);
   const exchange = exchanges.find((e) => e.id === exchangeId);
   if (exchange) {
@@ -627,6 +642,7 @@ export function mockAcceptExchange(monthYear: string, exchangeId: number): void 
 }
 
 export function mockDeclineExchange(monthYear: string, exchangeId: number): void {
+  assertNotProduction();
   const exchanges = generateMockExchanges(monthYear);
   const exchange = exchanges.find((e) => e.id === exchangeId);
   if (exchange) {
@@ -637,6 +653,7 @@ export function mockDeclineExchange(monthYear: string, exchangeId: number): void
 }
 
 export function mockCancelExchange(monthYear: string, exchangeId: number): void {
+  assertNotProduction();
   const exchanges = generateMockExchanges(monthYear);
   const exchange = exchanges.find((e) => e.id === exchangeId);
   if (exchange) {
@@ -654,6 +671,7 @@ export function mockCreateExchange(monthYear: string, data: {
   requesterShiftType?: string;
   targetShiftType?: string;
 }): void {
+  assertNotProduction();
   const exchanges = generateMockExchanges(monthYear);
   const maxId = exchanges.reduce((max, e) => Math.max(max, e.id), 0);
   exchanges.push({
@@ -675,21 +693,25 @@ export function mockCreateExchange(monthYear: string, data: {
 
 // ── Helpers for panels ───────────────────────────────────────────────
 export function getMockIncomingRequests(monthYear: string): ExchangeRequest[] {
+  assertNotProduction();
   return generateMockExchanges(monthYear).filter(
     (e) => e.status === 'pending' && e.target_employee_id === CURRENT_USER_ID
   );
 }
 
 export function getMockOutgoingRequests(monthYear: string): ExchangeRequest[] {
+  assertNotProduction();
   return generateMockExchanges(monthYear).filter(
     (e) => e.status === 'pending' && e.requester_employee_id === CURRENT_USER_ID
   );
 }
 
 export function getMockHistory(monthYear: string): ExchangeRequest[] {
+  assertNotProduction();
   return generateMockExchanges(monthYear).filter((e) => e.status !== 'pending');
 }
 
 export function getMockIncomingCount(monthYear: string): number {
+  assertNotProduction();
   return getMockIncomingRequests(monthYear).length;
 }
