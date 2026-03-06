@@ -14,8 +14,6 @@ import {
   LineChart,
   Activity,
   Info,
-  FlaskConical,
-  Radio,
   Grid3X3,
   CalendarRange,
   RotateCcw,
@@ -51,14 +49,6 @@ import { printCalendarHtml } from '@/lib/printCalendar';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
-import { useExchangeStore } from '@/lib/stores/exchangeStore';
-import {
-  generateMockHistory,
-  generateMockFairness,
-  generateMockMonthlyData,
-  generateMockEmployeeTrends,
-  generateMockCalendarHtml,
-} from '@/lib/mockData/historyMockData';
 import { SHIFT_TYPES, DEFAULT_SHIFT_TYPE, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 
 const SHIFT_TYPE_KEYS = Object.keys(SHIFT_TYPES);
@@ -279,7 +269,6 @@ const getHeatCellStyle = (val: number, maxVal: number, shiftTypeColor?: string) 
 export default function HistoryPage() {
   const router = useRouter();
   const { canAccess, isLoading: accessLoading } = usePageAccess();
-  const { useMockData, setUseMockData } = useExchangeStore();
 
   useEffect(() => {
     if (!accessLoading && !canAccess('/history')) {
@@ -384,31 +373,26 @@ export default function HistoryPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        if (useMockData) {
-          setHistory(generateMockHistory());
-          setFairness(generateMockFairness(selectedShiftType));
-          setMonthlyData(generateMockMonthlyData());
-          setEmployeeTrends(generateMockEmployeeTrends());
-        } else {
-          const [historyData, fairnessData, monthlyDataResult, trendsData] = await Promise.all([
+        const [historyData, fairnessData, monthlyDataResult, trendsData] =
+          await Promise.all([
             historyApi.get(selectedShiftType),
             historyApi.getFairness(selectedShiftType),
             historyApi.getMonthly(selectedShiftType),
             historyApi.getEmployeeTrends(selectedShiftType),
           ]);
-          setHistory(historyData);
-          setFairness(fairnessData);
-          setMonthlyData(monthlyDataResult);
-          setEmployeeTrends(trendsData);
-        }
+        setHistory(historyData);
+        setFairness(fairnessData);
+        setMonthlyData(monthlyDataResult);
+        setEmployeeTrends(trendsData);
       } catch (error) {
         console.error('Failed to load history:', error);
+        toast.error('Failed to load history data');
       } finally {
         setLoading(false);
       }
     }
     loadData();
-  }, [useMockData, selectedShiftType]);
+  }, [selectedShiftType]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -422,8 +406,7 @@ export default function HistoryPage() {
   }, []);
 
   // Memoized chart data: Employee Trends line chart
-  // BUG FIX: Always use monthly_shifts (backend already filters by shift_type).
-  // Fall back to monthly_shifts_by_type for mock data compatibility.
+  // Backend already filters by shift_type via monthly_shifts.
   const trendsChartData = useMemo(() => {
     if (!employeeTrends?.trends || !monthlyData?.months) return [];
 
@@ -434,9 +417,7 @@ export default function HistoryPage() {
     return months.map((month: string) => {
       const dataPoint: any = { month: formatMonthYear(month) };
       employeeTrends.trends.forEach((emp: any) => {
-        dataPoint[emp.employee_name] =
-          emp.monthly_shifts?.[month] ??
-          emp.monthly_shifts_by_type?.[month]?.[selectedShiftType!] ?? 0;
+        dataPoint[emp.employee_name] = emp.monthly_shifts?.[month] ?? 0;
       });
       return dataPoint;
     });
@@ -534,8 +515,7 @@ export default function HistoryPage() {
     return months.map((month: string) => {
       const counts = employeeTrends.trends
         .map((emp: any) => {
-          return emp.monthly_shifts?.[month] ??
-            emp.monthly_shifts_by_type?.[month]?.[selectedShiftType!] ?? 0;
+          return emp.monthly_shifts?.[month] ?? 0;
         })
         .filter((c: number) => c > 0);
 
@@ -568,8 +548,7 @@ export default function HistoryPage() {
     let maxCount = 0;
     const employees = employeeTrends.trends.map((emp: any) => {
       const monthCounts = months.map((m: string) => {
-        const count = emp.monthly_shifts?.[m] ??
-          emp.monthly_shifts_by_type?.[m]?.[selectedShiftType!] ?? 0;
+        const count = emp.monthly_shifts?.[m] ?? 0;
         if (count > maxCount) maxCount = count;
         return count;
       });
@@ -594,19 +573,17 @@ export default function HistoryPage() {
     setSelectedMonth(monthYear);
     setCalendarLoading(true);
     try {
-      if (useMockData) {
-        setCalendarHtml(generateMockCalendarHtml(monthYear));
-      } else {
-        const html = await assignmentsApi.getCalendar(monthYear);
-        setCalendarHtml(html);
-      }
+      const html = await assignmentsApi.getCalendar(monthYear);
+      setCalendarHtml(html);
     } catch (error) {
       console.error('Failed to load calendar:', error);
-      setCalendarHtml('<div class="text-center py-8 text-red-500">Failed to load calendar</div>');
+      setCalendarHtml(
+        '<div class="text-center py-8 text-red-500">Failed to load calendar</div>'
+      );
     } finally {
       setCalendarLoading(false);
     }
-  }, [useMockData]);
+  }, []);
 
   const closeCalendarModal = useCallback(() => {
     setSelectedMonth(null);
@@ -647,25 +624,6 @@ export default function HistoryPage() {
             Track shift assignment history and fairness metrics
           </p>
         </div>
-        {process.env.NODE_ENV === 'development' && (
-          <button
-            onClick={() => setUseMockData(!useMockData)}
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors',
-              useMockData
-                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-            )}
-            title={useMockData ? 'Using mock data' : 'Using real API'}
-          >
-            {useMockData ? (
-              <FlaskConical className="w-3.5 h-3.5" />
-            ) : (
-              <Radio className="w-3.5 h-3.5" />
-            )}
-            {useMockData ? 'Mock' : 'Live'}
-          </button>
-        )}
       </motion.div>
 
       {/* Filter Bar: Shift Type + Date Range */}
