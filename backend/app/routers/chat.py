@@ -208,14 +208,11 @@ async def stream_message(
         except Exception as e:
             error_occurred = True
             error_msg = str(e)
-            if "daily quota" in error_msg.lower() or "All Gemini models" in error_msg:
-                # All fallback models exhausted (daily limit)
-                full_content = "The AI assistant has reached its daily request limit across all available models. Please try again tomorrow."
-                async for event in _stream_words(full_content):
-                    yield event
-            elif "429" in error_msg:
-                # Single-model transient rate limit (safety net)
-                full_content = "I'm temporarily rate-limited by the AI provider. Please wait a moment and try again."
+            if "rate-limited" in error_msg.lower() or "429" in error_msg:
+                full_content = (
+                    "The AI assistant is temporarily rate-limited. "
+                    "Please wait about a minute and try again."
+                )
                 async for event in _stream_words(full_content):
                     yield event
             else:

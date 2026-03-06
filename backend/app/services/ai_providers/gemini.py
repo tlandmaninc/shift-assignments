@@ -1,10 +1,15 @@
 """Google Gemini AI provider using the free API tier."""
 
 import json
+import time
 import httpx
 from collections.abc import AsyncGenerator
 from typing import Optional
 from .base import AIProvider, AIResponse
+
+# Cooldown in seconds before retrying a model after a 429.
+# Gemini free-tier per-minute limits reset quickly; 60s is enough.
+_DEFAULT_COOLDOWN_SECONDS = 60
 
 
 class GeminiProvider(AIProvider):
@@ -39,11 +44,15 @@ class GeminiProvider(AIProvider):
         self,
         api_key: str,
         model: str = "gemini-2.0-flash",
+        cooldown_seconds: int = _DEFAULT_COOLDOWN_SECONDS,
     ):
         self.api_key = api_key
         self.model = self.MODELS.get(model, model)
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
-        self._exhausted_models: set[str] = set()
+        self._cooldown_seconds = cooldown_seconds
+        # Maps model name -> monotonic timestamp when it was rate-limited.
+        # Entries auto-expire after _cooldown_seconds.
+        self._rate_limited_until: dict[str, float] = {}
 
     @property
     def provider_name(self) -> str:
@@ -58,14 +67,32 @@ class GeminiProvider(AIProvider):
         """Detect HTTP 429 quota/rate-limit errors."""
         return "429" in error_msg
 
+    def _mark_rate_limited(self, model: str) -> None:
+        """Record that a model hit a 429; it will be skipped until cooldown expires."""
+        self._rate_limited_until[model] = time.monotonic() + self._cooldown_seconds
+
+    def _is_cooled_down(self, model: str) -> bool:
+        """Return True if the model is available (not rate-limited or cooldown expired)."""
+        deadline = self._rate_limited_until.get(model)
+        if deadline is None:
+            return True
+        if time.monotonic() >= deadline:
+            del self._rate_limited_until[model]
+            return True
+        return False
+
+    def _clear_rate_limit(self, model: str) -> None:
+        """Clear cooldown for a model after a successful request."""
+        self._rate_limited_until.pop(model, None)
+
     def _build_model_sequence(self) -> list[str]:
-        """Return the ordered list of models to try, skipping exhausted ones."""
+        """Return the ordered list of models to try, skipping cooled-down ones."""
         if self.model in self.FALLBACK_CHAIN:
             start = self.FALLBACK_CHAIN.index(self.model)
             chain = self.FALLBACK_CHAIN[start:]
         else:
             chain = [self.model]
-        return [m for m in chain if m not in self._exhausted_models]
+        return [m for m in chain if self._is_cooled_down(m)]
 
     async def check_health(self) -> dict:
         """Check if Gemini API is accessible with the provided key."""
@@ -284,7 +311,8 @@ class GeminiProvider(AIProvider):
                             else:
                                 raise RuntimeError(error_msg)
                         else:
-                            self.model = model  # persist active model after successful fallback
+                            self._clear_rate_limit(model)
+                            self.model = model
                             async for line in response.aiter_lines():
                                 if not line.startswith("data: "):
                                     continue
@@ -304,11 +332,13 @@ class GeminiProvider(AIProvider):
                 raise  # non-429 errors propagate immediately
 
             if got_429:
-                self._exhausted_models.add(model)
+                self._mark_rate_limited(model)
                 continue
 
         raise RuntimeError(
-            f"All Gemini models have exceeded their daily quota. Last error: {last_error}"
+            "All Gemini models are temporarily rate-limited. "
+            f"Please wait about {self._cooldown_seconds} seconds and try again. "
+            f"Last error: {last_error}"
         )
 
     async def chat(
@@ -351,21 +381,25 @@ class GeminiProvider(AIProvider):
                 )
 
             if result.success:
-                self.model = model  # persist active model after successful fallback
+                self._clear_rate_limit(model)
+                self.model = model
                 return result
 
             if self._is_quota_error(result.error or ""):
-                self._exhausted_models.add(model)
+                self._mark_rate_limited(model)
                 last_error = result.error
                 continue  # try next model
 
             return result  # non-429 failure, return immediately
 
-        # All fallback models exhausted
+        # All fallback models temporarily rate-limited
         return AIResponse(
             success=False,
             content=None,
-            error="All Gemini models have exceeded their daily quota. Please try again tomorrow.",
+            error=(
+                "All Gemini models are temporarily rate-limited. "
+                f"Please wait about {self._cooldown_seconds} seconds and try again."
+            ),
             provider=self.provider_name,
             model=self.model,
         )
