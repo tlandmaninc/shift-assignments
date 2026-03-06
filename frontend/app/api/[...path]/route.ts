@@ -65,7 +65,7 @@ async function proxyRequest(request: NextRequest) {
     // Forward all other headers
     response.headers.forEach((value, key) => {
       // Skip headers that cause issues or are handled separately
-      if (!['content-encoding', 'transfer-encoding', 'set-cookie', 'cache-control', 'etag', 'last-modified', 'expires'].includes(key.toLowerCase())) {
+      if (!['content-encoding', 'content-length', 'transfer-encoding', 'set-cookie', 'cache-control', 'etag', 'last-modified', 'expires'].includes(key.toLowerCase())) {
         responseHeaders.set(key, value);
       }
     });
