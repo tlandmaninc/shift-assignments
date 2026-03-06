@@ -13,13 +13,28 @@ const nextConfig = {
   },
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
-    const cspScriptSrc = isProd ? "'self' 'unsafe-inline'" : "'self' 'unsafe-eval' 'unsafe-inline'";
+    // Firebase Phone Auth + reCAPTCHA domains
+    const firebaseScript = 'https://www.gstatic.com/recaptcha/ https://www.google.com/recaptcha/';
+    const firebaseConnect = [
+      'https://identitytoolkit.googleapis.com',
+      'https://securetoken.googleapis.com',
+      'https://www.googleapis.com',
+      'https://firebase.googleapis.com',
+    ].join(' ');
+    const firebaseFrame = 'https://www.google.com/recaptcha/ https://*.firebaseapp.com';
+
+    const cspScriptSrc = isProd
+      ? `'self' 'unsafe-inline' ${firebaseScript}`
+      : `'self' 'unsafe-eval' 'unsafe-inline' ${firebaseScript}`;
     const csp = [
       "default-src 'self'",
       `script-src ${cspScriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
-      isProd ? "connect-src 'self'" : "connect-src 'self' http://localhost:8000 ws://localhost:8000",
+      isProd
+        ? `connect-src 'self' ${firebaseConnect}`
+        : `connect-src 'self' http://localhost:8000 ws://localhost:8000 ${firebaseConnect}`,
+      `frame-src ${firebaseFrame}`,
       "frame-ancestors 'none'",
     ].join('; ');
 
@@ -36,10 +51,14 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    // In Docker/local dev, proxy API calls at the Next.js level.
+    // On Vercel, app/api/[...path]/route.ts handles this as a serverless function.
+    const backendUrl = process.env.BACKEND_URL;
+    if (!backendUrl) return [];
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/:path*`,
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },
