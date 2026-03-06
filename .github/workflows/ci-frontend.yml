@@ -78,5 +78,5 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ## Frontend Production Deployment Triggered
 
-          - [App](https://shift-assignments-frontend-prod.vercel.app)
+          - [App](https://shift-assignments.vercel.app)
           EOF
