@@ -429,7 +429,7 @@ async def verify_phone_auth(request: Request, body: PhoneAuthRequest, response: 
     if not validate_email_domain(email):
         raise HTTPException(
             status_code=400,
-            detail="Only @clalit.co.il and @clalit.com email addresses are allowed."
+            detail="Only @clalit.org.il email addresses are allowed."
         )
 
     # 2. Check Firebase availability
