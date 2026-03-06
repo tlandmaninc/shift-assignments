@@ -3,11 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 // Allow up to 3 minutes for AI chat responses (Ollama on CPU can be slow)
 export const maxDuration = 180;
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Read at request time — BACKEND_URL and API_URL are runtime env vars (not inlined by Webpack).
+// NEXT_PUBLIC_API_URL is inlined at build time and may be empty on Vercel.
+function getBackendUrl(): string {
+  return process.env.BACKEND_URL || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+}
 
 async function proxyRequest(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  const url = `${BACKEND_URL}${pathname}${search}`;
+  const url = `${getBackendUrl()}${pathname}${search}`;
 
   const headers = new Headers();
   request.headers.forEach((value, key) => {
