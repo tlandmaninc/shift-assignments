@@ -673,12 +673,26 @@ class Storage:
         # Validate month_year format to prevent path traversal
         year, month = validate_month_year(month_year)
 
+        # Determine which shift types are being saved
+        new_shift_types: set[str] = set()
+        for value in assignments.values():
+            if isinstance(value, list):
+                for entry in value:
+                    if isinstance(entry, dict):
+                        new_shift_types.add(entry.get("shift_type", DEFAULT_SHIFT_TYPE))
+        if not new_shift_types:
+            new_shift_types.add(DEFAULT_SHIFT_TYPE)
+
         # Load existing history
         history = self._load_json(settings.history_file)
         all_assignments = history.get("assignments", [])
 
-        # Remove existing assignments for this month
-        all_assignments = [a for a in all_assignments if a.get("month_year") != month_year]
+        # Remove only entries for this month AND matching shift types
+        all_assignments = [
+            a for a in all_assignments
+            if a.get("month_year") != month_year
+            or a.get("shift_type", DEFAULT_SHIFT_TYPE) not in new_shift_types
+        ]
 
         # Add new assignments to history (flatten multi-type to individual records)
         now_iso = datetime.now().isoformat()
@@ -715,10 +729,43 @@ class Storage:
         if not settings.database_url:
             output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Merge with existing assignment data to preserve other shift types
+        existing = self._load_json(output_dir / "assignment.json")
+        merged_assignments = {}
+        merged_counts: dict[str, int] = {}
+
+        if existing and existing.get("assignments"):
+            old_assignments = self._normalize_assignments(existing).get("assignments", {})
+            # Keep entries from other shift types
+            for date_key, entries in old_assignments.items():
+                if isinstance(entries, list):
+                    kept = [
+                        e for e in entries
+                        if isinstance(e, dict)
+                        and e.get("shift_type", DEFAULT_SHIFT_TYPE) not in new_shift_types
+                    ]
+                    if kept:
+                        merged_assignments[date_key] = kept
+            # Keep shift counts for employees not in the new data
+            for emp_name, count in existing.get("shift_counts", {}).items():
+                if emp_name not in month_count:
+                    merged_counts[emp_name] = count
+
+        # Add new assignments
+        for date_key, entries in assignments.items():
+            existing_entries = merged_assignments.get(date_key, [])
+            if isinstance(entries, list):
+                merged_assignments[date_key] = existing_entries + entries
+            else:
+                merged_assignments[date_key] = existing_entries + [
+                    {"employee_name": entries, "shift_type": DEFAULT_SHIFT_TYPE}
+                ]
+        merged_counts.update(month_count)
+
         assignment_data = {
             "month_year": month_year,
-            "assignments": assignments,
-            "shift_counts": month_count,
+            "assignments": merged_assignments,
+            "shift_counts": merged_counts,
             "created_at": now_iso,
         }
 

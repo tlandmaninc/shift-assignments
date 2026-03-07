@@ -176,9 +176,8 @@ async def generate_assignments(request: AssignmentGenerateRequest):
     calendar_gen = CalendarGenerator()
     calendar_html = calendar_gen.generate_calendar(year, month, assignments, month_count)
 
-    # Save calendar to file
+    # Save calendar HTML (assignment.json is already saved by the scheduler)
     calendar_gen.save_calendar(year, month, assignments, month_count)
-    calendar_gen.save_json(year, month, assignments, month_count, emp_data)
 
     # Update form status
     form["status"] = "processed"
