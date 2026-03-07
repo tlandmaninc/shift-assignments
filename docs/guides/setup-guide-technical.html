@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECT Shift Assignment Platform - Technical Setup Guide</title>
+<style>
+  /* ========== RESET & BASE ========== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --bg-code: #0d1117;
+    --bg-card: #1e2a4a;
+    --text-primary: #e8e8f0;
+    --text-secondary: #a0a0b8;
+    --text-muted: #6c6c80;
+    --border-color: #2a2a4a;
+    --border-light: #3a3a5a;
+    --neon-green: #00e599;
+    --neon-green-dim: #00b377;
+    --vercel-black: #000000;
+    --vercel-white: #f0f0f0;
+    --render-purple: #6c63ff;
+    --render-purple-dim: #5548d9;
+    --github-light: #f0f0f0;
+    --gemini-blue: #4285f4;
+    --accent-orange: #ff9f43;
+    --accent-red: #ff6b6b;
+    --accent-cyan: #00d2ff;
+    --success-green: #2ecc71;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+    --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+                   Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+    --sidebar-width: 260px;
+    --header-height: 64px;
+  }
+
+  html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-height) + 24px); }
+
+  body {
+    font-family: var(--font-system);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ========== HEADER ========== */
+  .site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background: rgba(26, 26, 46, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    z-index: 100;
+  }
+
+  .site-header h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+  }
+
+  .site-header h1 span { color: var(--neon-green); }
+
+  .site-header .badge {
+    margin-left: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--render-purple);
+    color: #fff;
+  }
+
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 16px;
+    font-size: 1.2rem;
+  }
+
+  /* ========== LAYOUT ========== */
+  .layout {
+    display: flex;
+    margin-top: var(--header-height);
+    min-height: calc(100vh - var(--header-height));
+  }
+
+  /* ========== SIDEBAR ========== */
+  .sidebar {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    width: var(--sidebar-width);
+    height: calc(100vh - var(--header-height));
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    padding: 24px 0;
+    z-index: 50;
+  }
+
+  .sidebar-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    padding: 0 20px;
+    margin-bottom: 8px;
+  }
+
+  .sidebar nav a {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 8px 20px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.88rem;
+    transition: all 0.15s ease;
+    border-left: 3px solid transparent;
+  }
+
+  .sidebar nav a:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .sidebar nav a.active {
+    color: var(--neon-green);
+    border-left-color: var(--neon-green);
+    background: rgba(0, 229, 153, 0.06);
+  }
+
+  .sidebar nav a .step-num {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    min-width: 18px;
+  }
+
+  .sidebar nav a.active .step-num { color: var(--neon-green); }
+
+  /* ========== MAIN CONTENT ========== */
+  .main-content {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    padding: 40px 48px 80px;
+    max-width: 900px;
+  }
+
+  /* ========== ARCHITECTURE DIAGRAM ========== */
+  .diagram-wrapper {
+    margin: 0 0 48px;
+    padding: 32px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow-x: auto;
+  }
+
+  .diagram-wrapper h2 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  .diagram-wrapper svg { display: block; margin: 0 auto; }
+
+  /* ========== SECTIONS ========== */
+  section {
+    margin-bottom: 56px;
+    scroll-margin-top: calc(var(--header-height) + 24px);
+  }
+
+  h2.section-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  h2.section-title .num {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--bg-primary);
+    background: var(--neon-green);
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 28px 0 12px;
+    color: var(--text-primary);
+  }
+
+  p { margin: 12px 0; color: var(--text-secondary); }
+  p a, li a { color: var(--neon-green); text-decoration: none; }
+  p a:hover, li a:hover { text-decoration: underline; }
+
+  .section-description {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+  }
+
+  /* ========== CHECKLIST ========== */
+  .checklist {
+    list-style: none;
+    padding: 0;
+  }
+
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 16px;
+    margin: 4px 0;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+  }
+
+  .checklist li .cb {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-light);
+    border-radius: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: transparent;
+  }
+
+  .checklist li .cb:hover { border-color: var(--neon-green); }
+
+  .checklist li .cb.checked {
+    background: var(--neon-green);
+    border-color: var(--neon-green);
+  }
+
+  .checklist li .cb.checked::after {
+    content: '\2713';
+    color: var(--bg-primary);
+    font-size: 0.75rem;
+    font-weight: 900;
+  }
+
+  .checklist li strong { color: var(--text-primary); }
+
+  .checklist-sub { margin-left: 32px; font-size: 0.85rem; color: var(--text-muted); }
+
+  /* ========== CODE BLOCKS ========== */
+  .code-block {
+    position: relative;
+    margin: 16px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+  }
+
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #161b22;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .code-block-lang {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .copy-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
+  }
+
+  .copy-btn.copied {
+    color: var(--neon-green);
+    border-color: var(--neon-green);
+  }
+
+  .code-block pre {
+    background: var(--bg-code);
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .code-block pre .comment { color: #6a737d; }
+  .code-block pre .string { color: #a5d6ff; }
+  .code-block pre .variable { color: #ff9f43; }
+  .code-block pre .command { color: #79c0ff; }
+  .code-block pre .url { color: #00e599; }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--accent-cyan);
+  }
+
+  /* ========== TABLES ========== */
+  .styled-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 16px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    font-size: 0.88rem;
+  }
+
+  .styled-table thead th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 700;
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .styled-table tbody td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    vertical-align: top;
+  }
+
+  .styled-table tbody tr:last-child td { border-bottom: none; }
+
+  .styled-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.015); }
+  .styled-table tbody tr:hover { background: rgba(255, 255, 255, 0.04); }
+
+  .styled-table td code {
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .styled-table.env-table tbody td:first-child {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--accent-orange);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .styled-table.env-table tbody td:nth-child(2) {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--accent-cyan);
+  }
+
+  /* ========== TROUBLESHOOTING TABLE ========== */
+  .styled-table.troubleshoot-table tbody td:first-child {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--accent-red);
+    white-space: nowrap;
+  }
+
+  .styled-table.troubleshoot-table tbody td:nth-child(2) {
+    color: var(--text-muted);
+  }
+
+  .styled-table.troubleshoot-table tbody td:nth-child(3) {
+    color: var(--neon-green);
+  }
+
+  /* ========== VERIFICATION CHECKLIST ========== */
+  .verify-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+  }
+
+  .verify-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    margin: 6px 0;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+  }
+
+  .verify-list li .icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--neon-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .verify-list li .icon.done {
+    background: var(--neon-green);
+  }
+
+  .verify-list li .icon.done::after {
+    content: '\2713';
+    color: var(--bg-primary);
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  /* ========== CALLOUTS ========== */
+  .callout {
+    margin: 20px 0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    border-left: 4px solid;
+  }
+
+  .callout-info {
+    background: rgba(0, 210, 255, 0.06);
+    border-left-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+  }
+
+  .callout-warn {
+    background: rgba(255, 159, 67, 0.06);
+    border-left-color: var(--accent-orange);
+    color: var(--accent-orange);
+  }
+
+  .callout-tip {
+    background: rgba(0, 229, 153, 0.06);
+    border-left-color: var(--neon-green);
+    color: var(--neon-green);
+  }
+
+  .callout strong { display: block; margin-bottom: 4px; }
+
+  /* ========== SERVICE BADGES ========== */
+  .svc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .svc-neon { background: var(--neon-green); color: #0a0a1a; }
+  .svc-vercel { background: var(--vercel-white); color: var(--vercel-black); }
+  .svc-render { background: var(--render-purple); color: #fff; }
+  .svc-github { background: var(--github-light); color: #24292f; }
+  .svc-gemini { background: var(--gemini-blue); color: #fff; }
+
+  /* ========== PIPELINE FLOW ========== */
+  .pipeline-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+
+  .pipeline-step {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .pipeline-arrow {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    padding: 0 8px;
+  }
+
+  .pipeline-step.push { background: var(--github-light); color: #24292f; }
+  .pipeline-step.test { background: var(--accent-cyan); color: #0a0a1a; }
+  .pipeline-step.dev { background: var(--render-purple); color: #fff; }
+  .pipeline-step.approve { background: var(--accent-orange); color: #0a0a1a; }
+  .pipeline-step.prod { background: var(--neon-green); color: #0a0a1a; }
+
+  /* ========== FOOTER ========== */
+  .footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 900px) {
+    .sidebar {
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+    }
+
+    .sidebar.open { transform: translateX(0); }
+
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 40;
+    }
+
+    .sidebar-overlay.visible { display: block; }
+
+    .main-content {
+      margin-left: 0;
+      padding: 24px 20px 60px;
+    }
+
+    .menu-toggle { display: block; }
+
+    .diagram-wrapper { padding: 16px; }
+    .diagram-wrapper svg { width: 100%; height: auto; }
+
+    .styled-table { font-size: 0.82rem; }
+    .styled-table thead th,
+    .styled-table tbody td { padding: 8px 10px; }
+
+    .pipeline-flow { flex-direction: column; align-items: stretch; gap: 4px; }
+    .pipeline-arrow { transform: rotate(90deg); text-align: center; padding: 2px 0; }
+    .pipeline-step { text-align: center; }
+  }
+
+  /* ========== PRINT ========== */
+  @media print {
+    :root {
+      --bg-primary: #fff;
+      --bg-secondary: #f8f8f8;
+      --bg-tertiary: #eee;
+      --bg-code: #f5f5f5;
+      --bg-card: #f8f8f8;
+      --text-primary: #111;
+      --text-secondary: #333;
+      --text-muted: #666;
+      --border-color: #ddd;
+      --border-light: #ccc;
+      --neon-green: #00875a;
+      --render-purple: #5548d9;
+      --accent-cyan: #0077b6;
+      --accent-orange: #c76a00;
+      --accent-red: #c62828;
+    }
+
+    body { font-size: 11pt; line-height: 1.5; }
+
+    .site-header { position: static; border-bottom: 2px solid #111; print-color-adjust: exact; }
+    .sidebar, .menu-toggle, .copy-btn, .sidebar-overlay { display: none !important; }
+
+    .main-content {
+      margin-left: 0;
+      padding: 0;
+      max-width: 100%;
+    }
+
+    .layout { display: block; margin-top: 0; }
+
+    section { page-break-inside: avoid; margin-bottom: 24px; }
+    .code-block { break-inside: avoid; }
+    .styled-table { break-inside: avoid; }
+
+    .code-block pre {
+      background: #f5f5f5 !important;
+      color: #111 !important;
+      border: 1px solid #ddd;
+      print-color-adjust: exact;
+    }
+
+    .checklist li .cb { border: 2px solid #666; print-color-adjust: exact; }
+    .svc-badge { border: 1px solid #999; print-color-adjust: exact; }
+
+    a { color: var(--accent-cyan); }
+    a::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #666; }
+    nav a::after { content: none; }
+  }
+
+  /* ========== SCROLLBAR ========== */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-primary); }
+  ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">&#9776;</button>
+  <h1><span>ECT</span> Shift Assignment Platform</h1>
+  <span class="badge">Setup Guide</span>
+</header>
+
+<!-- ============ SIDEBAR OVERLAY (mobile) ============ -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- ============ LAYOUT ============ -->
+<div class="layout">
+
+  <!-- ======== SIDEBAR / TOC ======== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-label">Setup Steps</div>
+    <nav id="toc">
+      <a href="#prerequisites"><span class="step-num">01</span> Prerequisites</a>
+      <a href="#local-dev"><span class="step-num">02</span> Clone &amp; Local Dev</a>
+      <a href="#neon"><span class="step-num">03</span> Neon PostgreSQL</a>
+      <a href="#render"><span class="step-num">04</span> Render Backend</a>
+      <a href="#vercel"><span class="step-num">05</span> Vercel Frontend</a>
+      <a href="#connect"><span class="step-num">06</span> Connect &amp; Verify</a>
+      <a href="#cicd"><span class="step-num">07</span> CI/CD Pipeline</a>
+      <a href="#troubleshooting"><span class="step-num">08</span> Troubleshooting</a>
+    </nav>
+  </aside>
+
+  <!-- ======== MAIN CONTENT ======== -->
+  <main class="main-content">
+
+    <!-- ======== ARCHITECTURE DIAGRAM ======== -->
+    <div class="diagram-wrapper">
+      <h2>System Architecture</h2>
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" style="max-width:880px;width:100%;height:auto;">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 7" refX="10" refY="3.5"
+                  markerWidth="10" markerHeight="7" orient="auto-start-auto">
+            <path d="M 0 0 L 10 3.5 L 0 7 z" fill="#6c6c80"/>
+          </marker>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Region label -->
+        <rect x="180" y="10" width="690" height="300" rx="16" ry="16"
+              fill="none" stroke="#2a2a4a" stroke-width="1.5" stroke-dasharray="8 4"/>
+        <text x="830" y="30" fill="#6c6c80" font-family="-apple-system, sans-serif"
+              font-size="11" font-weight="600" text-anchor="end">Frankfurt, EU</text>
+
+        <!-- User Browser -->
+        <rect x="10" y="100" width="140" height="70" rx="12" ry="12"
+              fill="#1e2a4a" stroke="#3a3a5a" stroke-width="1.5"/>
+        <text x="80" y="130" fill="#e8e8f0" font-family="-apple-system, sans-serif"
+              font-size="13" font-weight="700" text-anchor="middle">User Browser</text>
+        <text x="80" y="150" fill="#6c6c80" font-family="monospace"
+              font-size="10" text-anchor="middle">HTTPS</text>
+
+        <!-- Arrow: Browser -> Vercel -->
+        <line x1="150" y1="135" x2="202" y2="135" stroke="#6c6c80" stroke-width="1.5"
+              marker-end="url(#arrow)"/>
+
+        <!-- Vercel -->
+        <rect x="208" y="85" width="170" height="100" rx="12" ry="12"
+              fill="#111" stroke="#444" stroke-width="1.5"/>
+        <rect x="208" y="85" width="170" height="28" rx="12" ry="12"
+              fill="#f0f0f0"/>
+        <rect x="208" y="100" width="170" height="13" fill="#f0f0f0"/>
+        <text x="293" y="103" fill="#000" font-family="-apple-system, sans-serif"
+              font-size="11" font-weight="800" text-anchor="middle">VERCEL CDN</text>
+        <text x="293" y="135" fill="#e8e8f0" font-family="-apple-system, sans-serif"
+              font-size="12" font-weight="600" text-anchor="middle">Next.js Frontend</text>
+        <text x="293" y="155" fill="#6c6c80" font-family="monospace"
+              font-size="10" text-anchor="middle">fra1 region</text>
+        <text x="293" y="173" fill="#6c6c80" font-family="monospace"
+              font-size="10" text-anchor="middle">/api/* proxy</text>
+
+        <!-- Arrow: Vercel -> Render -->
+        <line x1="378" y1="135" x2="430" y2="135" stroke="#6c6c80" stroke-width="1.5"
+              marker-end="url(#arrow)"/>
+
+        <!-- Render -->
+        <rect x="436" y="85" width="180" height="100" rx="12" ry="12"
+              fill="#1a1040" stroke="#6c63ff" stroke-width="1.5" filter="url(#glow)"/>
+        <rect x="436" y="85" width="180" height="28" rx="12" ry="12"
+              fill="#6c63ff"/>
+        <rect x="436" y="100" width="180" height="13" fill="#6c63ff"/>
+        <text x="526" y="103" fill="#fff" font-family="-apple-system, sans-serif"
+              font-size="11" font-weight="800" text-anchor="middle">RENDER DOCKER</text>
+        <text x="526" y="135" fill="#e8e8f0" font-family="-apple-system, sans-serif"
+              font-size="12" font-weight="600" text-anchor="middle">FastAPI Backend</text>
+        <text x="526" y="155" fill="#a0a0b8" font-family="monospace"
+              font-size="10" text-anchor="middle">frankfurt region</text>
+        <text x="526" y="173" fill="#a0a0b8" font-family="monospace"
+              font-size="10" text-anchor="middle">REST + WebSocket</text>
+
+        <!-- Arrow: Render -> Neon -->
+        <line x1="616" y1="135" x2="668" y2="135" stroke="#6c6c80" stroke-width="1.5"
+              marker-end="url(#arrow)"/>
+
+        <!-- Neon -->
+        <rect x="674" y="85" width="180" height="100" rx="12" ry="12"
+              fill="#0a2820" stroke="#00e599" stroke-width="1.5" filter="url(#glow)"/>
+        <rect x="674" y="85" width="180" height="28" rx="12" ry="12"
+              fill="#00e599"/>
+        <rect x="674" y="100" width="180" height="13" fill="#00e599"/>
+        <text x="764" y="103" fill="#0a0a1a" font-family="-apple-system, sans-serif"
+              font-size="11" font-weight="800" text-anchor="middle">NEON POSTGRESQL</text>
+        <text x="764" y="135" fill="#e8e8f0" font-family="-apple-system, sans-serif"
+              font-size="12" font-weight="600" text-anchor="middle">JSONB Storage</text>
+        <text x="764" y="155" fill="#a0a0b8" font-family="monospace"
+              font-size="10" text-anchor="middle">aws-eu-central-1</text>
+        <text x="764" y="173" fill="#a0a0b8" font-family="monospace"
+              font-size="10" text-anchor="middle">Serverless Postgres</text>
+
+        <!-- Arrow: Render -> Gemini (downward) -->
+        <line x1="526" y1="185" x2="526" y2="237" stroke="#6c6c80" stroke-width="1.5"
+              marker-end="url(#arrow)"/>
+
+        <!-- Gemini -->
+        <rect x="436" y="243" width="180" height="60" rx="12" ry="12"
+              fill="#1a2040" stroke="#4285f4" stroke-width="1.5"/>
+        <text x="526" y="271" fill="#4285f4" font-family="-apple-system, sans-serif"
+              font-size="12" font-weight="700" text-anchor="middle">Gemini AI API</text>
+        <text x="526" y="291" fill="#6c6c80" font-family="monospace"
+              font-size="10" text-anchor="middle">gemini-2.5-flash</text>
+      </svg>
+    </div>
+
+    <!-- ============================= -->
+    <!-- SECTION 1: PREREQUISITES      -->
+    <!-- ============================= -->
+    <section id="prerequisites">
+      <h2 class="section-title"><span class="num">1</span> Prerequisites</h2>
+      <p class="section-description">Ensure you have the following accounts and tools before proceeding.</p>
+
+      <h3>Accounts</h3>
+      <ul class="checklist" id="checklist-accounts">
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>GitHub</strong> &mdash; <a href="https://github.com" target="_blank">github.com</a> (repository hosting)</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Neon</strong> &mdash; <a href="https://neon.tech" target="_blank">neon.tech</a> (serverless PostgreSQL)</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Render</strong> &mdash; <a href="https://render.com" target="_blank">render.com</a> (backend hosting)</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Vercel</strong> &mdash; <a href="https://vercel.com" target="_blank">vercel.com</a> (frontend hosting)</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Gemini API Key</strong> &mdash; <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> (AI chat)</span>
+        </li>
+      </ul>
+
+      <h3>Tools</h3>
+      <ul class="checklist" id="checklist-tools">
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Git</strong> &mdash; version control</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Node.js 20+</strong> &mdash; <a href="https://nodejs.org" target="_blank">nodejs.org</a></span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Python 3.12+</strong> &mdash; <a href="https://python.org" target="_blank">python.org</a></span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>uv</strong> &mdash; <a href="https://astral.sh/uv" target="_blank">astral.sh/uv</a> (Python package manager)</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><strong>Docker &amp; Docker Compose</strong> &mdash; for local development</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 2: CLONE & LOCAL DEV  -->
+    <!-- ============================= -->
+    <section id="local-dev">
+      <h2 class="section-title"><span class="num">2</span> Clone &amp; Local Dev</h2>
+      <p class="section-description">Get the codebase running locally with Docker Compose.</p>
+
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="command">git clone</span> <span class="url">https://github.com/YOUR_USERNAME/shift-assignments.git</span>
+<span class="command">cd</span> shift-assignments
+<span class="command">make</span> setup    <span class="comment"># copies .env.example files</span>
+<span class="command">make</span> dev      <span class="comment"># starts Docker Compose with hot-reload</span></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <strong>Verify local setup:</strong>
+        Frontend: <code>http://localhost:3000</code> &mdash;
+        Backend health: <code>http://localhost:8000/health</code>
+      </div>
+
+      <div class="callout callout-tip">
+        <strong>WSL2 users:</strong>
+        Run all commands from WSL, not Windows CMD/PowerShell. File watching relies on
+        <code>WATCHPACK_POLLING=true</code> (already set in docker-compose.yaml).
+      </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 3: NEON POSTGRESQL    -->
+    <!-- ============================= -->
+    <section id="neon">
+      <h2 class="section-title"><span class="num">3</span> Neon PostgreSQL Setup</h2>
+      <p class="section-description">
+        <span class="svc-badge svc-neon">Neon</span>
+        Set up a serverless PostgreSQL database in the Frankfurt region.
+      </p>
+
+      <h3>Create Project</h3>
+      <ul class="checklist">
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span>Sign up at <a href="https://neon.tech" target="_blank">neon.tech</a></span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span>Create a new project: name <code>shift-assignments</code>, region <code>aws-eu-central-1</code> (Frankfurt)</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span>Copy the connection string from the Neon dashboard</span>
+        </li>
+      </ul>
+
+      <h3>Connection String Format</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">text</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="url">postgresql://neondb_owner:PASSWORD@ep-XXXX.eu-central-1.aws.neon.tech/neondb?sslmode=require</span></pre>
+      </div>
+
+      <h3>Run Migration</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="variable">DATABASE_URL</span>=<span class="string">"postgresql://neondb_owner:PASSWORD@ep-XXXX.eu-central-1.aws.neon.tech/neondb?sslmode=require"</span> \
+  <span class="command">uv run</span> python backend/scripts/migrate_to_neon.py</pre>
+      </div>
+
+      <h3>Verify Connection</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="variable">DATABASE_URL</span>=<span class="string">"postgresql://..."</span> \
+  <span class="command">uv run</span> python -c <span class="string">"from backend.app.db import init_db; init_db(); print('OK')"</span></pre>
+      </div>
+
+      <div class="callout callout-info">
+        <strong>Note:</strong>
+        The connection string contains your password. Never commit it to version control.
+        Store it in environment variables only.
+      </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 4: RENDER BACKEND     -->
+    <!-- ============================= -->
+    <section id="render">
+      <h2 class="section-title"><span class="num">4</span> Render Backend Deployment</h2>
+      <p class="section-description">
+        <span class="svc-badge svc-render">Render</span>
+        Deploy the FastAPI backend as a Docker web service.
+      </p>
+
+      <h3>Create Service</h3>
+      <p>Navigate to <a href="https://dashboard.render.com" target="_blank">Render Dashboard</a> and select
+        <strong>New &rarr; Web Service &rarr; Connect GitHub repo</strong>.</p>
+
+      <table class="styled-table">
+        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Name</td><td><code>shift-assignments-backend</code></td></tr>
+          <tr><td>Region</td><td>Frankfurt</td></tr>
+          <tr><td>Branch</td><td><code>main</code></td></tr>
+          <tr><td>Root Directory</td><td><em>(leave empty &mdash; uses render.yaml)</em></td></tr>
+          <tr><td>Runtime</td><td>Docker</td></tr>
+          <tr><td>Instance Type</td><td>Free</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Environment Variables</h3>
+      <table class="styled-table env-table">
+        <thead><tr><th>Variable</th><th>Value</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>SECRET_KEY</td>
+            <td>(Generate)</td>
+            <td>Click "Generate" button, 32+ characters</td>
+          </tr>
+          <tr>
+            <td>DATABASE_URL</td>
+            <td>postgresql://...</td>
+            <td>Neon connection string from step 3</td>
+          </tr>
+          <tr>
+            <td>ENVIRONMENT</td>
+            <td>production</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>FRONTEND_URL</td>
+            <td>https://YOUR-APP.vercel.app</td>
+            <td>Update after Vercel deploy (step 5)</td>
+          </tr>
+          <tr>
+            <td>AI_PROVIDER</td>
+            <td>gemini</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>GEMINI_API_KEY</td>
+            <td>your-key</td>
+            <td>From <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></td>
+          </tr>
+          <tr>
+            <td>GEMINI_MODEL</td>
+            <td>gemini-2.5-flash</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>ADMIN_EMAILS</td>
+            <td>your@email.com</td>
+            <td>Comma-separated list</td>
+          </tr>
+          <tr>
+            <td>GOOGLE_CLIENT_ID</td>
+            <td>(optional)</td>
+            <td>For Google OAuth login</td>
+          </tr>
+          <tr>
+            <td>GOOGLE_CLIENT_SECRET</td>
+            <td>(optional)</td>
+            <td>For Google OAuth login</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Deploy &amp; Verify</h3>
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="code-block-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="command">curl</span> <span class="url">https://YOUR-BACKEND.onrender.com/health</span></pre>
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>Free tier note:</strong>
+        The service sleeps after 15 minutes of inactivity. The first request after sleep takes 30&ndash;60 seconds to spin up.
+      </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 5: VERCEL FRONTEND    -->
+    <!-- ============================= -->
+    <section id="vercel">
+      <h2 class="section-title"><span class="num">5</span> Vercel Frontend Deployment</h2>
+      <p class="section-description">
+        <span class="svc-badge svc-vercel">Vercel</span>
+        Deploy the Next.js frontend with automatic builds on push.
+      </p>
+
+      <h3>Create Project</h3>
+      <p>Go to <a href="https://vercel.com/new" target="_blank">Vercel Dashboard</a> and select
+        <strong>Add New &rarr; Project &rarr; Import GitHub repo</strong>.</p>
+
+      <table class="styled-table">
+        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Project Name</td><td><code>shift-assignments</code></td></tr>
+          <tr><td>Framework</td><td>Next.js (auto-detected)</td></tr>
+          <tr><td>Root Directory</td><td><code>frontend</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Environment Variables</h3>
+      <table class="styled-table env-table">
+        <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>API_URL</td>
+            <td>https://YOUR-BACKEND.onrender.com</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <strong>Important:</strong>
+        Use <code>API_URL</code> (not <code>NEXT_PUBLIC_API_URL</code>). This is a runtime server-side variable
+        used by the Next.js API proxy route. It is not exposed to the browser.
+      </div>
+
+      <h3>Verify</h3>
+      <p>After deployment, visit your Vercel URL and confirm the login page loads.</p>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 6: CONNECT & VERIFY   -->
+    <!-- ============================= -->
+    <section id="connect">
+      <h2 class="section-title"><span class="num">6</span> Connect &amp; Verify</h2>
+      <p class="section-description">Wire everything together and run through the verification checklist.</p>
+
+      <h3>Update Backend FRONTEND_URL</h3>
+      <p>Go to your Render service's environment variables and update <code>FRONTEND_URL</code> to your
+        actual Vercel URL (e.g., <code>https://shift-assignments.vercel.app</code>). Redeploy the service.</p>
+
+      <h3>Google OAuth Setup (if using)</h3>
+      <ul class="checklist">
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>
+            &rarr; APIs &amp; Services &rarr; Credentials &rarr; OAuth 2.0 Client</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span>Add Authorized redirect URI:<br>
+            <code>https://YOUR-APP.vercel.app/api/auth/google/callback</code></span>
+        </li>
+      </ul>
+
+      <h3>Verification Checklist</h3>
+      <ul class="verify-list" id="verify-checklist">
+        <li>
+          <span class="icon" onclick="toggleVerify(this)"></span>
+          <span><strong>Backend health:</strong> <code>curl https://YOUR-BACKEND.onrender.com/health</code></span>
+        </li>
+        <li>
+          <span class="icon" onclick="toggleVerify(this)"></span>
+          <span><strong>Frontend loads:</strong> visit your Vercel URL in a browser</span>
+        </li>
+        <li>
+          <span class="icon" onclick="toggleVerify(this)"></span>
+          <span><strong>Login works:</strong> complete the Google OAuth flow</span>
+        </li>
+        <li>
+          <span class="icon" onclick="toggleVerify(this)"></span>
+          <span><strong>Chat works:</strong> send a message, AI responds</span>
+        </li>
+        <li>
+          <span class="icon" onclick="toggleVerify(this)"></span>
+          <span><strong>API docs:</strong> <code>https://YOUR-BACKEND.onrender.com/api/docs</code></span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 7: CI/CD PIPELINE     -->
+    <!-- ============================= -->
+    <section id="cicd">
+      <h2 class="section-title"><span class="num">7</span> CI/CD Pipeline <span style="font-size:0.7em;font-weight:400;color:var(--text-muted);">(Optional)</span></h2>
+      <p class="section-description">
+        <span class="svc-badge svc-github">GitHub</span>
+        Set up automated deployments with manual approval gates.
+      </p>
+
+      <h3>GitHub Environments</h3>
+      <p>In your GitHub repo, go to <strong>Settings &rarr; Environments</strong> and create:</p>
+      <ul class="checklist">
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><code>production-backend</code> with required reviewers</span>
+        </li>
+        <li>
+          <span class="cb" onclick="toggleCheck(this)"></span>
+          <span><code>production-frontend</code> with required reviewers</span>
+        </li>
+      </ul>
+
+      <h3>Deploy Hook URLs</h3>
+      <p>Create a Deploy Hook in each Render/Vercel service (found in service Settings).</p>
+
+      <h3>GitHub Secrets</h3>
+      <table class="styled-table env-table">
+        <thead><tr><th>Secret</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>RENDER_DEPLOY_HOOK_DEV</td>
+            <td>Render dev service &rarr; Settings &rarr; Deploy Hook</td>
+          </tr>
+          <tr>
+            <td>RENDER_DEPLOY_HOOK_PROD</td>
+            <td>Render prod service &rarr; Settings &rarr; Deploy Hook</td>
+          </tr>
+          <tr>
+            <td>VERCEL_DEPLOY_HOOK_DEV</td>
+            <td>Vercel dev project &rarr; Settings &rarr; Git &rarr; Deploy Hooks</td>
+          </tr>
+          <tr>
+            <td>VERCEL_DEPLOY_HOOK_PROD</td>
+            <td>Vercel prod project &rarr; Settings &rarr; Git &rarr; Deploy Hooks</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Pipeline Flow</h3>
+      <div class="pipeline-flow">
+        <div class="pipeline-step push">Push</div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step test">Tests</div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step dev">Deploy Dev</div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step approve">Manual Approval</div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step prod">Deploy Prod</div>
+      </div>
+    </section>
+
+    <!-- ============================= -->
+    <!-- SECTION 8: TROUBLESHOOTING    -->
+    <!-- ============================= -->
+    <section id="troubleshooting">
+      <h2 class="section-title"><span class="num">8</span> Troubleshooting</h2>
+      <p class="section-description">Common issues and their fixes.</p>
+
+      <table class="styled-table troubleshoot-table">
+        <thead><tr><th>Issue</th><th>Cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>502 Bad Gateway</td>
+            <td>Backend sleeping (free tier)</td>
+            <td>Wait 30&ndash;60 seconds for cold start, then retry</td>
+          </tr>
+          <tr>
+            <td>CORS error</td>
+            <td>FRONTEND_URL mismatch</td>
+            <td>Update env var on Render &mdash; must be exact URL with <code>https://</code></td>
+          </tr>
+          <tr>
+            <td>Login fails</td>
+            <td>OAuth redirect URI wrong</td>
+            <td>Check Google Cloud Console, ensure redirect URI matches your Vercel URL</td>
+          </tr>
+          <tr>
+            <td>Chat error</td>
+            <td>Gemini rate limit</td>
+            <td>Wait 60 seconds (temporary cooldown), then try again</td>
+          </tr>
+          <tr>
+            <td>Build fails on Render</td>
+            <td>Docker build error</td>
+            <td>Check Render logs; ensure <code>Dockerfile</code> exists in <code>backend/</code></td>
+          </tr>
+          <tr>
+            <td>Data not persisting</td>
+            <td>DATABASE_URL not set</td>
+            <td>Add Neon connection string to Render environment variables</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ======== FOOTER ======== -->
+    <div class="footer">
+      <p>ECT Shift Assignment Platform &mdash; Technical Setup Guide</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ JAVASCRIPT ============ -->
+<script>
+  // ---- Sidebar toggle (mobile) ----
+  function toggleSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('visible');
+  }
+
+  // ---- Copy to clipboard ----
+  function copyCode(btn) {
+    var pre = btn.closest('.code-block').querySelector('pre');
+    var text = pre.textContent || pre.innerText;
+    navigator.clipboard.writeText(text).then(function() {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    }).catch(function() {
+      // Fallback for older browsers
+      var textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (e) {
+        btn.textContent = 'Failed';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+      }
+      document.body.removeChild(textarea);
+    });
+  }
+
+  // ---- Checklist toggle ----
+  function toggleCheck(el) {
+    el.classList.toggle('checked');
+  }
+
+  // ---- Verification checkmark toggle ----
+  function toggleVerify(el) {
+    el.classList.toggle('done');
+  }
+
+  // ---- Active sidebar link on scroll ----
+  (function() {
+    var sections = document.querySelectorAll('section[id]');
+    var tocLinks = document.querySelectorAll('#toc a');
+
+    function highlightToc() {
+      var scrollY = window.scrollY || window.pageYOffset;
+      var headerOffset = 100;
+      var current = '';
+
+      for (var i = 0; i < sections.length; i++) {
+        var section = sections[i];
+        var sectionTop = section.offsetTop - headerOffset;
+        if (scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      }
+
+      for (var j = 0; j < tocLinks.length; j++) {
+        tocLinks[j].classList.remove('active');
+        if (tocLinks[j].getAttribute('href') === '#' + current) {
+          tocLinks[j].classList.add('active');
+        }
+      }
+    }
+
+    window.addEventListener('scroll', highlightToc, { passive: true });
+    highlightToc();
+  })();
+
+  // ---- Close sidebar on link click (mobile) ----
+  (function() {
+    var tocLinks = document.querySelectorAll('#toc a');
+    for (var i = 0; i < tocLinks.length; i++) {
+      tocLinks[i].addEventListener('click', function() {
+        if (window.innerWidth <= 900) {
+          document.getElementById('sidebar').classList.remove('open');
+          document.getElementById('sidebarOverlay').classList.remove('visible');
+        }
+      });
+    }
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECT Shift Assignment — Setup Guides</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #1a1a2e;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      color: #555;
+      margin-bottom: 2.5rem;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (max-width: 600px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .card--dark {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      border: 1px solid #2a2a4a;
+    }
+
+    .card--dark .card-title {
+      color: #ffffff;
+    }
+
+    .card--dark .card-desc {
+      color: #b0b0c8;
+    }
+
+    .card--dark .card-time {
+      color: #7b8cde;
+    }
+
+    .card--light {
+      background: #ffffff;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+
+    .card--light .card-title {
+      color: #1a1a2e;
+    }
+
+    .card--light .card-desc {
+      color: #555;
+    }
+
+    .card--light .card-time {
+      color: #4a6cf7;
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 0.25rem;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .card-desc {
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .card-time {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.25rem;
+    }
+
+    .footer {
+      font-size: 0.85rem;
+      color: #777;
+      max-width: 520px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ECT Shift Assignment &mdash; Setup Guides</h1>
+    <p class="subtitle">Choose the guide that best fits your experience level</p>
+
+    <div class="cards">
+      <!-- Technical Guide -->
+      <a href="setup-guide-technical.html" class="card card--dark">
+        <svg class="card-icon" viewBox="0 0 48 48" fill="none"
+          xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="8" width="40" height="32" rx="4"
+            stroke="#7b8cde" stroke-width="2.5" fill="none" />
+          <line x1="4" y1="16" x2="44" y2="16"
+            stroke="#7b8cde" stroke-width="2.5" />
+          <circle cx="9" cy="12" r="1.5" fill="#ff5f56" />
+          <circle cx="14" cy="12" r="1.5" fill="#ffbd2e" />
+          <circle cx="19" cy="12" r="1.5" fill="#27c93f" />
+          <text x="12" y="28" font-family="monospace" font-size="10"
+            fill="#7b8cde">$&gt;_</text>
+        </svg>
+        <span class="card-title">Developer Guide</span>
+        <span class="card-desc">
+          For developers comfortable with Git, CLI, Docker, and environment
+          variables. Includes CI/CD pipeline setup.
+        </span>
+        <span class="card-time">~20 minutes</span>
+      </a>
+
+      <!-- Beginner Guide -->
+      <a href="setup-guide-beginner.html" class="card card--light">
+        <svg class="card-icon" viewBox="0 0 48 48" fill="none"
+          xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 4 L28 18 L44 18 L31 27 L35 42 L24 33 L13 42
+            L17 27 L4 18 L20 18 Z"
+            stroke="#4a6cf7" stroke-width="2.5" fill="none"
+            stroke-linejoin="round" />
+          <circle cx="24" cy="23" r="4" fill="#4a6cf7" opacity="0.3" />
+        </svg>
+        <span class="card-title">Beginner Guide</span>
+        <span class="card-desc">
+          Step-by-step walkthrough for first-time users. No coding experience
+          needed. Includes screenshots and detailed explanations.
+        </span>
+        <span class="card-time">~30 minutes</span>
+      </a>
+    </div>
+
+    <p class="footer">
+      Both guides deploy the same application for $0/month using
+      Vercel + Render + Neon PostgreSQL
+    </p>
+  </div>
+</body>
+</html>
