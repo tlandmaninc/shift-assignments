@@ -15,6 +15,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  thinking?: string[];
 }
 
 type ConnectionStatus = 'checking' | 'connected' | 'disconnected';
@@ -221,15 +222,15 @@ export default function ChatPage() {
           });
           inputRef.current?.focus();
         },
-        // onToolExecution
+        // onToolExecution — append to thinking instead of content
         (event) => {
+          const thinkingEntry = `Tool: ${event.tool} — ${event.status}`;
           setMessages((prev) => {
             const existing = prev.find((m) => m.id === assistantMsgId);
-            const toolMsg = `\n\n> **Tool:** ${event.tool} — ${event.status}\n`;
             if (existing) {
               return prev.map((m) =>
                 m.id === assistantMsgId
-                  ? { ...m, content: m.content + toolMsg }
+                  ? { ...m, thinking: [...(m.thinking || []), thinkingEntry] }
                   : m
               );
             }
@@ -238,8 +239,32 @@ export default function ChatPage() {
               {
                 id: assistantMsgId,
                 role: 'assistant' as const,
-                content: toolMsg,
+                content: '',
                 timestamp: new Date(),
+                thinking: [thinkingEntry],
+              },
+            ];
+          });
+        },
+        // onThinking
+        (text) => {
+          setMessages((prev) => {
+            const existing = prev.find((m) => m.id === assistantMsgId);
+            if (existing) {
+              return prev.map((m) =>
+                m.id === assistantMsgId
+                  ? { ...m, thinking: [...(m.thinking || []), text] }
+                  : m
+              );
+            }
+            return [
+              ...prev,
+              {
+                id: assistantMsgId,
+                role: 'assistant' as const,
+                content: '',
+                timestamp: new Date(),
+                thinking: [text],
               },
             ];
           });

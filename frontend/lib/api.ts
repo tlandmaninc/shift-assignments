@@ -406,6 +406,7 @@ export const chatApi = {
     onDone: () => void,
     onError: (error: string) => void,
     onToolExecution?: (event: { tool: string; status: string; result?: any }) => void,
+    onThinking?: (text: string) => void,
   ): Promise<void> => {
     const url = `${API_BASE}/chat/stream`;
     const response = await fetch(url, {
@@ -439,6 +440,8 @@ export const chatApi = {
           const data = JSON.parse(line.slice(6));
           if (data.conversation_id) {
             onConversationId(data.conversation_id);
+          } else if (data.thinking && onThinking) {
+            onThinking(data.thinking);
           } else if (data.tool_execution && onToolExecution) {
             onToolExecution(data.tool_execution);
           } else if (data.token) {

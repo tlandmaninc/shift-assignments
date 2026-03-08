@@ -164,3 +164,29 @@ class TestBuildToolsPrompt:
     def test_marks_admin_tools(self):
         prompt = build_tools_prompt()
         assert "(admin only)" in prompt
+
+    def test_contains_color_map(self):
+        prompt = build_tools_prompt()
+        assert "purple=#8B5CF6" in prompt
+        assert "blue=#3B82F6" in prompt
+        assert "red=#EF4444" in prompt
+
+    def test_contains_time_conversion_rules(self):
+        prompt = build_tools_prompt()
+        assert "T220000" in prompt
+        assert "T060000" in prompt
+        assert "next_day_end=true" in prompt
+
+    def test_contains_key_label_derivation(self):
+        prompt = build_tools_prompt()
+        assert "night_rounds" in prompt
+        assert "Night Rounds" in prompt
+
+    def test_forbids_asking_for_technical_details(self):
+        prompt = build_tools_prompt()
+        assert "NEVER ask users for hex color codes" in prompt
+        assert "iCal time formats" in prompt
+
+    def test_tool_calls_described_as_internal(self):
+        prompt = build_tools_prompt()
+        assert "INTERNAL" in prompt

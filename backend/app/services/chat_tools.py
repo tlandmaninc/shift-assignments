@@ -112,6 +112,9 @@ def build_tools_prompt() -> str:
         '{"tool": "tool_name", "params": {...}}',
         "```",
         "",
+        "Tool calls are INTERNAL — the user never sees them. Always write a",
+        "human-friendly message BEFORE and AFTER the tool call block.",
+        "",
         "Available tools:",
     ]
     for name, info in CHAT_TOOLS.items():
@@ -119,12 +122,44 @@ def build_tools_prompt() -> str:
         lines.append(f"- **{name}**{admin}: {info['description']}")
     lines.extend([
         "",
-        "IMPORTANT:",
+        "## Conversion Rules (apply these yourself — NEVER ask users for them)",
+        "",
+        "**Color name → hex:** red=#EF4444, orange=#F97316, amber=#F59E0B, "
+        "yellow=#EAB308, lime=#84CC16, green=#22C55E, emerald=#10B981, "
+        "teal=#14B8A6, cyan=#06B6D4, sky=#0EA5E9, blue=#3B82F6, "
+        "indigo=#6366F1, violet=#7C3AED, purple=#8B5CF6, fuchsia=#D946EF, "
+        "pink=#EC4899, rose=#F43F5E",
+        "",
+        "**Time → iCal:** \"10pm\"→T220000, \"6am\"→T060000, \"2:30pm\"→T143000, "
+        "\"midnight\"→T000000, \"noon\"→T120000. If end < start, set next_day_end=true.",
+        "",
+        "**Name → key/label:** \"night rounds\" → key: \"night_rounds\", "
+        "label: \"Night Rounds\". Key is lowercase with underscores; label is Title Case.",
+        "",
+        "**calendar_title:** Default to \"{label} Shift\" if not specified.",
+        "",
+        "## Confirmation Template",
+        "",
+        "After validating, show the user a plain-language summary like:",
+        "  Name: Night Rounds",
+        "  Hours: 10:00 PM – 6:00 AM (overnight)",
+        "  Color: Purple",
+        "  Doctors per shift: 4",
+        "  Days: Weekdays only",
+        "  Max per month: 3",
+        "",
+        "Then ask: \"Shall I create this shift type?\"",
+        "",
+        "## IMPORTANT Rules",
         "- Only use tools when the user explicitly asks to create, modify, "
         "or inspect shift types.",
         "- Always validate before creating. Always confirm with the user "
         "before creating.",
         "- For general questions about shifts, answer from the data context.",
+        "- NEVER ask users for hex color codes, iCal time formats, or "
+        "internal field names. Convert them yourself using the rules above.",
+        "- If validation fails, fix the issue silently or ask in plain "
+        "language (e.g. \"What color would you like?\" not \"provide a hex code\").",
     ])
     return "\n".join(lines)
 

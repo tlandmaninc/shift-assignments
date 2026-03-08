@@ -9,6 +9,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  thinking?: string[];
 }
 
 interface MessageBubbleProps {
@@ -53,6 +54,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-tl-sm'
         )}
       >
+        {!isUser && message.thinking && message.thinking.length > 0 && (
+          <details className="mb-2 text-xs">
+            <summary className="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
+              Thinking
+            </summary>
+            <div className="mt-1 p-2 rounded bg-gray-800/50 text-gray-400 font-mono text-[11px] whitespace-pre-wrap max-h-40 overflow-y-auto">
+              {message.thinking.map((t, i) => <div key={i}>{t}</div>)}
+            </div>
+          </details>
+        )}
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
         <span
           className={cn(
