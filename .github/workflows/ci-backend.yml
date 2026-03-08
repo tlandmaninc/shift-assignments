@@ -55,11 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment:
+      name: development-backend
+      url: https://shift-assignments-backend-dev.onrender.com/health
     steps:
       - name: Trigger Render dev deploy
-        run: |
-          curl -s "${{ secrets.RENDER_DEPLOY_HOOK_DEV }}"
-          echo "::notice::Dev backend → https://shift-assignments-backend-dev.onrender.com/health"
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_DEV }}"
 
       - name: Dev deployment summary
         run: |
@@ -81,12 +82,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-dev]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    environment: production-backend
+    environment:
+      name: production-backend
+      url: https://shift-assignments-backend-prod.onrender.com/health
     steps:
       - name: Trigger Render prod deploy
-        run: |
-          curl -s "${{ secrets.RENDER_DEPLOY_HOOK_PROD }}"
-          echo "::notice::Prod backend → https://shift-assignments-backend-prod.onrender.com/health"
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_PROD }}"
 
       - name: Deployment summary
         run: |

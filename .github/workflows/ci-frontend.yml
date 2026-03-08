@@ -44,11 +44,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment:
+      name: development-frontend
+      url: https://shift-assignments-frontend-dev.vercel.app
     steps:
       - name: Trigger Vercel dev deploy
-        run: |
-          curl -s "${{ secrets.VERCEL_DEPLOY_HOOK_DEV }}"
-          echo "::notice::Dev frontend → https://shift-assignments-frontend-dev.vercel.app"
+        run: curl -s "${{ secrets.VERCEL_DEPLOY_HOOK_DEV }}"
 
       - name: Dev deployment summary
         run: |
@@ -70,12 +71,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-dev]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    environment: production-frontend
+    environment:
+      name: production-frontend
+      url: https://shift-assignments.vercel.app
     steps:
       - name: Trigger Vercel prod deploy
-        run: |
-          curl -s "${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}"
-          echo "::notice::Prod frontend → https://shift-assignments.vercel.app"
+        run: curl -s "${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}"
 
       - name: Deployment summary
         run: |
