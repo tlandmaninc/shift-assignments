@@ -8,6 +8,7 @@ Supports:
 """
 
 import json
+import logging
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Optional
@@ -22,6 +23,8 @@ from .chat_tools import (
     MAX_TOOL_ITERATIONS,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ChatService:
     """Service for handling AI chat interactions with multiple provider support."""
@@ -29,6 +32,7 @@ class ChatService:
     def __init__(self, storage: Storage):
         self.storage = storage
         self._provider: Optional[AIProvider] = None
+        self._fallback_providers: Optional[list[AIProvider]] = None
 
     @property
     def provider(self) -> AIProvider:
@@ -51,9 +55,39 @@ class ChatService:
             )
         return self._provider
 
+    def _get_fallback_providers(self) -> list[AIProvider]:
+        """Build list of fallback providers that have API keys configured."""
+        if self._fallback_providers is not None:
+            return self._fallback_providers
+
+        primary = settings.ai_provider.lower()
+        fallbacks: list[AIProvider] = []
+
+        # Only add providers that have an API key and aren't the primary
+        candidates = [
+            ("groq", settings.groq_api_key, settings.groq_model),
+            ("openrouter", settings.openrouter_api_key, settings.openrouter_model),
+            ("together", settings.together_api_key, settings.together_model),
+        ]
+        for ptype, key, model in candidates:
+            if ptype != primary and key:
+                fallbacks.append(get_ai_provider(
+                    provider_type=ptype,
+                    groq_api_key=settings.groq_api_key,
+                    groq_model=settings.groq_model,
+                    openrouter_api_key=settings.openrouter_api_key,
+                    openrouter_model=settings.openrouter_model,
+                    together_api_key=settings.together_api_key,
+                    together_model=settings.together_model,
+                ))
+
+        self._fallback_providers = fallbacks
+        return fallbacks
+
     def reset_provider(self):
         """Reset provider to pick up config changes."""
         self._provider = None
+        self._fallback_providers = None
 
     def _format_employees(self, employees: list[dict]) -> str:
         """Format employee data for context."""
@@ -348,11 +382,7 @@ Assignment rules:
         tool_events: list[dict] = []
 
         for _ in range(MAX_TOOL_ITERATIONS):
-            result = await self.provider.chat(
-                messages=messages,
-                system_prompt=system_prompt,
-                max_tokens=2048,
-            )
+            result = await self._chat_with_fallback(messages, system_prompt)
 
             if not result.success:
                 return result.content or result.error or "AI error", tool_events
@@ -385,6 +415,36 @@ Assignment rules:
 
         # Safety cap reached
         return "I've completed the available actions.", tool_events
+
+    async def _chat_with_fallback(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+    ) -> "AIResponse":
+        """Call provider.chat() with automatic fallback on quota errors."""
+        result = await self.provider.chat(
+            messages=messages,
+            system_prompt=system_prompt,
+            max_tokens=2048,
+        )
+        if result.success:
+            return result
+
+        is_quota = "rate-limited" in (result.error or "").lower() or "429" in (result.error or "")
+        if not is_quota:
+            return result
+
+        for fb in self._get_fallback_providers():
+            logger.info("chat() falling back to %s", fb.provider_name)
+            fb_result = await fb.chat(
+                messages=messages,
+                system_prompt=system_prompt,
+                max_tokens=2048,
+            )
+            if fb_result.success:
+                return fb_result
+
+        return result  # Return original error if no fallback worked
 
     async def chat(
         self,
@@ -429,15 +489,38 @@ Assignment rules:
         system_prompt = self._build_system_prompt(context, user)
         messages = self._build_messages(message, conversation_history)
 
-        # Stream the first response from the provider
-        first_response = ""
-        async for chunk in self.provider.stream_chat(
-            messages=messages,
-            system_prompt=system_prompt,
-            max_tokens=2048,
-        ):
-            first_response += chunk
-            yield chunk
+        # Try primary provider, fall back on quota errors
+        active_provider = self.provider
+        try:
+            first_response = ""
+            async for chunk in active_provider.stream_chat(
+                messages=messages,
+                system_prompt=system_prompt,
+                max_tokens=2048,
+            ):
+                first_response += chunk
+                yield chunk
+        except RuntimeError as e:
+            if "rate-limited" not in str(e).lower() and "429" not in str(e):
+                raise
+            # Try fallback providers
+            for fb in self._get_fallback_providers():
+                try:
+                    logger.info("Falling back to %s", fb.provider_name)
+                    first_response = ""
+                    async for chunk in fb.stream_chat(
+                        messages=messages,
+                        system_prompt=system_prompt,
+                        max_tokens=2048,
+                    ):
+                        first_response += chunk
+                        yield chunk
+                    active_provider = fb
+                    break
+                except Exception:
+                    continue
+            else:
+                raise  # No fallback worked
 
         # Check if the streamed response contains tool calls
         tool_calls = parse_tool_calls(first_response)
@@ -464,7 +547,7 @@ Assignment rules:
 
         # Get follow-up response (may contain more tool calls — loop up to cap)
         for _ in range(MAX_TOOL_ITERATIONS - 1):
-            result = await self.provider.chat(
+            result = await active_provider.chat(
                 messages=messages,
                 system_prompt=system_prompt,
                 max_tokens=2048,
