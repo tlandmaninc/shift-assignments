@@ -164,39 +164,94 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
           <RotateCcw className="w-3 h-3" />
         </button>
       )}
-      {/* Custom range popover */}
+      {/* Custom range calendar popover */}
       <AnimatePresence>
-        {popoverOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.1 }}
-            className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 flex items-center gap-2"
-          >
-            <select
-              value={customRange.from || ''}
-              onChange={(e) => onCustomChange({ ...customRange, from: e.target.value || null })}
-              className="px-2 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500"
+        {popoverOpen && (() => {
+          // Group months by year
+          const byYear: Record<string, string[]> = {};
+          for (const m of availableMonths) {
+            const yr = m.split('-')[0];
+            (byYear[yr] ??= []).push(m);
+          }
+          const years = Object.keys(byYear).sort();
+          const isFrom = (m: string) => customRange.from === m;
+          const isTo = (m: string) => customRange.to === m;
+          const inRange = (m: string) => {
+            if (!customRange.from && !customRange.to) return false;
+            if (customRange.from && m < customRange.from) return false;
+            if (customRange.to && m > customRange.to) return false;
+            return true;
+          };
+
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.1 }}
+              className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 min-w-[240px]"
             >
-              <option value="">From</option>
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>{formatMonthYear(m)}</option>
-              ))}
-            </select>
-            <span className="text-slate-400 text-xs">–</span>
-            <select
-              value={customRange.to || ''}
-              onChange={(e) => onCustomChange({ ...customRange, to: e.target.value || null })}
-              className="px-2 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Latest</option>
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>{formatMonthYear(m)}</option>
-              ))}
-            </select>
-          </motion.div>
-        )}
+              {/* Header with range display */}
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Select range</span>
+                {(customRange.from || customRange.to) && (
+                  <button
+                    onClick={() => onCustomChange({ from: null, to: null })}
+                    className="text-[10px] text-primary-500 hover:text-primary-400 font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {/* Active range indicator */}
+              {(customRange.from || customRange.to) && (
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 px-0.5">
+                  {customRange.from ? formatMonthYear(customRange.from) : 'Start'} – {customRange.to ? formatMonthYear(customRange.to) : 'Latest'}
+                </div>
+              )}
+              {/* Month grid by year */}
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {years.map((yr) => (
+                  <div key={yr}>
+                    <div className="text-[10px] font-semibold text-slate-400 mb-1 px-0.5">{yr}</div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {byYear[yr].map((m) => {
+                        const mo = new Date(parseInt(m.split('-')[0]), parseInt(m.split('-')[1]) - 1)
+                          .toLocaleDateString('en-US', { month: 'short' });
+                        const selected = isFrom(m) || isTo(m);
+                        const between = inRange(m) && !selected;
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => {
+                              if (!customRange.from || (customRange.from && customRange.to)) {
+                                onCustomChange({ from: m, to: null });
+                              } else if (m < customRange.from) {
+                                onCustomChange({ from: m, to: customRange.from });
+                              } else {
+                                onCustomChange({ ...customRange, to: m });
+                              }
+                            }}
+                            className={cn(
+                              'px-1.5 py-1 rounded-md text-[11px] font-medium transition-all',
+                              selected
+                                ? 'bg-primary-500 text-white shadow-sm'
+                                : between
+                                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            )}
+                          >
+                            {mo}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );
