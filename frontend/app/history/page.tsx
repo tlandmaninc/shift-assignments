@@ -61,6 +61,15 @@ const CHART_COLORS = [
 
 type ChartView = 'trends' | 'monthly' | 'distribution' | 'heatmap';
 type SortOption = 'shifts-desc' | 'shifts-asc' | 'name-asc' | 'name-desc';
+type TimePreset = 'all' | '3m' | '6m' | '1y' | 'custom';
+
+const TIME_PRESETS: { id: TimePreset; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: '3m', label: '3M' },
+  { id: '6m', label: '6M' },
+  { id: '1y', label: '1Y' },
+  { id: 'custom', label: 'Custom' },
+];
 
 // Shared chart tooltip container classes
 const TOOLTIP_BOX = 'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[280px]';
@@ -291,6 +300,8 @@ export default function HistoryPage() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [selectedShiftType, setSelectedShiftType] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
+  const [timePreset, setTimePreset] = useState<TimePreset>('all');
+  const [showCustomRange, setShowCustomRange] = useState(false);
   const [sunburstDrill, setSunburstDrill] = useState<string | null>(null); // null = top level, string = drilled type key
 
   // Available months for date range picker (sorted)
@@ -300,6 +311,26 @@ export default function HistoryPage() {
       .map((m: any) => m.month_year)
       .sort();
   }, [monthlyData]);
+
+  // Apply time preset to date range
+  const applyTimePreset = useCallback((preset: TimePreset) => {
+    setTimePreset(preset);
+    if (preset === 'all') {
+      setDateRange({ from: null, to: null });
+      setShowCustomRange(false);
+    } else if (preset === 'custom') {
+      setShowCustomRange(true);
+    } else {
+      setShowCustomRange(false);
+      if (availableMonths.length === 0) return;
+      const latest = availableMonths[availableMonths.length - 1];
+      const [y, m] = latest.split('-').map(Number);
+      const months = preset === '3m' ? 3 : preset === '6m' ? 6 : 12;
+      const fromDate = new Date(y, m - 1 - (months - 1), 1);
+      const fromStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
+      setDateRange({ from: fromStr, to: null });
+    }
+  }, [availableMonths]);
 
   // Date range filter helper
   const filterByDateRange = useCallback(<T extends Record<string, any>>(data: T[], monthKey = 'month_year'): T[] => {
@@ -667,33 +698,68 @@ export default function HistoryPage() {
           ))}
         </div>
 
-        {/* Date Range Filter */}
+        {/* Time Period Filter */}
         <div className="flex items-center gap-2 flex-wrap">
           <CalendarRange className="w-4 h-4 text-slate-400" />
-          <select
-            value={dateRange.from || ''}
-            onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value || null }))}
-            className="px-2 py-1.5 rounded-lg text-sm bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">From: All</option>
-            {availableMonths.map((m: string) => (
-              <option key={m} value={m}>{formatMonthYear(m)}</option>
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 gap-0.5">
+            {TIME_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => applyTimePreset(preset.id)}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
+                  timePreset === preset.id
+                    ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                )}
+              >
+                {preset.label}
+              </button>
             ))}
-          </select>
-          <span className="text-slate-400 text-sm">–</span>
-          <select
-            value={dateRange.to || ''}
-            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value || null }))}
-            className="px-2 py-1.5 rounded-lg text-sm bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0 outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">To: All</option>
-            {availableMonths.map((m: string) => (
-              <option key={m} value={m}>{formatMonthYear(m)}</option>
-            ))}
-          </select>
+          </div>
+          {/* Custom range selects */}
+          <AnimatePresence>
+            {showCustomRange && (
+              <motion.div
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center gap-2 overflow-hidden"
+              >
+                <select
+                  value={dateRange.from || ''}
+                  onChange={(e) => {
+                    setDateRange(prev => ({ ...prev, from: e.target.value || null }));
+                    setTimePreset('custom');
+                  }}
+                  className="px-2 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">From</option>
+                  {availableMonths.map((m: string) => (
+                    <option key={m} value={m}>{formatMonthYear(m)}</option>
+                  ))}
+                </select>
+                <span className="text-slate-400 text-xs">to</span>
+                <select
+                  value={dateRange.to || ''}
+                  onChange={(e) => {
+                    setDateRange(prev => ({ ...prev, to: e.target.value || null }));
+                    setTimePreset('custom');
+                  }}
+                  className="px-2 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">Latest</option>
+                  {availableMonths.map((m: string) => (
+                    <option key={m} value={m}>{formatMonthYear(m)}</option>
+                  ))}
+                </select>
+              </motion.div>
+            )}
+          </AnimatePresence>
           {(dateRange.from || dateRange.to) && (
             <button
-              onClick={() => setDateRange({ from: null, to: null })}
+              onClick={() => applyTimePreset('all')}
               className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
               title="Reset date range"
             >
@@ -939,7 +1005,7 @@ export default function HistoryPage() {
           />
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 56 }}>
+              <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 12 }} className="text-slate-500" />
                 <YAxis
@@ -1019,7 +1085,7 @@ export default function HistoryPage() {
           />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={fairnessTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={fairnessTrendData} margin={{ top: 10, right: 40, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="fairnessGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -1027,14 +1093,29 @@ export default function HistoryPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-slate-500" />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="text-slate-500" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11 }}
+                  angle={fairnessTrendData.length > 8 ? -35 : 0}
+                  textAnchor={fairnessTrendData.length > 8 ? 'end' : 'middle'}
+                  height={fairnessTrendData.length > 8 ? 50 : 30}
+                  className="text-slate-500"
+                />
+                <YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 11 }} className="text-slate-500" />
+                <YAxis
+                  yAxisId="gap"
+                  orientation="right"
+                  tick={{ fontSize: 10 }}
+                  className="text-slate-400"
+                  label={{ value: 'Gap', angle: 90, position: 'insideRight', offset: -4, style: { fontSize: 10, fill: '#94a3b8' } }}
+                />
                 <Tooltip content={<FairnessOverTimeTooltip />} />
-                <ReferenceArea y1={80} y2={100} fill="#22c55e" fillOpacity={0.06} />
-                <ReferenceArea y1={60} y2={80} fill="#f59e0b" fillOpacity={0.06} />
-                <ReferenceArea y1={0} y2={60} fill="#ef4444" fillOpacity={0.06} />
-                <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="4 4" strokeWidth={1} />
+                <ReferenceArea yAxisId="score" y1={80} y2={100} fill="#22c55e" fillOpacity={0.06} />
+                <ReferenceArea yAxisId="score" y1={60} y2={80} fill="#f59e0b" fillOpacity={0.06} />
+                <ReferenceArea yAxisId="score" y1={0} y2={60} fill="#ef4444" fillOpacity={0.06} />
+                <ReferenceLine yAxisId="score" y={80} stroke="#22c55e" strokeDasharray="4 4" strokeWidth={1} />
                 <Area
+                  yAxisId="score"
                   type="monotone"
                   dataKey="fairness"
                   stroke="#22c55e"
@@ -1044,6 +1125,7 @@ export default function HistoryPage() {
                   activeDot={{ r: 6, strokeWidth: 2, stroke: '#22c55e', fill: 'white' }}
                 />
                 <Line
+                  yAxisId="gap"
                   type="monotone"
                   dataKey="gap"
                   stroke="#8b5cf6"
@@ -1164,7 +1246,10 @@ export default function HistoryPage() {
                       <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
                       <XAxis
                         dataKey="month"
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 11 }}
+                        angle={trendsChartData.length > 8 ? -35 : 0}
+                        textAnchor={trendsChartData.length > 8 ? 'end' : 'middle'}
+                        height={trendsChartData.length > 8 ? 50 : 30}
                         className="text-slate-500"
                       />
                       <YAxis
@@ -1246,8 +1331,10 @@ export default function HistoryPage() {
                         <XAxis
                           dataKey="month"
                           tick={{ fontSize: 10 }}
+                          angle={monthlyChartData.length > 8 ? -35 : 0}
+                          textAnchor={monthlyChartData.length > 8 ? 'end' : 'middle'}
                           tickFormatter={(v: string) => v.split(' ')[0]}
-                          label={{ value: 'Month', position: 'insideBottom', offset: -14, style: { fontSize: 11, fill: '#94a3b8' } }}
+                          height={monthlyChartData.length > 8 ? 45 : 30}
                         />
                         <YAxis
                           allowDecimals={false}
