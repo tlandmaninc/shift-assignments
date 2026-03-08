@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Assignment - User Guide</title>
+<style>
+  :root {
+    --primary: #3b82f6;
+    --primary-light: #dbeafe;
+    --primary-dark: #1e40af;
+    --success: #22c55e;
+    --success-light: #dcfce7;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --info: #06b6d4;
+    --info-light: #cffafe;
+    --purple: #8b5cf6;
+    --purple-light: #ede9fe;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --sidebar-bg: #0f172a;
+    --sidebar-text: #94a3b8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+
+  /* ── Icons ── */
+  .ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    flex-shrink: 0;
+  }
+  .ic svg { width: 100%; height: 100%; }
+  .ic-lg { width: 32px; height: 32px; }
+  .ic-sm { width: 18px; height: 18px; }
+
+  /* ── Screenshots ── */
+  .screenshot {
+    margin: 24px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
+  }
+  .screenshot img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .screenshot-caption {
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    padding: 10px 16px;
+    font-size: 0.82rem;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+  @media print {
+    .screenshot { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+    color: white;
+    padding: 60px 24px 50px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle at 30% 70%, rgba(59,130,246,0.15) 0%, transparent 50%),
+                radial-gradient(circle at 70% 30%, rgba(139,92,246,0.1) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 12px; position: relative; }
+  .hero p { font-size: 1.15rem; opacity: 0.85; max-width: 600px; margin: 0 auto; position: relative; }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  /* ── Navigation ── */
+  .toc-bar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    position: sticky;
+    top: 0; z-index: 100;
+    overflow-x: auto;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .toc-bar-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    gap: 4px;
+    padding: 8px 0;
+  }
+  .toc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .toc-link:hover { background: var(--primary-light); color: var(--primary-dark); }
+  .toc-link svg { width: 16px; height: 16px; }
+
+  /* ── Main Content ── */
+  .content { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 56px; scroll-margin-top: 80px; }
+  .section-header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 20px; padding-bottom: 14px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-icon svg { width: 26px; height: 26px; }
+  .section-header h2 { font-size: 1.6rem; font-weight: 700; }
+  .section-header .subtitle { font-size: 0.9rem; color: var(--text-secondary); font-weight: 400; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h3 {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── Steps ── */
+  .steps { counter-reset: step-counter; list-style: none; padding: 0; }
+  .step {
+    counter-increment: step-counter;
+    position: relative;
+    padding-left: 56px; padding-bottom: 28px;
+    border-left: 2px solid var(--border);
+    margin-left: 20px;
+  }
+  .step:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .step::before {
+    content: counter(step-counter);
+    position: absolute; left: -16px; top: 0;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--primary); color: white;
+    font-size: 0.85rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step h4 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .step p { color: var(--text-secondary); font-size: 0.95rem; }
+
+  /* ── Callout boxes ── */
+  .callout {
+    border-radius: 10px; padding: 14px 18px; margin: 14px 0;
+    display: flex; gap: 12px; align-items: flex-start; font-size: 0.92rem;
+  }
+  .callout svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; }
+  .callout-tip { background: var(--success-light); border-left: 4px solid var(--success); }
+  .callout-warn { background: var(--warning-light); border-left: 4px solid var(--warning); }
+  .callout-info { background: var(--info-light); border-left: 4px solid var(--info); }
+  .callout-admin { background: var(--purple-light); border-left: 4px solid var(--purple); }
+
+  /* ── Feature grid ── */
+  .feature-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px; margin: 16px 0;
+  }
+  .feature-item {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; transition: box-shadow 0.2s;
+  }
+  .feature-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  .feature-item .fi-icon { margin-bottom: 8px; }
+  .feature-item .fi-icon svg { width: 28px; height: 28px; }
+  .feature-item h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+  .feature-item p { font-size: 0.85rem; color: var(--text-secondary); }
+
+  kbd {
+    background: #f1f5f9; border: 1px solid #cbd5e1;
+    border-radius: 4px; padding: 2px 6px;
+    font-size: 0.82rem; font-family: inherit;
+  }
+
+  .role-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .role-admin { background: var(--purple-light); color: var(--purple); }
+  .role-all { background: var(--success-light); color: #15803d; }
+
+  .diagram-container {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 30px 20px; margin: 20px 0;
+    text-align: center; overflow-x: auto;
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 1.8rem; }
+    .content { padding: 24px 16px 60px; }
+    .section-header h2 { font-size: 1.3rem; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .step { padding-left: 44px; }
+  }
+  @media print {
+    .toc-bar { display: none; }
+    .hero { padding: 30px 20px; }
+    .section { page-break-inside: avoid; }
+    .card { box-shadow: none; border: 1px solid #ddd; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+<!-- ═══ SVG Icon Definitions (hidden) ═══ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+  </symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+  </symbol>
+  <symbol id="i-layout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+  </symbol>
+  <symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+  </symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+  </symbol>
+  <symbol id="i-bar-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>
+  </symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+  </symbol>
+  <symbol id="i-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+  </symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </symbol>
+  <symbol id="i-lightbulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14"/>
+  </symbol>
+  <symbol id="i-alert-tri" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+  </symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  </symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+  </symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+  </symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+  </symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="3" x2="12" y2="21"/><polyline points="1 12 5 8 9 12"/><polyline points="15 12 19 8 23 12"/><line x1="1" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="23" y2="12"/>
+  </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+  </symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+  </symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+  </symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+  </symbol>
+  <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+  </symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </symbol>
+  <symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 00-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 012-3.95A12.88 12.88 0 0122 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 01-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+  </symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+  </symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>
+  </symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+  </symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+  </symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+  </symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+  </symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 20h20"/><path d="M3.5 16L2 6l5.5 4L12 4l4.5 6L22 6l-1.5 10z"/>
+  </symbol>
+  <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+  </symbol>
+  <symbol id="i-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+  </symbol>
+</svg>
+
+<!-- ════════════════════════════════════════════════════ HERO ══ -->
+<div class="hero">
+  <div class="hero-badge">User Guide v1.0</div>
+  <h1>Shift Assignment</h1>
+  <p>A complete guide to every page and feature in the Psychiatry Department shift management platform.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════ TOC ══ -->
+<nav class="toc-bar">
+  <div class="toc-bar-inner">
+    <a href="#overview" class="toc-link"><svg><use href="#i-home"/></svg> Overview</a>
+    <a href="#login" class="toc-link"><svg><use href="#i-lock"/></svg> Login</a>
+    <a href="#dashboard" class="toc-link"><svg><use href="#i-layout"/></svg> Dashboard</a>
+    <a href="#forms" class="toc-link"><svg><use href="#i-file-text"/></svg> Forms</a>
+    <a href="#assignments" class="toc-link"><svg><use href="#i-calendar"/></svg> Assignments</a>
+    <a href="#employees" class="toc-link"><svg><use href="#i-users"/></svg> Employees</a>
+    <a href="#history" class="toc-link"><svg><use href="#i-bar-chart"/></svg> History</a>
+    <a href="#exchange" class="toc-link"><svg><use href="#i-refresh"/></svg> Exchange</a>
+    <a href="#chat" class="toc-link"><svg><use href="#i-message"/></svg> Chat</a>
+    <a href="#profile" class="toc-link"><svg><use href="#i-user"/></svg> Profile</a>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════ CONTENT ══ -->
+<div class="content">
+
+<!-- ─── OVERVIEW ─── -->
+<section class="section" id="overview">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--primary-light);color:var(--primary)"><svg><use href="#i-home"/></svg></div>
+    <div><h2>App Overview</h2><div class="subtitle">How the app is organized and who can access what</div></div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-target"/></svg> What This App Does</h3>
+    <p>The Shift Assignment platform helps the Psychiatry Department manage shift scheduling fairly and efficiently. It covers the entire workflow:</p>
+    <div class="feature-grid" style="margin-top:16px">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-file-text"/></svg></div>
+        <h4>Collect Availability</h4>
+        <p>Create Google Forms to gather employee availability for each month.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--purple)"><use href="#i-cpu"/></svg></div>
+        <h4>Generate Assignments</h4>
+        <p>AI-powered algorithm assigns shifts fairly based on constraints and history.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-bar-chart"/></svg></div>
+        <h4>Track Fairness</h4>
+        <p>Analytics dashboard shows shift distribution, trends, and fairness scores.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--warning)"><use href="#i-refresh"/></svg></div>
+        <h4>Exchange Shifts</h4>
+        <p>Employees can request shift swaps with real-time notifications.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--info)"><use href="#i-message"/></svg></div>
+        <h4>Ask the AI</h4>
+        <p>Chat assistant answers questions about schedules, assignments, and fairness.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--danger)"><use href="#i-calendar"/></svg></div>
+        <h4>Calendar Export</h4>
+        <p>Add shifts to Google Calendar with a single click from your profile.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-users"/></svg> User Roles</h3>
+    <p>There are two roles in the app. Your role is determined by your email address:</p>
+    <div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:240px;background:var(--purple-light);border-radius:12px;padding:18px">
+        <strong style="color:var(--purple);display:flex;align-items:center;gap:6px"><svg class="ic" style="color:var(--purple)"><use href="#i-crown"/></svg> Admin</strong>
+        <p style="font-size:0.9rem;margin-top:6px;color:var(--text-secondary)">Full access to all pages. Can create forms, generate assignments, manage employees, view analytics, and control page visibility for other users.</p>
+      </div>
+      <div style="flex:1;min-width:240px;background:var(--success-light);border-radius:12px;padding:18px">
+        <strong style="color:#15803d;display:flex;align-items:center;gap:6px"><svg class="ic" style="color:#15803d"><use href="#i-user"/></svg> Employee</strong>
+        <p style="font-size:0.9rem;margin-top:6px;color:var(--text-secondary)">Access to Dashboard, Profile, Shift Exchange, Chat, and History (if enabled by admin). Can view their own shifts and request exchanges.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-layout"/></svg> Navigation</h3>
+    <p>The app has a collapsible sidebar on the left and a top header bar:</p>
+    <ul style="margin-top:10px;padding-left:20px;color:var(--text-secondary);font-size:0.95rem">
+      <li><strong>Sidebar</strong> &mdash; Click the arrow at the bottom to collapse/expand. Shows all pages you have access to.</li>
+      <li><strong>Header</strong> &mdash; Shows the banner, your avatar, dark mode toggle, and notification bell.</li>
+      <li><strong>Notifications</strong> &mdash; Click the bell icon to see recent updates like published shifts or exchange requests.</li>
+      <li><strong>Dark Mode</strong> &mdash; Click the sun/moon icon in the header to toggle between light and dark themes.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─── LOGIN ─── -->
+<section class="section" id="login">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--info-light);color:var(--info)"><svg><use href="#i-lock"/></svg></div>
+    <div><h2>Login</h2><div class="subtitle">How to sign in to your account</div></div>
+  </div>
+
+  <div class="screenshot">
+    <img src="screenshots/login.png" alt="Login page with Google and Phone sign-in options" loading="lazy">
+    <div class="screenshot-caption">Login page &mdash; Choose Google or Phone sign-in</div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-shield"/></svg> Two Ways to Sign In</h3>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-globe"/></svg></div>
+        <h4>Google Sign-In</h4>
+        <p>Click <strong>"Sign in with Google"</strong> and choose your Google account. This is the fastest method &mdash; one click and you're in.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-phone"/></svg></div>
+        <h4>Phone Number</h4>
+        <p>Click <strong>"Sign in with Phone Number"</strong>, enter your Clalit email (<code>@clalit.org.il</code>) and Israeli phone number, then verify the SMS code.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-phone"/></svg> Phone Login Steps</h3>
+    <ol class="steps">
+      <li class="step">
+        <h4>Enter Your Details</h4>
+        <p>Type your <strong>Clalit email</strong> (must end in <code>@clalit.org.il</code>) and your <strong>phone number</strong> in the format <code>05X-XXX-XXXX</code>.</p>
+      </li>
+      <li class="step">
+        <h4>Receive SMS Code</h4>
+        <p>Click <strong>"Send Code"</strong>. You'll receive a 6-digit verification code via SMS within a few seconds.</p>
+      </li>
+      <li class="step">
+        <h4>Enter the Code</h4>
+        <p>Type the 6-digit code and click <strong>"Verify Code"</strong>. If the code expired, click <strong>"Resend Code"</strong> (available after 60 seconds).</p>
+      </li>
+    </ol>
+    <div class="callout callout-tip">
+      <svg><use href="#i-lightbulb"/></svg>
+      <div>If you see "rate limited", wait a minute and try again. The system allows a limited number of SMS codes per minute.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── DASHBOARD ─── -->
+<section class="section" id="dashboard">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--primary-light);color:var(--primary)"><svg><use href="#i-layout"/></svg></div>
+    <div><h2>Dashboard</h2><div class="subtitle">Your home screen with KPIs and quick actions</div></div>
+  </div>
+  <span class="role-badge role-all">All Users</span>
+
+  <div class="screenshot">
+    <img src="screenshots/dashboard.png" alt="Dashboard with KPI cards, Quick Actions, and Recent Forms" loading="lazy">
+    <div class="screenshot-caption">Dashboard &mdash; KPI overview, Quick Actions, and Recent Forms</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-bar-chart"/></svg> KPI Cards</h3>
+    <p>At the top you'll see four summary cards:</p>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--purple)"><use href="#i-users"/></svg></div>
+        <h4>Total Employees</h4><p>Number of active employees in the system.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-calendar"/></svg></div>
+        <h4>Total Shifts</h4><p>Total shifts assigned across all months.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-file-text"/></svg></div>
+        <h4>Active Forms</h4><p>Forms currently open for responses.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--warning)"><use href="#i-scale"/></svg></div>
+        <h4>Fairness Score</h4><p>How evenly shifts are distributed (100% = perfectly fair).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-zap"/></svg> Quick Actions</h3>
+    <p>Three shortcut buttons take you directly to the most common tasks:</p>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:8px">
+      <li><strong>Form Generation</strong> &mdash; Jump to creating a new availability form</li>
+      <li><strong>Assign Shifts</strong> &mdash; Go to the assignment wizard</li>
+      <li><strong>View History</strong> &mdash; Open fairness analytics</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-file-text"/></svg> Recent Forms</h3>
+    <p>Shows the last 3 forms with their status: <strong>Active</strong> (collecting responses) or <strong>Processed</strong> (assignments generated).</p>
+  </div>
+
+  <div class="callout callout-admin">
+    <svg><use href="#i-crown"/></svg>
+    <div><strong>Admin Only: Page Access Control</strong><br>At the bottom of the Dashboard, admins can toggle which pages are visible to regular employees. Each page can be set to "All Users" or "Admin Only". Click <strong>"Save Settings"</strong> after making changes.</div>
+  </div>
+</section>
+
+<!-- ─── FORMS ─── -->
+<section class="section" id="forms">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--success-light);color:var(--success)"><svg><use href="#i-file-text"/></svg></div>
+    <div><h2>Form Generation</h2><div class="subtitle">Create and manage monthly availability forms</div></div>
+  </div>
+  <span class="role-badge role-admin">Admin Only</span>
+
+  <div class="screenshot">
+    <img src="screenshots/forms.png" alt="Form Generation page with calendar date picker and settings" loading="lazy">
+    <div class="screenshot-caption">Form Generation &mdash; Calendar date picker, shift type selector, and Google Forms integration</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-calendar"/></svg> How It Works</h3>
+    <p>This page lets you configure which dates to include in the monthly availability form, then generate a Google Form that employees fill out.</p>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-clipboard"/></svg> Step-by-Step Workflow</h3>
+    <ol class="steps">
+      <li class="step">
+        <h4>Choose the Month</h4>
+        <p>Use the left/right arrows above the calendar to navigate to the desired month.</p>
+      </li>
+      <li class="step">
+        <h4>Select Shift Type</h4>
+        <p>In the right panel, choose <strong>ECT</strong>, <strong>Internal</strong>, or <strong>ER</strong>. Each type has different rules (e.g., ECT excludes weekends by default).</p>
+      </li>
+      <li class="step">
+        <h4>Pick Dates</h4>
+        <p>Click individual dates on the calendar to include or exclude them. Fridays and Saturdays are automatically excluded for ECT/Internal. Toggle <strong>"Include Tuesdays"</strong> if needed.</p>
+      </li>
+      <li class="step">
+        <h4>Configure the Form</h4>
+        <p>Click <strong>"Configure Google Form"</strong>. This saves the form settings and shows you the questions that will appear.</p>
+      </li>
+      <li class="step">
+        <h4>Generate Google Form</h4>
+        <p>Click <strong>"Generate Google Form"</strong> to create the actual Google Form. It opens in a new tab for review.</p>
+      </li>
+      <li class="step">
+        <h4>Share with Employees</h4>
+        <p>Copy the <strong>Share Link</strong> and send it to employees via email, WhatsApp, or any channel.</p>
+      </li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-info"/></svg> Calendar Legend</h3>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;font-size:0.9rem">
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:20px;height:20px;border-radius:6px;background:#3b82f6;display:inline-block"></span> Included Date</div>
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:20px;height:20px;border-radius:6px;background:#f1f5f9;border:1px solid #cbd5e1;display:inline-block"></span> Excluded / Weekend</div>
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:20px;height:20px;border-radius:6px;background:#fef3c7;border:1px solid #f59e0b;display:inline-block"></span> Tuesday (togglable)</div>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <svg><use href="#i-info"/></svg>
+    <div><strong>Google Connection Required</strong><br>The green/red indicator in the settings panel shows whether you're connected to Google. If disconnected, log out and log back in with Google to reconnect.</div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-trash"/></svg> Managing Forms</h3>
+    <p>Below the calendar, you'll see existing forms. Each shows title, status badge, date count, and a delete button.</p>
+    <div class="callout callout-warn">
+      <svg><use href="#i-alert-tri"/></svg>
+      <div>Deleting a form is permanent. If assignments were already generated, the assignments are kept but the form configuration is removed.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── ASSIGNMENTS ─── -->
+<section class="section" id="assignments">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--warning-light);color:var(--warning)"><svg><use href="#i-calendar"/></svg></div>
+    <div><h2>Shift Assignments</h2><div class="subtitle">Run the scheduler and publish shifts</div></div>
+  </div>
+  <span class="role-badge role-admin">Admin Only</span>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-rocket"/></svg> The Assignment Wizard (4 Steps)</h3>
+    <p>A guided process to go from employee responses to published shifts. A progress bar at the top tracks your current step with numbered circles and checkmarks.</p>
+  </div>
+
+  <div class="card">
+    <h3>Step 1: Select a Form</h3>
+    <p>Choose the month to assign shifts for. Each form card shows the title, shift type badge (e.g., ECT), date count, and status. Click a card to proceed.</p>
+    <div class="screenshot">
+      <img src="screenshots/assignments-step1.png" alt="Step 1 — Select Form showing March 2026 ECT Shift Assignment card with active status and 19 dates" loading="lazy">
+      <div class="screenshot-caption">Step 1 &mdash; Select a form. The March 2026 ECT form shows as "active" with 19 scheduled dates.</div>
+    </div>
+    <div class="callout callout-tip">
+      <svg><use href="#i-lightbulb"/></svg>
+      <div>Only forms with status <strong>"Active"</strong> can be used for new assignments. Already-processed forms show as "Processed" and are greyed out.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Step 2: Import Employee Availability</h3>
+    <p>Choose how to get the employee data:</p>
+    <div class="screenshot">
+      <img src="screenshots/assignments-step2.png" alt="Step 2 — Import options showing Paste CSV Data and Fetch from Google Forms" loading="lazy">
+      <div class="screenshot-caption">Step 2 &mdash; Two import methods: paste CSV from Google Sheets, or fetch directly from a linked Google Form.</div>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-clipboard"/></svg></div>
+        <h4>Fetch from Google Forms</h4>
+        <p>If a Google Form is linked, click <strong>"Fetch from Google Forms"</strong>. The app reads all submissions automatically via the Google API.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-file-text"/></svg></div>
+        <h4>Paste CSV Data</h4>
+        <p>Open your Google Form responses in Google Sheets, select all data (Ctrl+A), copy (Ctrl+C), and paste into the text area. The parser auto-detects employee names, dates, and availability.</p>
+      </div>
+    </div>
+    <div class="screenshot">
+      <img src="screenshots/assignments-step2-csv.png" alt="Step 2 — CSV data pasted in the text area showing employee availability rows" loading="lazy">
+      <div class="screenshot-caption">CSV data pasted &mdash; 10 employee responses with availability for 19 dates. Click "Parse CSV" to continue.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Step 3: Review &amp; Validate</h3>
+    <p>The app validates the imported data and displays a summary:</p>
+    <div class="screenshot">
+      <img src="screenshots/assignments-step3.png" alt="Step 3 — Review showing 10 employees with validation passing, each with name, new/experienced badge, and available date count" loading="lazy">
+      <div class="screenshot-caption">Step 3 &mdash; All 10 employees parsed and validated. Green banner confirms data is ready for assignment.</div>
+    </div>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:6px">
+      <li><strong>Validation status</strong> &mdash; green check ("Data is valid and ready for assignment") or red errors to fix</li>
+      <li><strong>Employee cards</strong> &mdash; each card shows the employee name, New/Experienced badge, and count of available dates</li>
+      <li><strong>Warnings</strong> &mdash; non-blocking issues like low availability counts</li>
+    </ul>
+    <p style="margin-top:10px">Click <strong>"Generate Assignments"</strong> to run the scheduling algorithm.</p>
+    <div class="callout callout-info">
+      <svg><use href="#i-cpu"/></svg>
+      <div><strong>How the Algorithm Works</strong><br>The scheduler uses a fairness-first approach with backtracking constraint satisfaction. It considers each employee's total historical shifts, their availability, and hard constraints (max 2 shifts/month, no consecutive days, no same weekday twice, new employees limited to last 2 weeks) to find the most balanced assignment.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Step 4: Results &amp; Publish</h3>
+    <p>After the algorithm runs, you'll see a success banner with the shift type and count, a full calendar preview, and a shift distribution table.</p>
+    <div class="screenshot">
+      <img src="screenshots/assignments-step4.png" alt="Step 4 — Results showing success banner, calendar preview with color-coded ECT shifts for March 2026, and export buttons" loading="lazy">
+      <div class="screenshot-caption">Step 4 &mdash; "Assignments Generated Successfully!" with a color-coded calendar showing all 19 ECT shifts assigned to 10 employees.</div>
+    </div>
+    <p style="margin-top:10px">The <strong>Shift Distribution</strong> table below the calendar shows how shifts are balanced across employees:</p>
+    <div class="screenshot">
+      <img src="screenshots/assignments-step4-distribution.png" alt="Shift Distribution table showing each employee with their shift count and New/Experienced badge" loading="lazy">
+      <div class="screenshot-caption">Shift Distribution &mdash; Each employee's shift count and experience level. Fair distribution: most employees receive 2 shifts.</div>
+    </div>
+    <p style="margin-top:10px">Available actions:</p>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-download"/></svg></div>
+        <h4>Download JSON</h4><p>Export the raw assignment data as a JSON file for further processing.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-printer"/></svg></div>
+        <h4>Download HTML Calendar</h4><p>Save the color-coded calendar as an HTML file for printing or email sharing.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--purple)"><use href="#i-send"/></svg></div>
+        <h4>Publish &amp; Notify</h4><p>Finalize the assignments, update history, and notify each employee of their shift dates with calendar links.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── EMPLOYEES ─── -->
+<section class="section" id="employees">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--purple-light);color:var(--purple)"><svg><use href="#i-users"/></svg></div>
+    <div><h2>Employees</h2><div class="subtitle">Manage the employee roster</div></div>
+  </div>
+  <span class="role-badge role-admin">Admin Only</span>
+
+  <div class="screenshot">
+    <img src="screenshots/employees.png" alt="Employees page with stats cards and employee table" loading="lazy">
+    <div class="screenshot-caption">Employees &mdash; Active roster with status badges, shift counts, and management actions</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-bar-chart"/></svg> Overview Cards</h3>
+    <p>Three cards at the top show: <strong>Active Employees</strong>, <strong>New Employees</strong> (first month), and <strong>Total Shifts Assigned</strong> across all history.</p>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-user"/></svg> Adding an Employee</h3>
+    <ol class="steps">
+      <li class="step"><h4>Click "Add Employee"</h4><p>The button is in the top-right corner of the page.</p></li>
+      <li class="step"><h4>Fill in Details</h4><p>Enter the employee's <strong>name</strong>, <strong>email</strong>, and check <strong>"First month"</strong> if they're new to shifts.</p></li>
+      <li class="step"><h4>Save</h4><p>Click <strong>"Add Employee"</strong> in the modal. They'll appear in the active list.</p></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-users"/></svg> Employee Table</h3>
+    <p>The main table shows all active employees with:</p>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:6px">
+      <li><strong>Name</strong> &mdash; the employee's display name</li>
+      <li><strong>Status</strong> &mdash; "New" (green badge) or "Experienced"</li>
+      <li><strong>Total Shifts</strong> &mdash; cumulative shifts from all months</li>
+      <li><strong>Actions</strong> &mdash; toggle new/experienced, deactivate (trash icon)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-link"/></svg> Duplicate Detection &amp; Merging</h3>
+    <p>Click <strong>"Find Duplicates"</strong> to scan for employees that might be the same person (e.g., Hebrew and English versions of a name). For each pair you'll see both names, similarity percentage, match type, and a <strong>"Merge"</strong> button. Use <strong>"Merge All"</strong> to merge all pairs at once.</p>
+    <div class="callout callout-warn">
+      <svg><use href="#i-alert-tri"/></svg>
+      <div>Merging transfers all shift history from the source to the target employee and deactivates the duplicate. This cannot be undone.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-globe"/></svg> Translate All</h3>
+    <p>Click <strong>"Translate All"</strong> to convert Hebrew employee names to English. A confirmation dialog shows before proceeding. This uses AI translation and also updates all historical records.</p>
+  </div>
+</section>
+
+<!-- ─── HISTORY ─── -->
+<section class="section" id="history">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--success-light);color:var(--success)"><svg><use href="#i-bar-chart"/></svg></div>
+    <div><h2>History &amp; Analytics</h2><div class="subtitle">Fairness tracking, charts, and historical calendars</div></div>
+  </div>
+  <span class="role-badge role-all">All Users (if enabled)</span>
+
+  <div class="screenshot">
+    <img src="screenshots/history.png" alt="History page with fairness score, leaderboards, and gap analysis chart" loading="lazy">
+    <div class="screenshot-caption">History &amp; Analytics &mdash; Fairness score, shift leaderboards, gap analysis, and trend charts</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-target"/></svg> Filters</h3>
+    <p>At the top of the page you can narrow down the data:</p>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:6px">
+      <li><strong>Shift Type</strong> &mdash; buttons for All Types, ECT, Internal, ER</li>
+      <li><strong>Date Range</strong> &mdash; From/To month dropdowns</li>
+      <li><strong>Reset</strong> &mdash; clears date filters back to "all time"</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-scale"/></svg> Fairness Metrics</h3>
+    <p>Five metric cards appear at the top:</p>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-scale"/></svg></div>
+        <h4>Fairness Score</h4><p>0&ndash;100%. Higher is better. Color-coded: green (&gt;80%), yellow (50&ndash;80%), red (&lt;50%). Hover for the formula.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--info)"><use href="#i-bar-chart"/></svg></div>
+        <h4>Average Shifts</h4><p>Mean number of shifts per employee in the selected period.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--warning)"><use href="#i-trending-up"/></svg></div>
+        <h4>Standard Deviation</h4><p>How spread out the shift counts are. Lower = more fair.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--danger)"><use href="#i-arrow-up"/></svg></div>
+        <h4>Most Shifts</h4><p>Top 3 employees with the highest shift counts.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-arrow-down"/></svg></div>
+        <h4>Fewest Shifts</h4><p>Bottom 3 employees with the lowest shift counts.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-trending-up"/></svg> Charts &amp; Visualizations</h3>
+    <p>The Analytics Dashboard includes 6 interactive chart tabs. Click any tab to switch views. Hover any data point for details.</p>
+    <div class="callout callout-tip" style="margin-top:12px">
+      <svg><use href="#i-lightbulb"/></svg>
+      <div>Use the sort dropdown (above charts) to reorder employees by shift count (ascending/descending) or alphabetically.</div>
+    </div>
+  </div>
+
+  <!-- ── Chart 1: Employee Trends ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-trending-up"/></svg> 1. Employee Trends</h3>
+    <p>A <strong>line chart</strong> plotting each employee's cumulative shift count over time. Each employee is a separate colored line.</p>
+    <div class="screenshot" style="margin-top:16px">
+      <img src="screenshots/history-employee-trends.png" alt="Employee Trends line chart showing shift counts per employee over months" loading="lazy">
+      <div class="screenshot-caption">Employee Trends &mdash; Track how each employee's shift load evolves month by month</div>
+    </div>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:10px">
+      <li><strong>X-axis</strong> &mdash; Months (December 2025, January 2026, etc.)</li>
+      <li><strong>Y-axis</strong> &mdash; Number of shifts assigned</li>
+      <li><strong>Lines</strong> &mdash; One line per employee, color-coded. Hover a line to see the exact count.</li>
+      <li><strong>What to look for</strong> &mdash; Lines should rise at similar rates. If one line climbs much faster, that employee is getting more than their fair share.</li>
+    </ul>
+  </div>
+
+  <!-- ── Chart 2: Monthly Overview ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-bar-chart"/></svg> 2. Monthly Overview</h3>
+    <p>A <strong>dual-pane synchronized chart</strong>. The top pane shows stacked bars (ECT, Internal, ER shifts per month) while the bottom pane shows how many employees were active that month.</p>
+    <div class="screenshot" style="margin-top:16px">
+      <img src="screenshots/history-monthly-overview.png" alt="Monthly Overview stacked bar chart with shift counts by type and active employee count" loading="lazy">
+      <div class="screenshot-caption">Monthly Overview &mdash; Stacked bars for shift types with active employee counts below</div>
+    </div>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:10px">
+      <li><strong>Top pane</strong> &mdash; Stacked bar segments colored by shift type. Hover a segment to see the exact count.</li>
+      <li><strong>Bottom pane</strong> &mdash; Bar chart showing how many unique employees received assignments that month.</li>
+      <li><strong>Legend</strong> &mdash; Right side shows shift type colors and the "Active Employees" metric.</li>
+      <li><strong>What to look for</strong> &mdash; A healthy trend has consistent total shifts and a growing or stable employee base.</li>
+    </ul>
+  </div>
+
+  <!-- ── Chart 3: Shift Distribution ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-bar-chart"/></svg> 3. Shift Distribution</h3>
+    <p>A <strong>nested donut chart</strong> showing the breakdown of shifts. The inner ring shows totals per shift type (ECT, Internal, ER). The outer ring drills into individual employees within each type.</p>
+    <div class="screenshot" style="margin-top:16px">
+      <img src="screenshots/history-shift-distribution.png" alt="Shift Distribution donut chart showing inner type ring and outer employee ring" loading="lazy">
+      <div class="screenshot-caption">Shift Distribution &mdash; Inner ring = shift types, outer ring = per-employee breakdown</div>
+    </div>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:10px">
+      <li><strong>Center</strong> &mdash; Shows total shift count across all types.</li>
+      <li><strong>Inner ring</strong> &mdash; One segment per shift type, sized by count. Hover for percentage.</li>
+      <li><strong>Outer ring</strong> &mdash; Click a type segment to drill down and see each employee's contribution.</li>
+      <li><strong>What to look for</strong> &mdash; An even outer ring means shifts are spread fairly. One dominant segment means one employee is assigned disproportionately.</li>
+    </ul>
+  </div>
+
+  <!-- ── Chart 4: Shift Gap Analysis ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-scale"/></svg> 4. Shift Gap Analysis</h3>
+    <p>A <strong>horizontal diverging bar chart</strong> centered on the team average. Bars extending right mean the employee has more shifts than average; bars extending left mean fewer.</p>
+    <div class="screenshot" style="margin-top:16px">
+      <img src="screenshots/history-gap-analysis.png" alt="Shift Gap Analysis diverging bar chart showing deviation from team average" loading="lazy">
+      <div class="screenshot-caption">Gap Analysis &mdash; Green = balanced, blue = over average, orange/red = under average or extreme</div>
+    </div>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:10px">
+      <li><strong>Center line (0)</strong> &mdash; The team average. Values like "+1.4" mean 1.4 shifts above average.</li>
+      <li><strong>Color coding</strong> &mdash; Green (balanced, near zero), Blue (over average), Orange (under average), Red (extreme deviation).</li>
+      <li><strong>What to look for</strong> &mdash; In a perfectly fair system, all bars would be near zero. Long red bars on either side need attention.</li>
+    </ul>
+  </div>
+
+  <!-- ── Chart 5: Fairness Over Time ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-scale"/></svg> 5. Fairness Over Time</h3>
+    <p>A <strong>filled area chart</strong> tracking two metrics month by month: the overall Fairness Score (0&ndash;100%) and the Max-Min Gap (difference between the most and least assigned employees).</p>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:10px">
+      <li><strong>Fairness Score line</strong> &mdash; Higher is better. Green zone (80&ndash;100%), yellow (60&ndash;80%), red (&lt;60%).</li>
+      <li><strong>Max-Min Gap line</strong> &mdash; Lower is better. A rising gap means growing inequality.</li>
+      <li><strong>What to look for</strong> &mdash; The fairness score should stay in the green zone. If it drops into yellow/red, the scheduling algorithm may need adjustment.</li>
+    </ul>
+  </div>
+
+  <!-- ── Chart 6: Heatmap ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-bar-chart"/></svg> 6. Employees Shifts Heatmap</h3>
+    <p>A <strong>color-intensity grid</strong> with employees as rows and months as columns. Darker purple cells mean more shifts that month. Rows are sorted by total shift count (most to fewest).</p>
+    <div class="screenshot" style="margin-top:16px">
+      <img src="screenshots/history-heatmap.png" alt="Employees Shifts Heatmap grid showing shift intensity by employee and month" loading="lazy">
+      <div class="screenshot-caption">Heatmap &mdash; Darker cells indicate more shifts. Dash (–) means zero shifts that month.</div>
+    </div>
+    <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:10px">
+      <li><strong>Color scale</strong> &mdash; Light (0&ndash;1 shifts) to dark purple (2+ shifts). A gradient legend appears at the top.</li>
+      <li><strong>Total column</strong> &mdash; Rightmost column sums all months for each employee.</li>
+      <li><strong>Total row</strong> &mdash; Bottom row sums all employees for each month.</li>
+      <li><strong>What to look for</strong> &mdash; Uniformly medium-shaded cells across all rows = fair distribution. A row of dark cells = overworked employee. A row of dashes = underutilized.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-calendar"/></svg> Monthly Calendar History</h3>
+    <p>Below the charts, each month with assignments is listed. Click a month to open a <strong>calendar popup</strong> showing all shift assignments in a color-coded grid. Use the <strong>Print</strong> button inside the popup to print or save as PDF.</p>
+  </div>
+</section>
+
+<!-- ─── EXCHANGE ─── -->
+<section class="section" id="exchange">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--warning-light);color:var(--warning)"><svg><use href="#i-refresh"/></svg></div>
+    <div><h2>Shift Exchange</h2><div class="subtitle">Request and manage shift swaps</div></div>
+  </div>
+  <span class="role-badge role-all">Employees with linked accounts</span>
+
+  <div class="screenshot">
+    <img src="screenshots/exchange.png" alt="Shift Exchange calendar showing March 2026 shifts with swap tabs" loading="lazy">
+    <div class="screenshot-caption">Shift Exchange &mdash; Monthly calendar view with My Shifts, Incoming, Outgoing, and History tabs</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-refresh"/></svg> How Shift Swaps Work</h3>
+    <p>If you can't make a shift, you can request another employee to take it. The whole process happens in real-time with WebSocket notifications &mdash; no page refresh needed.</p>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-clipboard"/></svg> The Four Tabs</h3>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--primary)"><use href="#i-calendar"/></svg></div>
+        <h4>My Shifts</h4><p>View your assigned shifts for the selected month. Click a shift to initiate a swap request.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--success)"><use href="#i-inbox"/></svg></div>
+        <h4>Incoming</h4><p>Swap requests from other employees asking you to take their shift. Accept or decline with one click. Badge shows count.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--warning)"><use href="#i-send"/></svg></div>
+        <h4>Outgoing</h4><p>Requests you've sent to others. You can cancel pending requests here.</p>
+      </div>
+      <div class="feature-item">
+        <div class="fi-icon"><svg style="color:var(--purple)"><use href="#i-book"/></svg></div>
+        <h4>History</h4><p>Completed and rejected exchange records for reference.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Exchange Flow Step-by-Step ── -->
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-send"/></svg> Step-by-Step Exchange Flow</h3>
+    <p>Here's the complete flow for requesting and completing a shift swap:</p>
+
+    <ol class="steps" style="margin-top:16px">
+      <li class="step">
+        <h4>Step 1: Select your shift &amp; browse candidates</h4>
+        <p>On the <strong>My Shifts</strong> tab, click the shift you want to swap. A <strong>Candidates</strong> panel slides open on the right showing every eligible colleague. Each candidate lists the dates they can offer in return &mdash; click any date pill (e.g. <em>"15 Sun"</em>) to start a swap with that specific date.</p>
+        <div class="screenshot" style="margin-top:12px">
+          <img src="screenshots/exchange-candidates.png" alt="Calendar with March 23 selected and Candidates panel showing 8 eligible employees with date pills" loading="lazy">
+          <div class="screenshot-caption">March 23 selected &mdash; 8 candidates available with their swappable dates</div>
+        </div>
+        <p style="margin-top:8px;color:var(--text-secondary);font-size:0.95rem">The system automatically filters candidates using constraint rules: max 2 shifts per month, max 1 per week, no consecutive days, and form-declared availability. Employees tagged <strong>"New"</strong> are recent hires with limited scheduling windows.</p>
+      </li>
+
+      <li class="step">
+        <h4>Step 2: Confirm the swap details</h4>
+        <p>After clicking a candidate's date, a <strong>Confirm Swap Request</strong> modal appears showing exactly which dates will be exchanged. You can optionally add a reason (e.g. "Family event") before sending.</p>
+        <div class="screenshot" style="margin-top:12px">
+          <img src="screenshots/exchange-confirm.png" alt="Confirm Swap Request modal showing You give Monday March 23 and David Cohen gives Sunday March 15" loading="lazy">
+          <div class="screenshot-caption">Confirm modal &mdash; Review the swap before sending</div>
+        </div>
+        <p style="margin-top:8px;color:var(--text-secondary);font-size:0.95rem">Click <strong>"Send Request"</strong> to submit, or <strong>"Back"</strong> to choose a different candidate. The reason field is optional but helps the other employee understand why you're requesting the swap.</p>
+      </li>
+
+      <li class="step">
+        <h4>Step 3: Track your request (Outgoing tab)</h4>
+        <p>After sending, switch to the <strong>Outgoing</strong> tab to see all your pending requests. Each card shows both sides of the swap &mdash; your shift and theirs &mdash; along with shift type badges (ECT, Internal, ER) and the reason you provided.</p>
+        <div class="screenshot" style="margin-top:12px">
+          <img src="screenshots/exchange-outgoing.png" alt="Outgoing tab with two pending swap requests showing Cancel Request buttons" loading="lazy">
+          <div class="screenshot-caption">Outgoing tab &mdash; Two pending requests with Cancel option</div>
+        </div>
+        <p style="margin-top:8px;color:var(--text-secondary);font-size:0.95rem">You can <strong>cancel</strong> any pending request before the other person responds. The target employee receives a real-time notification via WebSocket.</p>
+      </li>
+
+      <li class="step">
+        <h4>Step 4: Respond to requests (Incoming tab)</h4>
+        <p>When a colleague sends you a swap request, it appears in your <strong>Incoming</strong> tab with their reason. Each request shows the shift details for both sides with color-coded type badges, plus large <strong style="color:var(--success)">Accept</strong> and <strong style="color:var(--danger)">Decline</strong> buttons.</p>
+        <div class="screenshot" style="margin-top:12px">
+          <img src="screenshots/exchange-incoming.png" alt="Incoming tab with two pending requests from Sarah Thompson and Li Zhang, each with Accept and Decline buttons" loading="lazy">
+          <div class="screenshot-caption">Incoming tab &mdash; Accept or Decline swap requests from colleagues</div>
+        </div>
+        <p style="margin-top:8px;color:var(--text-secondary);font-size:0.95rem">The badge count on the tab (<strong>Incoming 2</strong>) shows how many unresolved requests are waiting. Accepting a swap immediately updates the schedule for both employees.</p>
+      </li>
+
+      <li class="step">
+        <h4>Step 5: Review the audit trail (History tab)</h4>
+        <p>Every completed, declined, or cancelled request moves to the <strong>History</strong> tab with a color-coded status badge and timestamp. Declined requests also show the decline reason.</p>
+        <div class="screenshot" style="margin-top:12px">
+          <img src="screenshots/exchange-history.png" alt="History tab showing one Accepted swap and one Declined swap with reason" loading="lazy">
+          <div class="screenshot-caption">History tab &mdash; Full audit trail of all exchange outcomes</div>
+        </div>
+        <ul style="padding-left:20px;color:var(--text-secondary);font-size:0.95rem;margin-top:8px">
+          <li><span style="color:var(--success);font-weight:600">Accepted</span> &mdash; Swap completed, both schedules updated automatically</li>
+          <li><span style="color:var(--danger);font-weight:600">Declined</span> &mdash; The other employee chose not to swap, with their stated reason</li>
+          <li><span style="color:var(--text-secondary);font-weight:600">Cancelled</span> &mdash; You withdrew the request before a response was given</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-bell"/></svg> Real-Time Notifications</h3>
+    <p>The page uses a <strong>WebSocket connection</strong> (shown as "Live" or "Offline" in the header). When someone responds to your swap request, you'll see the update instantly without refreshing.</p>
+    <div class="callout callout-info">
+      <svg><use href="#i-info"/></svg>
+      <div>You must have your account linked to an employee record to use this page. If you see "no employee linked", ask an admin to link your account on the Employees page.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CHAT ─── -->
+<section class="section" id="chat">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--info-light);color:var(--info)"><svg><use href="#i-message"/></svg></div>
+    <div><h2>AI Chat Assistant</h2><div class="subtitle">Ask questions about schedules, shifts, and fairness</div></div>
+  </div>
+  <span class="role-badge role-all">All Users</span>
+
+  <div class="screenshot">
+    <img src="screenshots/chat.png" alt="AI Chat interface with conversation history and quick-ask buttons" loading="lazy">
+    <div class="screenshot-caption">AI Chat &mdash; Conversation sidebar, quick-ask suggestions, and natural language input</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-cpu"/></svg> What You Can Ask</h3>
+    <p>The chat assistant has access to all shift data, employee records, and history. Try questions like:</p>
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+      <span style="background:var(--primary-light);color:var(--primary-dark);padding:8px 14px;border-radius:20px;font-size:0.85rem;font-weight:500">Who is assigned this week?</span>
+      <span style="background:var(--primary-light);color:var(--primary-dark);padding:8px 14px;border-radius:20px;font-size:0.85rem;font-weight:500">What's the fairness score?</span>
+      <span style="background:var(--primary-light);color:var(--primary-dark);padding:8px 14px;border-radius:20px;font-size:0.85rem;font-weight:500">Who has the most shifts?</span>
+      <span style="background:var(--primary-light);color:var(--primary-dark);padding:8px 14px;border-radius:20px;font-size:0.85rem;font-weight:500">Show next week's schedule</span>
+      <span style="background:var(--primary-light);color:var(--primary-dark);padding:8px 14px;border-radius:20px;font-size:0.85rem;font-weight:500">Who is assigned tomorrow?</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-message"/></svg> How to Use</h3>
+    <ol class="steps">
+      <li class="step"><h4>Type Your Question</h4><p>Type in the input field at the bottom, or click one of the suggestion buttons when starting a new chat.</p></li>
+      <li class="step"><h4>Send</h4><p>Press <kbd>Enter</kbd> or click the send button. The AI responds in real-time with streaming text.</p></li>
+      <li class="step"><h4>Continue the Conversation</h4><p>Ask follow-up questions &mdash; the assistant remembers context within the same chat.</p></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-book"/></svg> Chat History</h3>
+    <p>Previous conversations appear in the left sidebar. Click any conversation to load it. Click <strong>"New Chat"</strong> to start fresh.</p>
+    <div class="callout callout-tip">
+      <svg><use href="#i-lightbulb"/></svg>
+      <div>The first time you use chat, you may be asked to grant <strong>data processing consent</strong>. This allows the AI to access shift data to answer your questions.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PROFILE ─── -->
+<section class="section" id="profile">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--primary-light);color:var(--primary)"><svg><use href="#i-user"/></svg></div>
+    <div><h2>Profile</h2><div class="subtitle">Your info and upcoming shifts</div></div>
+  </div>
+  <span class="role-badge role-all">All Users</span>
+
+  <div class="screenshot">
+    <img src="screenshots/profile.png" alt="Profile page showing user info and upcoming shifts" loading="lazy">
+    <div class="screenshot-caption">Profile &mdash; User info card with role badge and upcoming shifts section</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3><svg class="ic"><use href="#i-user"/></svg> Your Profile Card</h3>
+    <p>Shows your profile picture (or initials), name, email, and role badge (Admin or Employee).</p>
+  </div>
+
+  <div class="card">
+    <h3><svg class="ic"><use href="#i-calendar"/></svg> Upcoming Shifts</h3>
+    <p>If your account is linked to an employee record, you'll see your upcoming shifts grouped by month. Each shift shows the date, day of the week, and an <strong>"Add to Calendar"</strong> button.</p>
+    <div class="callout callout-tip">
+      <svg><use href="#i-lightbulb"/></svg>
+      <div>Click <strong>"Add to Calendar"</strong> to open Google Calendar with the shift pre-filled as an event. It includes the date, time, and your name in the event title.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── WORKFLOW OVERVIEW ─── -->
+<section class="section" id="workflow">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--warning-light);color:var(--warning)"><svg><use href="#i-rocket"/></svg></div>
+    <div><h2>Monthly Workflow Summary</h2><div class="subtitle">The typical process from start to finish each month</div></div>
+  </div>
+
+  <div class="card">
+    <div class="diagram-container">
+      <svg viewBox="0 0 900 120" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto">
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/></marker></defs>
+        <rect x="10" y="20" width="140" height="80" rx="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+        <text x="80" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">Create Form</text>
+        <text x="80" y="72" text-anchor="middle" font-size="9" fill="#64748b">Pick dates &amp; type</text>
+        <rect x="190" y="20" width="140" height="80" rx="12" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
+        <text x="260" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="#15803d">Collect Responses</text>
+        <text x="260" y="72" text-anchor="middle" font-size="9" fill="#64748b">Share Google Form</text>
+        <rect x="370" y="20" width="140" height="80" rx="12" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+        <text x="440" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">Generate Shifts</text>
+        <text x="440" y="72" text-anchor="middle" font-size="9" fill="#64748b">Run algorithm</text>
+        <rect x="550" y="20" width="140" height="80" rx="12" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2"/>
+        <text x="620" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="#6d28d9">Publish &amp; Notify</text>
+        <text x="620" y="72" text-anchor="middle" font-size="9" fill="#64748b">Employees notified</text>
+        <rect x="730" y="20" width="140" height="80" rx="12" fill="#cffafe" stroke="#06b6d4" stroke-width="2"/>
+        <text x="800" y="52" text-anchor="middle" font-size="11" font-weight="700" fill="#0e7490">Track &amp; Exchange</text>
+        <text x="800" y="72" text-anchor="middle" font-size="9" fill="#64748b">History &amp; swaps</text>
+        <path d="M155 60 L185 60" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+        <path d="M335 60 L365 60" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+        <path d="M515 60 L545 60" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+        <path d="M695 60 L725 60" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+      </svg>
+    </div>
+    <ol class="steps" style="margin-top:16px">
+      <li class="step"><h4>Create the Form (Forms page)</h4><p>Admin selects month, picks dates, chooses shift type, and generates a Google Form.</p></li>
+      <li class="step"><h4>Collect Responses</h4><p>Share the form link with employees. Wait for everyone to submit their availability.</p></li>
+      <li class="step"><h4>Generate Assignments (Assignments page)</h4><p>Admin fetches responses, reviews the data, and runs the scheduler algorithm.</p></li>
+      <li class="step"><h4>Publish &amp; Notify</h4><p>Review the calendar, then click Publish to notify all employees of their shifts.</p></li>
+      <li class="step"><h4>Track &amp; Exchange</h4><p>Employees view their shifts on Profile, check History for fairness, and use Shift Exchange if they need to swap.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ─── FAQ ─── -->
+<section class="section" id="faq">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--danger-light);color:var(--danger)"><svg><use href="#i-help"/></svg></div>
+    <div><h2>Frequently Asked Questions</h2><div class="subtitle">Common questions and quick answers</div></div>
+  </div>
+
+  <div class="card">
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">Why can't I see certain pages in the sidebar?</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">Your admin controls which pages are visible to employees. If a page is missing, ask your admin to enable it in the Dashboard's "Page Access Control" section.</p>
+    </details>
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">How is the Fairness Score calculated?</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">The fairness score measures how evenly shifts are distributed. It's based on the standard deviation of shift counts. A perfectly even distribution scores 100%.</p>
+    </details>
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">What does "New Employee" mean for scheduling?</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">New employees (first month doing shifts) are restricted to only be assigned shifts in the last 2 weeks of the month. This allows them to settle in before taking shifts.</p>
+    </details>
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">Can I undo a published assignment?</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">Publishing sends notifications but doesn't lock the data. An admin can re-run the assignment for the same month. However, employees who already added shifts to their calendar would need to update manually.</p>
+    </details>
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">The chat says "rate limited" or "AI not available"</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">The AI service has daily usage limits. Wait a minute and try again, or try later in the day. If the issue persists, the admin may need to check the AI provider configuration.</p>
+    </details>
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">How do I add my shifts to Google Calendar?</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">Go to your <strong>Profile</strong> page and click <strong>"Add to Calendar"</strong> next to each shift. This opens Google Calendar with the event pre-filled. You can also click calendar links from the notification bell.</p>
+    </details>
+    <details>
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">Google Forms says "Not authenticated"</summary>
+      <p style="padding:8px 0 0 16px;color:var(--text-secondary);font-size:0.95rem">Sign out of the app and sign back in with Google. This refreshes the Google connection and re-grants the necessary permissions for Forms and Drive access.</p>
+    </details>
+  </div>
+</section>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer style="background:var(--sidebar-bg);color:var(--sidebar-text);text-align:center;padding:30px 20px;font-size:0.85rem">
+  <p style="margin-bottom:6px"><strong style="color:white">Shift Assignment Platform</strong></p>
+  <p>Psychiatry Department &mdash; Shift Management System</p>
+  <p style="margin-top:10px;opacity:0.6">User Guide v1.0</p>
+</footer>
+
+</body>
+</html>
