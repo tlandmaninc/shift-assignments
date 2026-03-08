@@ -7,6 +7,7 @@ Supports:
 - OpenAI (paid)
 """
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
@@ -417,12 +418,20 @@ Assignment rules:
         # Safety cap reached
         return "I've completed the available actions.", tool_events
 
+    @staticmethod
+    def _is_rate_limit_error(error: str | None) -> bool:
+        """Check if an error string indicates a rate/quota limit."""
+        if not error:
+            return False
+        low = error.lower()
+        return "rate" in low or "429" in low or "limit" in low or "quota" in low
+
     async def _chat_with_fallback(
         self,
         messages: list[dict],
         system_prompt: str,
     ) -> "AIResponse":
-        """Call provider.chat() with automatic fallback on quota errors."""
+        """Call provider.chat() with retry + automatic fallback on quota errors."""
         result = await self.provider.chat(
             messages=messages,
             system_prompt=system_prompt,
@@ -431,10 +440,21 @@ Assignment rules:
         if result.success:
             return result
 
-        is_quota = "rate-limited" in (result.error or "").lower() or "429" in (result.error or "")
-        if not is_quota:
+        if not self._is_rate_limit_error(result.error):
             return result
 
+        # Retry primary once after a short delay (per-minute limits recover fast)
+        logger.info("Primary %s rate-limited, retrying in 3s", self.provider.provider_name)
+        await asyncio.sleep(3)
+        retry = await self.provider.chat(
+            messages=messages,
+            system_prompt=system_prompt,
+            max_tokens=2048,
+        )
+        if retry.success:
+            return retry
+
+        # Cascade through fallback providers
         for fb in self._get_fallback_providers():
             logger.info("chat() falling back to %s", fb.provider_name)
             fb_result = await fb.chat(
@@ -444,6 +464,9 @@ Assignment rules:
             )
             if fb_result.success:
                 return fb_result
+            if self._is_rate_limit_error(fb_result.error):
+                logger.warning("Fallback %s also rate-limited", fb.provider_name)
+                continue
 
         return result  # Return original error if no fallback worked
 
@@ -501,25 +524,44 @@ Assignment rules:
             ):
                 first_response += chunk
         except RuntimeError as e:
-            if "rate-limited" not in str(e).lower() and "429" not in str(e):
+            if not self._is_rate_limit_error(str(e)):
                 raise
-            # Try fallback providers
-            for fb in self._get_fallback_providers():
-                try:
-                    logger.info("Falling back to %s", fb.provider_name)
-                    first_response = ""
-                    async for chunk in fb.stream_chat(
-                        messages=messages,
-                        system_prompt=system_prompt,
-                        max_tokens=2048,
-                    ):
-                        first_response += chunk
-                    active_provider = fb
-                    break
-                except Exception:
-                    continue
-            else:
-                raise  # No fallback worked
+
+            # Retry primary once after short delay
+            logger.info("Stream %s rate-limited, retrying in 3s", active_provider.provider_name)
+            try:
+                await asyncio.sleep(3)
+                first_response = ""
+                async for chunk in active_provider.stream_chat(
+                    messages=messages,
+                    system_prompt=system_prompt,
+                    max_tokens=2048,
+                ):
+                    first_response += chunk
+            except Exception:
+                # Cascade through fallback providers
+                for fb in self._get_fallback_providers():
+                    try:
+                        logger.info("Falling back to %s", fb.provider_name)
+                        first_response = ""
+                        async for chunk in fb.stream_chat(
+                            messages=messages,
+                            system_prompt=system_prompt,
+                            max_tokens=2048,
+                        ):
+                            first_response += chunk
+                        active_provider = fb
+                        break
+                    except Exception:
+                        logger.warning("Fallback %s failed", fb.provider_name)
+                        continue
+                else:
+                    # All providers exhausted — graceful message
+                    yield (
+                        "The AI assistant is temporarily busy. "
+                        "Please try again in a minute."
+                    )
+                    return
 
         # Check if the response contains tool calls
         tool_calls = parse_tool_calls(first_response)
@@ -555,19 +597,14 @@ Assignment rules:
 
         # Get follow-up response (may contain more tool calls — loop up to cap)
         for _ in range(MAX_TOOL_ITERATIONS - 1):
-            result = await active_provider.chat(
-                messages=messages,
-                system_prompt=system_prompt,
-                max_tokens=2048,
-            )
+            result = await self._chat_with_fallback(messages, system_prompt)
             if result.success:
                 content = result.content or ""
             else:
-                err = result.error or "AI error"
-                if "rate" in err.lower() or "429" in err or "limit" in err.lower():
+                if self._is_rate_limit_error(result.error):
                     content = ""  # Silently skip — tools already executed
                 else:
-                    content = err
+                    content = result.error or "AI error"
             follow_up_calls = parse_tool_calls(content) if result.success else []
 
             if not follow_up_calls:
