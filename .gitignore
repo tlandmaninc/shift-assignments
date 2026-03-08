@@ -25,6 +25,7 @@ backend/data/*.json
 backend/data/audit.log
 backend/data/google_token.json
 backend/data/assignments/
+backend/data/backup-*/
 
 # ─── IDE ───────────────────────────────────────────────────
 .vscode/

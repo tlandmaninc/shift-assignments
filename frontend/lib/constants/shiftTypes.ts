@@ -76,6 +76,34 @@ export const SHIFT_TYPES: Record<string, ShiftTypeConfig> = {
 
 export const DEFAULT_SHIFT_TYPE = 'ect';
 
-export function getShiftTypeConfig(shiftType: string): ShiftTypeConfig {
-  return SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+export function getShiftTypeConfig(
+  shiftType: string,
+  dynamicTypes?: Record<string, ShiftTypeConfig>,
+): ShiftTypeConfig {
+  const source = dynamicTypes || SHIFT_TYPES;
+  return source[shiftType] || source.ect || SHIFT_TYPES.ect;
+}
+
+export function getShiftTypeStyle(config: ShiftTypeConfig): {
+  bgClass: string;
+  textClass: string;
+  bgLight: string;
+  borderClass: string;
+  style?: React.CSSProperties;
+} {
+  if (config.bgClass) {
+    return {
+      bgClass: config.bgClass,
+      textClass: config.textClass,
+      bgLight: config.bgLight,
+      borderClass: config.borderClass,
+    };
+  }
+  return {
+    bgClass: '',
+    textClass: '',
+    bgLight: '',
+    borderClass: '',
+    style: { backgroundColor: config.color, color: '#fff' },
+  };
 }

@@ -1227,6 +1227,118 @@ class Storage:
         self._save_json(settings.exchanges_file, {"exchanges": exchanges})
         return exchange
 
+    # ==================== Shift Types ====================
+
+    def _shift_types_file(self) -> Path:
+        return settings.data_dir / "shift_types.json"
+
+    def _seed_shift_types(self) -> dict:
+        """Seed shift_types.json from built-in SHIFT_TYPE_CONFIG."""
+        from .constants import SHIFT_TYPE_CONFIG
+        seed = {"shift_types": {}, "cross_type_constraints": []}
+        for key, cfg in SHIFT_TYPE_CONFIG.items():
+            entry = dict(cfg)
+            entry["is_builtin"] = True
+            entry["constraints"] = {}  # use defaults
+            seed["shift_types"][key] = entry
+        self._save_json(self._shift_types_file(), seed)
+        return seed
+
+    def get_shift_types(self) -> dict[str, dict]:
+        """Return all shift types (built-in + custom), seeding on first call."""
+        data = self._load_json(self._shift_types_file())
+        if not data or "shift_types" not in data:
+            data = self._seed_shift_types()
+        return data.get("shift_types", {})
+
+    def get_shift_type(self, key: str) -> Optional[dict]:
+        """Get a single shift type by key."""
+        return self.get_shift_types().get(key)
+
+    def save_shift_type(self, key: str, config: dict) -> dict:
+        """Create or update a shift type. Returns the saved config."""
+        data = self._load_json(self._shift_types_file())
+        if not data or "shift_types" not in data:
+            data = self._seed_shift_types()
+
+        types = data.get("shift_types", {})
+        if len(types) >= 20 and key not in types:
+            raise ValueError("Maximum of 20 shift types allowed")
+
+        existing = types.get(key, {})
+        config["is_builtin"] = existing.get("is_builtin", False)
+        types[key] = config
+        data["shift_types"] = types
+        self._save_json(self._shift_types_file(), data)
+        return config
+
+    def delete_shift_type(self, key: str) -> bool:
+        """Delete a custom shift type. Returns False if built-in or not found."""
+        data = self._load_json(self._shift_types_file())
+        if not data or "shift_types" not in data:
+            return False
+        types = data.get("shift_types", {})
+        entry = types.get(key)
+        if not entry:
+            return False
+        if entry.get("is_builtin", False):
+            raise ValueError("Cannot delete built-in shift type")
+        # Check for existing assignments
+        history = self._load_json(settings.history_file)
+        assignments_list = history.get("assignments", [])
+        has_assignments = any(
+            a.get("shift_type") == key for a in assignments_list
+        )
+        if has_assignments:
+            raise ValueError(
+                f"Cannot delete shift type '{key}': has existing assignments"
+            )
+        del types[key]
+        data["shift_types"] = types
+        self._save_json(self._shift_types_file(), data)
+        return True
+
+    # -- Cross-type constraints --
+
+    def get_cross_type_constraints(self) -> list[dict]:
+        """Return all cross-type constraints."""
+        data = self._load_json(self._shift_types_file())
+        if not data:
+            return []
+        return data.get("cross_type_constraints", [])
+
+    def save_cross_type_constraint(self, constraint: dict) -> dict:
+        """Add a cross-type constraint. Auto-generates ID."""
+        data = self._load_json(self._shift_types_file())
+        if not data or "shift_types" not in data:
+            data = self._seed_shift_types()
+        constraints = data.get("cross_type_constraints", [])
+        # Check for duplicate
+        for c in constraints:
+            pair = {c.get("type_a"), c.get("type_b")}
+            if pair == {constraint["type_a"], constraint["type_b"]}:
+                raise ValueError("Cross-type constraint already exists for this pair")
+        max_id = max((int(c.get("id", 0)) for c in constraints), default=0)
+        constraint["id"] = str(max_id + 1)
+        constraints.append(constraint)
+        data["cross_type_constraints"] = constraints
+        self._save_json(self._shift_types_file(), data)
+        return constraint
+
+    def delete_cross_type_constraint(self, constraint_id: str) -> bool:
+        """Delete a cross-type constraint by ID."""
+        data = self._load_json(self._shift_types_file())
+        if not data:
+            return False
+        constraints = data.get("cross_type_constraints", [])
+        original_len = len(constraints)
+        constraints = [c for c in constraints if c.get("id") != constraint_id]
+        if len(constraints) == original_len:
+            return False
+        data["cross_type_constraints"] = constraints
+        self._save_json(self._shift_types_file(), data)
+        return True
+
     # ==================== Page Access ====================
 
     def get_page_access(self) -> dict:

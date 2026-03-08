@@ -10,6 +10,7 @@ from .github import router as github_router
 from .auth import router as auth_router
 from .exchanges import router as exchanges_router
 from .settings import router as settings_router
+from .shift_types import router as shift_types_router
 
 __all__ = [
     "forms_router",
@@ -22,4 +23,5 @@ __all__ = [
     "auth_router",
     "exchanges_router",
     "settings_router",
+    "shift_types_router",
 ]

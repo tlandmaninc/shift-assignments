@@ -42,6 +42,32 @@ SHIFT_TYPE_CONFIG = {
 
 DEFAULT_SHIFT_TYPE = "ect"
 
+BUILTIN_SHIFT_TYPE_KEYS = frozenset(SHIFT_TYPE_CONFIG.keys())
+
+
+def get_all_shift_types() -> dict:
+    """Return all shift types from storage (built-in + custom).
+
+    Falls back to SHIFT_TYPE_CONFIG if storage is unavailable.
+    """
+    try:
+        from .storage import storage
+        types = storage.get_shift_types()
+        if types:
+            return types
+    except Exception:
+        pass
+    return dict(SHIFT_TYPE_CONFIG)
+
+
+def get_shift_type_config(key: str) -> dict:
+    """Look up a single shift type config by key.
+
+    Reads from dynamic storage first, falls back to hardcoded defaults.
+    """
+    all_types = get_all_shift_types()
+    return all_types.get(key, all_types.get(DEFAULT_SHIFT_TYPE, {}))
+
 # Page access control defaults.
 # Values: "admin" = admin only, "all" = any authenticated user.
 DEFAULT_PAGE_ACCESS = {

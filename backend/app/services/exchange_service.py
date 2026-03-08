@@ -5,8 +5,10 @@ import logging
 from datetime import date, datetime
 from typing import Optional
 
-from ..constants import DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
+from ..schemas.shift_types import SchedulingConstraints
 from ..storage import storage
+from .constraint_checker import check_employee_constraints
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +49,16 @@ def validate_swap(
     target_name: str,
     target_date: str,
     employees: list[dict],
+    constraints: SchedulingConstraints | None = None,
 ) -> list[str]:
-    """
-    Validate a swap against all hard constraints from the scheduler.
+    """Validate a swap against scheduling constraints.
+
+    Uses the shared constraint checker. Accepts optional constraints;
+    defaults to SchedulingConstraints() which matches legacy behavior.
 
     Returns a list of validation error strings. Empty list means the swap is valid.
     """
+    c = constraints or SchedulingConstraints()
     errors = []
 
     # 1. Both employees must own their claimed dates
@@ -75,49 +81,14 @@ def validate_swap(
         d = _parse_date(date_str)
         emp_shifts.setdefault(emp_name, []).append(d)
 
-    # Build employee lookup
+    all_dates = sorted(_parse_date(ds) for ds in simulated.keys())
     emp_lookup = {e["name"]: e for e in employees}
 
     for name in [requester_name, target_name]:
         shifts = sorted(emp_shifts.get(name, []))
         emp = emp_lookup.get(name, {})
-
-        # 2. Max 2 shifts per month
-        if len(shifts) > 2:
-            errors.append(f"{name} would have {len(shifts)} shifts (max 2)")
-
-        # 3. Max 1 shift per ISO week
-        week_counts: dict[int, int] = {}
-        for d in shifts:
-            wk = d.isocalendar()[1]
-            week_counts[wk] = week_counts.get(wk, 0) + 1
-            if week_counts[wk] > 1:
-                errors.append(f"{name} would have multiple shifts in ISO week {wk}")
-
-        # 4. No consecutive calendar days
-        for i in range(len(shifts) - 1):
-            if (shifts[i + 1] - shifts[i]).days == 1:
-                errors.append(
-                    f"{name} would have consecutive shifts on {shifts[i]} and {shifts[i+1]}"
-                )
-
-        # 5. If 2 shifts, must be on different weekdays
-        if len(shifts) == 2 and shifts[0].weekday() == shifts[1].weekday():
-            errors.append(
-                f"{name} would have two shifts on the same weekday "
-                f"({shifts[0].strftime('%A')})"
-            )
-
-        # 6. New employees only in last 2 ISO weeks of the month's dates
-        if emp.get("is_new", False):
-            all_dates = sorted(_parse_date(ds) for ds in simulated.keys())
-            all_weeks = sorted({d.isocalendar()[1] for d in all_dates})
-            allowed_weeks = set(all_weeks[-2:]) if len(all_weeks) > 2 else set(all_weeks)
-            for d in shifts:
-                if d.isocalendar()[1] not in allowed_weeks:
-                    errors.append(
-                        f"{name} is a new employee and cannot be assigned in week {d.isocalendar()[1]}"
-                    )
+        is_new = emp.get("is_new", False)
+        errors.extend(check_employee_constraints(name, shifts, is_new, all_dates, c))
 
     return errors
 

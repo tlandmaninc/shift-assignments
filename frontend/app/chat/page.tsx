@@ -221,6 +221,29 @@ export default function ChatPage() {
           });
           inputRef.current?.focus();
         },
+        // onToolExecution
+        (event) => {
+          setMessages((prev) => {
+            const existing = prev.find((m) => m.id === assistantMsgId);
+            const toolMsg = `\n\n> **Tool:** ${event.tool} — ${event.status}\n`;
+            if (existing) {
+              return prev.map((m) =>
+                m.id === assistantMsgId
+                  ? { ...m, content: m.content + toolMsg }
+                  : m
+              );
+            }
+            return [
+              ...prev,
+              {
+                id: assistantMsgId,
+                role: 'assistant' as const,
+                content: toolMsg,
+                timestamp: new Date(),
+              },
+            ];
+          });
+        },
       );
     } catch (error: any) {
       setLoading(false);

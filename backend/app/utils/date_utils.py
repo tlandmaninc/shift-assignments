@@ -4,7 +4,7 @@ import calendar
 from datetime import date, timedelta
 from typing import Optional
 
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
 
 
 def get_month_dates(year: int, month: int) -> list[date]:
@@ -43,7 +43,7 @@ def get_excluded_dates(
 
     # Look up whether this shift type excludes weekends
     st = shift_type or DEFAULT_SHIFT_TYPE
-    cfg = SHIFT_TYPE_CONFIG.get(st, SHIFT_TYPE_CONFIG[DEFAULT_SHIFT_TYPE])
+    cfg = get_shift_type_config(st)
     exclude_weekends = cfg.get("exclude_weekends", True)
 
     # Convert string dates to date objects

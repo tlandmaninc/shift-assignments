@@ -19,7 +19,7 @@ from ..services import (
     parse_csv_responses,
     validate_availability_data,
 )
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
 from ..services.calendar_service import build_shift_calendar_url
 from ..services.ws_manager import ws_manager
 from ..audit import log_audit, AuditAction
@@ -112,7 +112,10 @@ async def validate_data(
         for e in employees
     ]
 
-    result = validate_availability_data(emp_data, dates)
+    shift_type = form.get("shift_type", DEFAULT_SHIFT_TYPE)
+    cfg = get_shift_type_config(shift_type)
+    max_per_month = cfg.get("constraints", {}).get("max_shifts_per_month", 2)
+    result = validate_availability_data(emp_data, dates, max_per_month)
 
     return {
         "valid": result["valid"],
@@ -148,16 +151,18 @@ async def generate_assignments(request: AssignmentGenerateRequest):
         for e in request.employees
     ]
 
-    # Validate first
-    validation = validate_availability_data(emp_data, dates)
+    # Determine shift type from form
+    shift_type = form.get("shift_type", DEFAULT_SHIFT_TYPE)
+
+    # Validate with shift-type-specific constraints
+    cfg = get_shift_type_config(shift_type)
+    max_per_month = cfg.get("constraints", {}).get("max_shifts_per_month", 2)
+    validation = validate_availability_data(emp_data, dates, max_per_month)
     if not validation["valid"]:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid data: {'; '.join(validation['errors'])}"
         )
-
-    # Determine shift type from form
-    shift_type = form.get("shift_type", DEFAULT_SHIFT_TYPE)
 
     # Run scheduler
     scheduler = SchedulerService()

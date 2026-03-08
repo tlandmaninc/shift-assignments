@@ -244,6 +244,7 @@ def parse_manual_availability(
 def validate_availability_data(
     employees: list[dict],
     dates: list[date],
+    max_shifts_per_month: int = 2,
 ) -> dict:
     """
     Validate availability data before running scheduler.
@@ -279,11 +280,12 @@ def validate_availability_data(
         emp for emp in employees
         if any(emp.get("availability", {}).values())
     ]
-    max_capacity = 2 * len(employees_with_avail)
+    max_capacity = max_shifts_per_month * len(employees_with_avail)
     if len(dates) > max_capacity:
         errors.append(
             f"Not enough capacity: {len(dates)} shifts needed, "
-            f"but only {max_capacity} possible (2 per employee)"
+            f"but only {max_capacity} possible "
+            f"({max_shifts_per_month} per employee)"
         )
 
     # Warnings

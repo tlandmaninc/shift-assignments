@@ -199,7 +199,12 @@ async def stream_message(
             async for chunk in chat_service.stream_chat(
                 message=chat_request.message,
                 conversation_history=history,
+                user=user,
             ):
+                # Tool events are dicts, text chunks are strings
+                if isinstance(chunk, dict):
+                    yield f"data: {json.dumps({'tool_execution': chunk})}\n\n"
+                    continue
                 full_content += chunk
                 # Split large chunks into words for a progressive streaming effect.
                 # Providers like Gemini may return the entire response in one event.
@@ -260,6 +265,7 @@ async def send_message(
     result = await chat_service.chat(
         message=chat_request.message,
         conversation_history=history,
+        user=user,
     )
 
     conversation["messages"].append({

@@ -349,6 +349,11 @@ export const exchangeApi = {
     }),
 };
 
+// Shift Types API
+export const shiftTypesApi = {
+  list: () => fetchApi<Record<string, any>>('/shift-types'),
+};
+
 // Chat API
 export interface ConversationSummary {
   id: string;
@@ -400,6 +405,7 @@ export const chatApi = {
     onConversationId: (id: string) => void,
     onDone: () => void,
     onError: (error: string) => void,
+    onToolExecution?: (event: { tool: string; status: string; result?: any }) => void,
   ): Promise<void> => {
     const url = `${API_BASE}/chat/stream`;
     const response = await fetch(url, {
@@ -433,6 +439,8 @@ export const chatApi = {
           const data = JSON.parse(line.slice(6));
           if (data.conversation_id) {
             onConversationId(data.conversation_id);
+          } else if (data.tool_execution && onToolExecution) {
+            onToolExecution(data.tool_execution);
           } else if (data.token) {
             onToken(data.token);
           } else if (data.error) {

@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from ..schemas import FormGenerateRequest, FormCreate, FormResponse
 from ..storage import storage
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
 from ..utils.date_utils import (
     get_included_dates_for_form,
     get_month_name,
@@ -81,7 +81,7 @@ async def create_form(request: FormGenerateRequest):
     existing = storage.get_form_by_month(month_year, shift_type)
 
     if existing:
-        type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
+        type_label = get_shift_type_config(shift_type).get("label", shift_type.upper())
         raise HTTPException(
             status_code=400,
             detail=f"{type_label} form already exists for {month_year}"
@@ -96,7 +96,7 @@ async def create_form(request: FormGenerateRequest):
     )
 
     month_name = get_month_name(request.month)
-    type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
+    type_label = get_shift_type_config(shift_type).get("label", shift_type.upper())
     title = f"{month_name} {request.year} {type_label} Shift Assignment"
 
     # Save form
@@ -157,7 +157,7 @@ async def get_form_template(form_id: int):
 
     included_dates = form.get("included_dates", [])
     shift_type = form.get("shift_type", DEFAULT_SHIFT_TYPE)
-    type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
+    type_label = get_shift_type_config(shift_type).get("label", shift_type.upper())
 
     questions = [
         {
@@ -188,7 +188,7 @@ async def get_form_template(form_id: int):
             "options": ["Available", "Not Available"],
         })
 
-    exclude_weekends = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("exclude_weekends", True)
+    exclude_weekends = get_shift_type_config(shift_type).get("exclude_weekends", True)
     title_prefix = form["title"].replace(" Shift Assignment", "")
     if exclude_weekends:
         form_desc = f"Please indicate your availability for each date in {title_prefix} (excluding Fridays, Saturdays, etc.)."

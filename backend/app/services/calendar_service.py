@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
 
 TIMEZONE = "Asia/Jerusalem"
 
@@ -54,7 +54,7 @@ def build_shift_calendar_url(
     Returns:
         Single URL string, or list of URLs if the shift has multiple slots.
     """
-    cfg = SHIFT_TYPE_CONFIG.get(shift_type, SHIFT_TYPE_CONFIG[DEFAULT_SHIFT_TYPE])
+    cfg = get_shift_type_config(shift_type)
 
     dt = datetime.strptime(shift_date, "%Y-%m-%d")
     day_name = dt.strftime("%A")

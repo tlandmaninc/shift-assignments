@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from jinja2 import Template
 from ..config import settings
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config, get_all_shift_types
 from ..utils.date_utils import get_month_name, parse_month_year
 
 CALENDAR_HTML_TEMPLATE = """
@@ -460,7 +460,7 @@ class CalendarGenerator:
                         for entry in entries:
                             emp_name = entry["employee_name"]
                             shift_type = entry.get("shift_type", DEFAULT_SHIFT_TYPE)
-                            type_cfg = SHIFT_TYPE_CONFIG.get(shift_type, SHIFT_TYPE_CONFIG[DEFAULT_SHIFT_TYPE])
+                            type_cfg = get_shift_type_config(shift_type)
                             active_types.add(shift_type)
                             badge_list.append({
                                 "employee": emp_name,
@@ -481,7 +481,7 @@ class CalendarGenerator:
         # Build shift type legend entries (only for types actually used)
         shift_types_legend = [
             {"label": cfg["label"], "color": cfg["color"]}
-            for st, cfg in SHIFT_TYPE_CONFIG.items()
+            for st, cfg in get_all_shift_types().items()
             if st in active_types
         ]
 

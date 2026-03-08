@@ -3,40 +3,33 @@
 from datetime import date, timedelta
 from typing import Optional
 from ..storage import storage
-from ..constants import DEFAULT_SHIFT_TYPE, SHIFT_TYPE_CONFIG
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
+from ..schemas.shift_types import SchedulingConstraints
 
 
 def backtracking_assign(
     employees: list[dict],
     dates: list[date],
     historical_shifts: Optional[dict[str, int]] = None,
+    constraints: Optional[SchedulingConstraints] = None,
 ) -> tuple[dict[str, str], dict[str, int]]:
     """
-    Assign shifts using backtracking with constraints.
+    Assign shifts using backtracking with configurable constraints.
 
-    Hard constraints:
-      - Max 2 shifts per employee per month.
-      - Max 1 shift per ISO week per employee.
-      - New employees only in the last two ISO weeks present in `dates`.
+    Hard constraints (configurable via SchedulingConstraints):
+      - Max N shifts per employee per month (default 2).
+      - Max N shifts per ISO week per employee (default 1).
+      - New employees only in the last N ISO weeks present in `dates` (default 2).
       - Never assign on a date the employee marked Not Available.
       - Every shift date must be assigned (if feasible).
-      - No consecutive shifts for same employee (calendar adjacency: +/- 1 day).
-      - If an employee has 2 shifts, they must be on different weekdays.
+      - No consecutive shifts for same employee (configurable).
+      - If multiple shifts, they must be on different weekdays (configurable).
 
     Soft constraints (for candidate ordering):
       - Prefer employees with fewer historical shifts (fairness).
       - Prefer employees with fewer remaining availability options (MRV).
-
-    Args:
-        employees: List of employee dicts with 'name', 'is_new', 'availability'
-        dates: List of dates to assign
-        historical_shifts: Optional dict of employee name -> total past shifts
-
-    Returns:
-        Tuple of (assignments dict, month_count dict)
-        - assignments: {date_iso: employee_name}
-        - month_count: {employee_name: shifts_this_month}
     """
+    c = constraints or SchedulingConstraints()
     historical_shifts = historical_shifts or {}
 
     name_to_emp = {e["name"]: e for e in employees}
@@ -55,12 +48,19 @@ def backtracking_assign(
 
     # Capacity check
     emps_with_avail = {e["name"] for e in employees if any(e["availability"].values())}
-    if len(dates) > 2 * len(emps_with_avail):
-        raise ValueError("Impossible schedule: more shifts than capacity (2 per employee).")
+    if len(dates) > c.max_shifts_per_month * len(emps_with_avail):
+        raise ValueError(
+            f"Impossible schedule: more shifts than capacity "
+            f"({c.max_shifts_per_month} per employee)."
+        )
 
-    # New employees can only be scheduled in the last 2 ISO weeks
+    # New employees can only be scheduled in the last N ISO weeks
     weeks = sorted({d.isocalendar()[1] for d in dates})
-    allowed_new_weeks = set(weeks[-2:]) if len(weeks) > 2 else set(weeks)
+    if c.new_employee_restricted_weeks > 0:
+        n = c.new_employee_restricted_weeks
+        allowed_new_weeks = set(weeks[-n:]) if len(weeks) > n else set(weeks)
+    else:
+        allowed_new_weeks = set(weeks)
 
     # MRV ordering: schedule hardest days first
     dates_sorted = sorted(dates, key=lambda d: len(avail[d]))
@@ -81,18 +81,19 @@ def backtracking_assign(
         return (prev_day in s) or (next_day in s)
 
     def violates_same_weekday_for_second_shift(name: str, d: date) -> bool:
-        """If employee already has 1 shift, the 2nd shift must be on a different weekday."""
+        """If employee already has 1 shift, additional shifts must differ."""
         if month_count[name] < 1:
             return False
         return d.weekday() in assigned_weekdays_set[name]
 
     def dfs(idx: int) -> bool:
         if idx == len(dates_sorted):
-            # Fairness check: everyone with availability must have at least 1 shift
-            for e in employees:
-                name = e["name"]
-                if any(e["availability"].values()) and month_count[name] == 0:
-                    return False
+            # Fairness check: everyone with availability must have >= 1 shift
+            if c.require_minimum_one_shift:
+                for e in employees:
+                    name = e["name"]
+                    if any(e["availability"].values()) and month_count[name] == 0:
+                        return False
             return True
 
         d = dates_sorted[idx]
@@ -109,28 +110,29 @@ def backtracking_assign(
             if emp["is_new"] and wn not in allowed_new_weeks:
                 continue
 
-            # Max 2 shifts per month
-            if month_count[name] >= 2:
+            # Max shifts per month
+            if month_count[name] >= c.max_shifts_per_month:
                 continue
 
-            # Max 1 per ISO week
-            if week_count[name].get(wn, 0) >= 1:
+            # Max shifts per ISO week
+            if week_count[name].get(wn, 0) >= c.max_shifts_per_week:
                 continue
 
-            # No consecutive calendar days
-            if violates_consecutive_shift(name, d):
+            # No consecutive calendar days (if configured)
+            if not c.allow_consecutive_days and violates_consecutive_shift(name, d):
                 continue
 
-            # If 2nd shift, weekday must differ from 1st
-            if violates_same_weekday_for_second_shift(name, d):
-                continue
+            # Different weekdays for additional shifts (if configured)
+            if c.require_different_weekdays:
+                if violates_same_weekday_for_second_shift(name, d):
+                    continue
 
             cands.append(name)
 
         if not cands:
             return False
 
-        # LCV-ish ordering: prefer fewer shifts, fewer remaining options, fewer historical
+        # LCV-ish ordering: prefer fewer shifts, fewer remaining options
         def key(name: str):
             e = name_to_emp[name]
             remaining = sum(
@@ -194,39 +196,30 @@ class SchedulerService:
         month_year: str,
         shift_type: str = DEFAULT_SHIFT_TYPE,
     ) -> tuple[dict, dict[str, int]]:
-        """
-        Generate assignments and store in JSON.
-
-        Args:
-            employees: List of employee dicts with 'name', 'is_new', 'availability'
-            dates: List of dates to assign
-            month_year: Month-year string (YYYY-MM)
-            shift_type: Shift type key (e.g. "ect", "internal", "er")
-
-        Returns:
-            Tuple of (assignments in multi-type format, shift_counts)
-        """
+        """Generate assignments and store in JSON."""
         # Get historical data for fairness
         historical = self.get_historical_shifts()
 
-        slots = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("slots", 1)
+        cfg = get_shift_type_config(shift_type)
+        slots = cfg.get("slots", 1)
+
+        # Load constraints from shift type config
+        constraints_data = cfg.get("constraints", {})
+        if isinstance(constraints_data, SchedulingConstraints):
+            constraints = constraints_data
+        else:
+            constraints = SchedulingConstraints(**(constraints_data or {}))
 
         if slots > 1:
-            # For multi-slot shifts (e.g. ER with 2 slots), run the scheduler
-            # multiple times to assign multiple employees per date.
+            # For multi-slot shifts, run the scheduler multiple times
             all_raw: list[dict[str, str]] = []
             cumulative_month_count: dict[str, int] = {}
 
             for slot_idx in range(slots):
-                # Build adjusted historical counts so fairness accounts for
-                # employees already assigned in prior slots.
                 adjusted_hist = dict(historical)
                 for name, extra in cumulative_month_count.items():
                     adjusted_hist[name] = adjusted_hist.get(name, 0) + extra
 
-                # Filter out employees already assigned to this date in a
-                # prior slot by temporarily removing their availability for
-                # those dates.
                 adjusted_employees = []
                 for emp in employees:
                     adj_avail = dict(emp["availability"])
@@ -236,10 +229,14 @@ class SchedulerService:
                                 adj_avail[d_iso] = False
                     adjusted_employees.append({**emp, "availability": adj_avail})
 
-                raw, mc = backtracking_assign(adjusted_employees, dates, adjusted_hist)
+                raw, mc = backtracking_assign(
+                    adjusted_employees, dates, adjusted_hist, constraints
+                )
                 all_raw.append(raw)
                 for name, count in mc.items():
-                    cumulative_month_count[name] = cumulative_month_count.get(name, 0) + count
+                    cumulative_month_count[name] = (
+                        cumulative_month_count.get(name, 0) + count
+                    )
 
             # Merge into multi-type format
             assignments: dict[str, list[dict]] = {}
@@ -250,10 +247,10 @@ class SchedulerService:
                     )
             month_count = cumulative_month_count
         else:
-            # Run scheduler
-            raw_assignments, month_count = backtracking_assign(employees, dates, historical)
+            raw_assignments, month_count = backtracking_assign(
+                employees, dates, historical, constraints
+            )
 
-            # Wrap in multi-type format: {date: [{employee_name, shift_type}]}
             assignments = {
                 date_str: [{"employee_name": emp_name, "shift_type": shift_type}]
                 for date_str, emp_name in raw_assignments.items()

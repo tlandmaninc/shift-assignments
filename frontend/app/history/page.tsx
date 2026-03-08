@@ -1297,7 +1297,6 @@ export default function HistoryPage() {
 
             {/* Shift Sunburst — interactive drill-down: top level shows shift types, drill into a type to see employees */}
             {activeChart === 'distribution' && (() => {
-              const SHIFT_COLORS: Record<string, string> = { ECT: '#3b82f6', Internal: '#10b981', ER: '#ef4444' };
               const RADIAN = Math.PI / 180;
 
               const employees = (activeFairness?.employees || []).filter((emp: any) => emp.total_shifts > 0);
@@ -1308,7 +1307,7 @@ export default function HistoryPage() {
               // Inner ring data (shift types)
               const typeData = relevantTypes.map(([key, config]: any) => {
                 const total = employees.reduce((sum: number, emp: any) => sum + ((emp.shifts_by_type || {})[key] || 0), 0);
-                return { name: config.label, value: total, fill: SHIFT_COLORS[key] || config.color, typeKey: key };
+                return { name: config.label, value: total, fill: config.color, typeKey: key };
               }).filter((d: any) => d.value > 0);
 
               const grandTotal = typeData.reduce((s: number, d: any) => s + d.value, 0);

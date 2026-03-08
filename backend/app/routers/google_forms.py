@@ -10,7 +10,7 @@ from slowapi.util import get_remote_address
 
 from ..config import settings
 from ..audit import log_audit, AuditAction
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_shift_type_config
 from ..storage import storage
 from ..services.google_credentials import (
     get_stored_credentials,
@@ -150,8 +150,8 @@ async def create_google_form(
 ):
     """Create a Google Form with the specified questions. Rate limited."""
     shift_type = form_request.shift_type or DEFAULT_SHIFT_TYPE
-    type_label = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("label", shift_type.upper())
-    exclude_weekends = SHIFT_TYPE_CONFIG.get(shift_type, {}).get("exclude_weekends", True)
+    type_label = get_shift_type_config(shift_type).get("label", shift_type.upper())
+    exclude_weekends = get_shift_type_config(shift_type).get("exclude_weekends", True)
     title_prefix = form_request.title.replace(" Shift Assignment", "")
     if exclude_weekends:
         form_description = (

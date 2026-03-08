@@ -7,13 +7,20 @@ Supports:
 - OpenAI (paid)
 """
 
+import json
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Optional
 from ..storage import Storage
 from ..config import settings
-from ..constants import SHIFT_TYPE_CONFIG, DEFAULT_SHIFT_TYPE
+from ..constants import DEFAULT_SHIFT_TYPE, get_all_shift_types, get_shift_type_config
 from .ai_providers import get_ai_provider, AIProvider
+from .chat_tools import (
+    build_tools_prompt,
+    parse_tool_calls,
+    execute_tool,
+    MAX_TOOL_ITERATIONS,
+)
 
 
 class ChatService:
@@ -119,7 +126,7 @@ class ChatService:
 
     def _shift_label(self, shift_type: str) -> str:
         """Resolve shift type key to display label."""
-        return SHIFT_TYPE_CONFIG.get(shift_type, {}).get(
+        return get_shift_type_config(shift_type).get(
             "label", shift_type.upper()
         )
 
@@ -289,7 +296,9 @@ Assignment rules:
 ## Response Guidelines
 - If asked about non-shift topics, answer briefly without referencing shift data.
 - Be concise. Use bullet points when helpful.
-- Always include the shift type (ECT/Internal/ER) when discussing specific shifts."""
+- Always include the shift type (ECT/Internal/ER) when discussing specific shifts.
+
+{build_tools_prompt()}"""
 
     async def check_health(self) -> dict:
         """Check if the AI provider is available and configured."""
@@ -323,43 +332,165 @@ Assignment rules:
         messages.append({"role": "user", "content": message})
         return messages
 
+    async def _run_tool_loop(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        user: Optional[dict] = None,
+    ) -> tuple[str, list[dict]]:
+        """Run the tool-call loop until the AI produces a final text response.
+
+        Returns (final_text, tool_events) where tool_events is a list of
+        {tool, status, result} dicts for the frontend.
+        """
+        tool_events: list[dict] = []
+
+        for _ in range(MAX_TOOL_ITERATIONS):
+            result = await self.provider.chat(
+                messages=messages,
+                system_prompt=system_prompt,
+                max_tokens=2048,
+            )
+
+            if not result.success:
+                return result.content or result.error or "AI error", tool_events
+
+            content = result.content or ""
+            tool_calls = parse_tool_calls(content)
+
+            if not tool_calls:
+                return content, tool_events
+
+            # Execute tool calls and feed results back
+            for tc in tool_calls:
+                tool_result = execute_tool(tc["tool"], tc["params"], user)
+                tool_events.append({
+                    "tool": tc["tool"],
+                    "status": "complete" if tool_result["success"] else "error",
+                    "result": tool_result.get("result") or tool_result.get("error"),
+                })
+
+                # Append tool call + result as context for next iteration
+                messages.append({"role": "assistant", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Tool result for {tc['tool']}:\n"
+                        f"```json\n{json.dumps(tool_result, default=str)}\n```\n"
+                        "Now respond to the user based on this result."
+                    ),
+                })
+
+        # Safety cap reached
+        return "I've completed the available actions.", tool_events
+
     async def chat(
         self,
         message: str,
-        conversation_history: Optional[list[dict]] = None
+        conversation_history: Optional[list[dict]] = None,
+        user: Optional[dict] = None,
     ) -> dict:
-        """Send message to AI provider and get response."""
+        """Send message to AI provider and get response, with tool-call support."""
         context = self._build_data_context()
         system_prompt = self._build_system_prompt(context)
         messages = self._build_messages(message, conversation_history)
 
-        result = await self.provider.chat(
-            messages=messages,
-            system_prompt=system_prompt,
-            max_tokens=2048,
+        final_text, tool_events = await self._run_tool_loop(
+            messages, system_prompt, user
         )
 
         return {
-            "success": result.success,
-            "content": result.content,
-            "error": result.error,
-            "provider": result.provider,
-            "model": result.model,
+            "success": True,
+            "content": final_text,
+            "error": None,
+            "provider": self.provider.provider_name,
+            "model": getattr(self.provider, "model", "unknown"),
+            "tool_events": tool_events,
         }
 
     async def stream_chat(
         self,
         message: str,
         conversation_history: Optional[list[dict]] = None,
-    ) -> AsyncGenerator[str, None]:
-        """Stream chat response as async generator of text chunks."""
+        user: Optional[dict] = None,
+    ) -> AsyncGenerator[str | dict, None]:
+        """Stream chat response with tool-call support.
+
+        Yields either text chunks (str) or tool event dicts.
+
+        Strategy: stream directly from the provider first. If the full
+        response contains tool calls, execute them and re-prompt (non-
+        streaming) for the final answer. This avoids a redundant non-
+        streaming call on every request.
+        """
         context = self._build_data_context()
         system_prompt = self._build_system_prompt(context)
         messages = self._build_messages(message, conversation_history)
 
+        # Stream the first response from the provider
+        first_response = ""
         async for chunk in self.provider.stream_chat(
             messages=messages,
             system_prompt=system_prompt,
             max_tokens=2048,
         ):
+            first_response += chunk
             yield chunk
+
+        # Check if the streamed response contains tool calls
+        tool_calls = parse_tool_calls(first_response)
+        if not tool_calls:
+            return  # No tools — we're done
+
+        # Execute tool calls
+        messages.append({"role": "assistant", "content": first_response})
+        for tc in tool_calls:
+            tool_result = execute_tool(tc["tool"], tc["params"], user)
+            yield {
+                "tool": tc["tool"],
+                "status": "complete" if tool_result["success"] else "error",
+                "result": tool_result.get("result") or tool_result.get("error"),
+            }
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"Tool result for {tc['tool']}:\n"
+                    f"```json\n{json.dumps(tool_result, default=str)}\n```\n"
+                    "Now respond to the user based on this result."
+                ),
+            })
+
+        # Get follow-up response (may contain more tool calls — loop up to cap)
+        for _ in range(MAX_TOOL_ITERATIONS - 1):
+            result = await self.provider.chat(
+                messages=messages,
+                system_prompt=system_prompt,
+                max_tokens=2048,
+            )
+            content = result.content or "" if result.success else (
+                result.error or "AI error"
+            )
+            follow_up_calls = parse_tool_calls(content) if result.success else []
+
+            if not follow_up_calls:
+                yield content
+                return
+
+            messages.append({"role": "assistant", "content": content})
+            for tc in follow_up_calls:
+                tool_result = execute_tool(tc["tool"], tc["params"], user)
+                yield {
+                    "tool": tc["tool"],
+                    "status": "complete" if tool_result["success"] else "error",
+                    "result": tool_result.get("result") or tool_result.get("error"),
+                }
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Tool result for {tc['tool']}:\n"
+                        f"```json\n{json.dumps(tool_result, default=str)}\n```\n"
+                        "Now respond to the user based on this result."
+                    ),
+                })
+
+        yield "I've completed the available actions."

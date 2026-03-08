@@ -23,6 +23,7 @@ from .routers import (
     auth_router,
     exchanges_router,
     settings_router,
+    shift_types_router,
 )
 
 # Rate limiter configuration
@@ -141,6 +142,7 @@ app.include_router(chat_router, prefix="/api")
 app.include_router(github_router, prefix="/api")
 app.include_router(exchanges_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(shift_types_router, prefix="/api")
 
 
 @app.get("/")
