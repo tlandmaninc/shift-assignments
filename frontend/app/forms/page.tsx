@@ -31,6 +31,7 @@ import {
   mockCreateForm,
   mockDeleteForm,
 } from '@/lib/mockData/formsMockData';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
 import { DEFAULT_SHIFT_TYPE, getShiftTypeStyle, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 import { useShiftTypes } from '@/hooks/useShiftTypes';
 
@@ -360,7 +361,7 @@ export default function FormsPage() {
             Configure and create availability forms for department staff
           </p>
         </div>
-        {process.env.NODE_ENV === 'development' && (
+        {isDemoAllowed && (
           <button
             onClick={() => setUseMockData(!useMockData)}
             className={cn(

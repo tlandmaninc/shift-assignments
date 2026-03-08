@@ -6,6 +6,7 @@ import {
   ShiftWithCalendarLink,
   WSMessage,
 } from '../types/exchange';
+import { isDemoAllowed } from '../mockData/demoMode';
 
 interface ExchangeState {
   // WebSocket
@@ -54,7 +55,7 @@ const getCurrentMonth = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 };
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const IS_PRODUCTION = !isDemoAllowed;
 
 export const useExchangeStore = create<ExchangeState>((set, get) => ({
   // WebSocket
@@ -127,8 +128,8 @@ export const useExchangeStore = create<ExchangeState>((set, get) => ({
   selectedShiftDate: null,
   setSelectedShiftDate: (date) => set({ selectedShiftDate: date }),
 
-  // Mock data toggle — always disabled in production
-  useMockData: false,
+  // Mock data toggle — defaults to true when demo mode is enabled
+  useMockData: isDemoAllowed,
   setUseMockData: (mock) => {
     if (IS_PRODUCTION) return;
     set({ useMockData: mock });

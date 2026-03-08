@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { exchangeApi } from '@/lib/api';
 import { getMockIncomingCount } from '@/lib/mockData/exchangeMockData';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
 import {
   ExchangeTabBar,
   MonthSelector,
@@ -127,7 +128,7 @@ export default function ShiftExchangePage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {process.env.NODE_ENV === 'development' && (
+          {isDemoAllowed && (
             <button
               onClick={() => setUseMockData(!useMockData)}
               className={cn(

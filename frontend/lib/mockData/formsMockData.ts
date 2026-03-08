@@ -8,9 +8,10 @@
  */
 
 import { SHIFT_TYPES } from '../constants/shiftTypes';
+import { isDemoAllowed } from './demoMode';
 
 function assertNotProduction() {
-  if (process.env.NODE_ENV === 'production') {
+  if (!isDemoAllowed) {
     throw new Error('Mock data must not be used in production');
   }
 }

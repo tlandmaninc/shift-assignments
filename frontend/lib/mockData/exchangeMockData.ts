@@ -15,9 +15,10 @@ import {
   EmployeeAvailability,
   EnhancedSwapCandidate,
 } from '../types/exchange';
+import { isDemoAllowed } from './demoMode';
 
 function assertNotProduction() {
-  if (process.env.NODE_ENV === 'production') {
+  if (!isDemoAllowed) {
     throw new Error('Mock data must not be used in production');
   }
 }
@@ -30,16 +31,16 @@ interface MockEmployee {
 }
 
 const EMPLOYEES: MockEmployee[] = [
-  { id: 1, name: 'Employee A', is_new: false },
-  { id: 2, name: 'Employee B', is_new: false },
-  { id: 3, name: 'Employee C', is_new: false },
-  { id: 4, name: 'Employee D', is_new: false },
-  { id: 5, name: 'Employee E', is_new: false },
-  { id: 6, name: 'Employee F', is_new: false },
-  { id: 7, name: 'Employee G', is_new: false },
-  { id: 8, name: 'Employee H', is_new: false },
-  { id: 9, name: 'Employee I', is_new: false },
-  { id: 10, name: 'Employee J', is_new: true },
+  { id: 1, name: 'Noa Levi', is_new: false },
+  { id: 2, name: 'James Wilson', is_new: false },
+  { id: 3, name: 'Fatima Al-Rashid', is_new: false },
+  { id: 4, name: 'Wei Chen', is_new: false },
+  { id: 5, name: 'Yael Mizrahi', is_new: false },
+  { id: 6, name: 'Sarah Thompson', is_new: false },
+  { id: 7, name: 'Omar Hassan', is_new: false },
+  { id: 8, name: 'Li Zhang', is_new: false },
+  { id: 9, name: 'David Cohen', is_new: false },
+  { id: 10, name: 'Amira Khalil', is_new: true },
 ];
 
 /** The "current user" is always employee 1. */
@@ -59,10 +60,21 @@ function seededRandom(seed: number) {
 const SHIFT_TYPE_KEYS = ['ect', 'internal', 'er'] as const;
 
 // ── Caches ───────────────────────────────────────────────────────────
-const assignmentCache = new Map<string, Map<string, { name: string; id: number; shift_type: string }[]>>();
-const scheduleCache = new Map<string, MonthSchedule>();
-const exchangeCache = new Map<string, ExchangeRequest[]>();
-const availabilityCache = new Map<string, EmployeeAvailability[]>();
+// Caches are cleared on HMR to ensure code changes take effect immediately.
+let assignmentCache = new Map<string, Map<string, { name: string; id: number; shift_type: string }[]>>();
+let scheduleCache = new Map<string, MonthSchedule>();
+let exchangeCache = new Map<string, ExchangeRequest[]>();
+let availabilityCache = new Map<string, EmployeeAvailability[]>();
+
+// Clear caches on HMR so code changes take effect without full reload
+if (typeof module !== 'undefined' && (module as any).hot) {
+  (module as any).hot.dispose(() => {
+    assignmentCache = new Map();
+    scheduleCache = new Map();
+    exchangeCache = new Map();
+    availabilityCache = new Map();
+  });
+}
 
 // ── Date helpers ─────────────────────────────────────────────────────
 function getDaysInMonth(year: number, month: number): number {
@@ -285,14 +297,22 @@ export function generateFormResponses(
 }
 
 // ── Helpers for flat view (for swap validation) ──────────────────────
-/** Flatten multi-entry assignments to a simple date->first-entry map for swap validation. */
+/**
+ * Flatten multi-entry assignments for a specific employee.
+ * Picks the entry matching `forEmployeeName` when present, otherwise first.
+ */
 function flattenAssignments(
-  assignments: Map<string, { name: string; id: number; shift_type: string }[]>
+  assignments: Map<string, { name: string; id: number; shift_type: string }[]>,
+  forEmployeeName?: string
 ): Map<string, { name: string; id: number }> {
   const flat = new Map<string, { name: string; id: number }>();
   for (const [dateStr, entries] of assignments) {
     if (entries.length > 0) {
-      flat.set(dateStr, { name: entries[0].name, id: entries[0].id });
+      const match = forEmployeeName
+        ? entries.find((e) => e.name === forEmployeeName)
+        : undefined;
+      const entry = match || entries[0];
+      flat.set(dateStr, { name: entry.name, id: entry.id });
     }
   }
   return flat;
@@ -306,19 +326,23 @@ function validateSwap(
   targetName: string,
   targetDate: string
 ): string[] {
-  const flat = flattenAssignments(assignments);
   const errors: string[] = [];
 
-  // 1. Ownership check
-  const rAssignee = flat.get(requesterDate);
-  const tAssignee = flat.get(targetDate);
-  if (!rAssignee || rAssignee.name !== requesterName) {
+  // 1. Ownership check — look at raw entries to support multi-type dates
+  const rEntries = assignments.get(requesterDate) || [];
+  const tEntries = assignments.get(targetDate) || [];
+  const rAssignee = rEntries.find((e) => e.name === requesterName);
+  const tAssignee = tEntries.find((e) => e.name === targetName);
+  if (!rAssignee) {
     errors.push(`${requesterName} is not assigned to ${requesterDate}`);
   }
-  if (!tAssignee || tAssignee.name !== targetName) {
+  if (!tAssignee) {
     errors.push(`${targetName} is not assigned to ${targetDate}`);
   }
   if (errors.length > 0) return errors;
+
+  // Build flat view for per-employee constraint checks
+  const flat = flattenAssignments(assignments);
 
   // Simulate swap
   const simulated = new Map(flat);
@@ -437,6 +461,34 @@ export function generateMockCandidates(
         }
       }
     }
+  }
+
+  // Also include employees who are available on the shift date but have no
+  // assignments yet (they can simply take the shift — no swap needed).
+  // This ensures the candidates panel is never empty for a valid user shift.
+  for (const emp of EMPLOYEES) {
+    if (emp.id === CURRENT_USER_ID) continue;
+    if (candidates.some((c) => c.employee_id === emp.id)) continue;
+
+    const avail = formResponses.find((a) => a.employeeId === emp.id);
+    if (!avail || !avail.availableDates.includes(shiftDate)) continue;
+
+    const empDates: string[] = [];
+    for (const [d, ents] of assignments) {
+      if (ents.some((e) => e.id === emp.id)) empDates.push(d);
+    }
+
+    // Prefer employees with fewer shifts but allow up to 2 for mock variety
+    if (empDates.length > 2) continue;
+
+    candidates.push({
+      employee_id: emp.id,
+      employee_name: emp.name,
+      eligible_dates: [shiftDate],
+      is_new: emp.is_new,
+      all_shift_dates: empDates,
+      availability: avail,
+    });
   }
 
   return candidates.sort((a, b) => a.employee_name.localeCompare(b.employee_name));

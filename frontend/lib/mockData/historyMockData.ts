@@ -8,9 +8,10 @@
 
 import { generateMonthAssignments } from './exchangeMockData';
 import { SHIFT_TYPES } from '../constants/shiftTypes';
+import { isDemoAllowed } from './demoMode';
 
 function assertNotProduction() {
-  if (process.env.NODE_ENV === 'production') {
+  if (!isDemoAllowed) {
     throw new Error('Mock data must not be used in production');
   }
 }
@@ -19,16 +20,16 @@ const SHIFT_TYPE_KEYS = Object.keys(SHIFT_TYPES);
 
 // Re-use the same roster
 const EMPLOYEES = [
-  { id: 1, name: 'Employee A', is_new: false },
-  { id: 2, name: 'Employee B', is_new: false },
-  { id: 3, name: 'Employee C', is_new: false },
-  { id: 4, name: 'Employee D', is_new: false },
-  { id: 5, name: 'Employee E', is_new: false },
-  { id: 6, name: 'Employee F', is_new: false },
-  { id: 7, name: 'Employee G', is_new: false },
-  { id: 8, name: 'Employee H', is_new: false },
-  { id: 9, name: 'Employee I', is_new: false },
-  { id: 10, name: 'Employee J', is_new: true },
+  { id: 1, name: 'Noa Levi', is_new: false },
+  { id: 2, name: 'James Wilson', is_new: false },
+  { id: 3, name: 'Fatima Al-Rashid', is_new: false },
+  { id: 4, name: 'Wei Chen', is_new: false },
+  { id: 5, name: 'Yael Mizrahi', is_new: false },
+  { id: 6, name: 'Sarah Thompson', is_new: false },
+  { id: 7, name: 'Omar Hassan', is_new: false },
+  { id: 8, name: 'Li Zhang', is_new: false },
+  { id: 9, name: 'David Cohen', is_new: false },
+  { id: 10, name: 'Amira Khalil', is_new: true },
 ];
 
 /** Get the last N months as YYYY-MM strings, ending with the current month. */
