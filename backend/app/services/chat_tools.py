@@ -186,6 +186,53 @@ def parse_tool_calls(text: str) -> list[dict]:
     return results
 
 
+def _normalize_time(value: str) -> str:
+    """Convert common time formats to iCal format (T060000).
+
+    Handles: '22:00', '10pm', '2:30pm', '06:00', 'T220000', etc.
+    """
+    if not value or (value.startswith("T") and len(value) == 7 and value[1:].isdigit()):
+        return value  # Already in iCal format
+
+    import re as _re
+
+    # "22:00" or "06:30" → T220000 / T063000
+    m = _re.match(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$", value)
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2))
+        s = int(m.group(3)) if m.group(3) else 0
+        return f"T{h:02d}{mi:02d}{s:02d}"
+
+    # "10pm", "6am", "2:30pm"
+    m = _re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$", value.lower())
+    if m:
+        h = int(m.group(1))
+        mi = int(m.group(2)) if m.group(2) else 0
+        if m.group(3) == "pm" and h != 12:
+            h += 12
+        if m.group(3) == "am" and h == 12:
+            h = 0
+        return f"T{h:02d}{mi:02d}00"
+
+    return value  # Return as-is; Pydantic will catch invalid formats
+
+
+def _normalize_params(params: dict) -> dict:
+    """Normalize AI-supplied params: fix times, derive missing fields."""
+    params = dict(params)  # shallow copy
+
+    for field in ("start_time", "end_time"):
+        if field in params and isinstance(params[field], str):
+            params[field] = _normalize_time(params[field])
+
+    # Auto-detect next_day_end if start > end
+    if "start_time" in params and "end_time" in params:
+        if "next_day_end" not in params:
+            params["next_day_end"] = params["start_time"] > params["end_time"]
+
+    return params
+
+
 def _extract_constraints(params: dict) -> dict:
     """Extract SchedulingConstraints fields from flat params dict."""
     constraint_fields = {
@@ -274,6 +321,7 @@ def _tool_get_shift_type(params: dict) -> dict:
 
 
 def _tool_validate_shift_type(params: dict) -> dict:
+    params = _normalize_params(params)
     key = params.get("key", "")
     errors = []
     warnings = []
@@ -307,6 +355,7 @@ def _tool_validate_shift_type(params: dict) -> dict:
 
 
 def _tool_create_shift_type(params: dict, user: Optional[dict]) -> dict:
+    params = _normalize_params(params)
     key = params.get("key", "")
 
     # Build the config

@@ -42,7 +42,7 @@ export default function ChatPage() {
   const [consentRequired, setConsentRequired] = useState(false);
   const [grantingConsent, setGrantingConsent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamingMessageId = useRef<string | null>(null);
 
   // Quick suggestions for common queries
@@ -301,12 +301,20 @@ export default function ChatPage() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
+
+  const autoResizeInput = useCallback(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+  }, []);
 
   const handleSuggestionClick = (suggestion: string) => {
     setInput(suggestion);
@@ -485,14 +493,18 @@ export default function ChatPage() {
           {/* Input Area */}
           <div className="border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0">
             <div className="flex gap-2">
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  autoResizeInput();
+                }}
+                onKeyDown={handleKeyDown}
+                rows={1}
                 placeholder="Ask about shifts, employees, or statistics..."
-                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none overflow-y-auto"
+                style={{ maxHeight: '120px' }}
                 disabled={loading || streaming || consentRequired}
               />
               <button
