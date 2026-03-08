@@ -31,7 +31,7 @@ import {
   mockCreateForm,
   mockDeleteForm,
 } from '@/lib/mockData/formsMockData';
-import { DEFAULT_SHIFT_TYPE, getShiftTypeStyle } from '@/lib/constants/shiftTypes';
+import { DEFAULT_SHIFT_TYPE, getShiftTypeStyle, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 import { useShiftTypes } from '@/hooks/useShiftTypes';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -54,6 +54,8 @@ export default function FormsPage() {
   const { canAccess, isLoading: accessLoading } = usePageAccess();
   const { useMockData, setUseMockData } = useExchangeStore();
   const { types: SHIFT_TYPES } = useShiftTypes();
+  // Safe accessor — always returns a valid config even during store transitions
+  const stFor = (key: string) => getShiftTypeConfig(key, SHIFT_TYPES);
 
   useEffect(() => {
     if (!accessLoading && !canAccess('/forms')) {
@@ -94,7 +96,7 @@ export default function FormsPage() {
 
   const generateFormQuestions = () => {
     if (!createdForm) return [];
-    const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+    const stConfig = stFor(shiftType);
     const questions = [
       { type: 'Short answer', question: 'Employee Name', required: true },
       { type: 'Multiple choice', question: `Is this your first month doing ${stConfig.label} shift?`, options: ['Yes', 'No'], required: true },
@@ -229,7 +231,7 @@ export default function FormsPage() {
 
     // Check if form already exists for this month + shift type
     const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
-    const stLabel = SHIFT_TYPES[shiftType]?.label || shiftType.toUpperCase();
+    const stLabel = stFor(shiftType).label;
     const existingForm = freshForms.find((f) => f?.month_year === monthYear && f?.shift_type === shiftType);
     if (existingForm) {
       console.log('Found existing form:', existingForm);
@@ -284,7 +286,7 @@ export default function FormsPage() {
   const isDateExcluded = (dateStr: string) => {
     const d = new Date(dateStr);
     const day = d.getDay();
-    const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+    const stConfig = stFor(shiftType);
     // Friday (5) and Saturday (6) excluded only for shift types that exclude weekends
     if (stConfig.excludeWeekends && (day === 5 || day === 6)) return true;
     // Tuesday (2) excluded unless includeTuesdays (only for weekend-excluding types)
@@ -301,7 +303,7 @@ export default function FormsPage() {
   const toggleDate = (dateStr: string) => {
     const d = new Date(dateStr);
     const day = d.getDay();
-    const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+    const stConfig = stFor(shiftType);
 
     // Can't toggle Friday/Saturday for types that exclude weekends
     if (stConfig.excludeWeekends && (day === 5 || day === 6)) return;
@@ -419,7 +421,7 @@ export default function FormsPage() {
                 .padStart(2, '0')}`;
               const d = new Date(dateStr);
               const dayOfWeek = d.getDay();
-              const stConfig = SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect;
+              const stConfig = stFor(shiftType);
               const isWeekend = stConfig.excludeWeekends && (dayOfWeek === 5 || dayOfWeek === 6);
               const isTuesday = stConfig.excludeWeekends && dayOfWeek === 2;
               const included = isDateIncluded(dateStr);
@@ -454,7 +456,7 @@ export default function FormsPage() {
               <div className="w-4 h-4 rounded bg-primary-100 dark:bg-primary-900/30 border-2 border-primary-500" />
               <span>Included</span>
             </div>
-            {(SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect).excludeWeekends && (
+            {(stFor(shiftType)).excludeWeekends && (
               <>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800" />
@@ -526,7 +528,7 @@ export default function FormsPage() {
             )}
 
             {/* Include Tuesdays Toggle - only relevant for ECT (weekend-excluding types) */}
-            {(SHIFT_TYPES[shiftType] || SHIFT_TYPES.ect).excludeWeekends && (
+            {(stFor(shiftType)).excludeWeekends && (
               <button
                 onClick={() => setIncludeTuesdays(!includeTuesdays)}
                 className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -563,7 +565,7 @@ export default function FormsPage() {
                 <X className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm text-amber-700 dark:text-amber-300">
-                    A {SHIFT_TYPES[shiftType]?.label || 'ECT'} form already exists for {MONTHS[month - 1]} {year}.
+                    A {stFor(shiftType).label} form already exists for {MONTHS[month - 1]} {year}.
                   </p>
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                     Delete the existing form below to create a new one, or select a different shift type.
@@ -596,10 +598,10 @@ export default function FormsPage() {
             <div
               className={cn(
                 'p-4 rounded-2xl border border-l-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
-                SHIFT_TYPES[shiftType]?.borderClass,
+                stFor(shiftType).borderClass,
               )}
-              style={!SHIFT_TYPES[shiftType]?.borderClass
-                ? { borderLeftColor: SHIFT_TYPES[shiftType]?.color }
+              style={!stFor(shiftType).borderClass
+                ? { borderLeftColor: stFor(shiftType).color }
                 : undefined
               }
             >
@@ -613,14 +615,14 @@ export default function FormsPage() {
                     <span
                       className={cn(
                         'px-2 py-0.5 rounded-full text-xs font-semibold text-white',
-                        SHIFT_TYPES[shiftType]?.bgClass,
+                        stFor(shiftType).bgClass,
                       )}
-                      style={!SHIFT_TYPES[shiftType]?.bgClass
-                        ? { backgroundColor: SHIFT_TYPES[shiftType]?.color }
+                      style={!stFor(shiftType).bgClass
+                        ? { backgroundColor: stFor(shiftType).color }
                         : undefined
                       }
                     >
-                      {SHIFT_TYPES[shiftType]?.label || shiftType}
+                      {stFor(shiftType).label}
                     </span>
                   </div>
 
@@ -772,7 +774,7 @@ export default function FormsPage() {
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-slate-900 dark:text-white">{form.title}</p>
                     {(() => {
-                      const formSt = SHIFT_TYPES[form.shift_type] || SHIFT_TYPES.ect;
+                      const formSt = stFor(form.shift_type || 'ect');
                       return (
                         <span
                           className={cn(
