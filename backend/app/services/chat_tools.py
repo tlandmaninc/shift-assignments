@@ -164,14 +164,24 @@ def build_tools_prompt() -> str:
     return "\n".join(lines)
 
 
+_TOOL_CALL_FENCED_RE = re.compile(
+    r'```tool_call\s*\n?\s*(\{.*?\})\s*\n?\s*```', re.DOTALL,
+)
+_TOOL_CALL_BARE_RE = re.compile(
+    r'(?:^|\n)\s*(\{"tool"\s*:\s*"[^"]+"\s*,\s*"params"\s*:\s*\{.*?\}\s*\})\s*(?:\n|$)',
+    re.DOTALL,
+)
+
+
 def parse_tool_calls(text: str) -> list[dict]:
     """Parse tool_call blocks from AI response text.
 
-    Looks for ```tool_call ... ``` blocks containing JSON.
+    Handles both fenced (```tool_call {...}```) and bare JSON blocks.
     Returns list of {tool, params} dicts.
     """
-    pattern = r"```tool_call\s*\n?\s*(\{.*?\})\s*\n?\s*```"
-    matches = re.findall(pattern, text, re.DOTALL)
+    matches = _TOOL_CALL_FENCED_RE.findall(text)
+    if not matches:
+        matches = _TOOL_CALL_BARE_RE.findall(text)
     results = []
     for match in matches:
         try:
@@ -184,6 +194,13 @@ def parse_tool_calls(text: str) -> list[dict]:
         except json.JSONDecodeError:
             logger.warning("Failed to parse tool call JSON: %s", match[:200])
     return results
+
+
+def strip_tool_call_blocks(text: str) -> str:
+    """Remove tool_call blocks (fenced and bare JSON) from text."""
+    text = _TOOL_CALL_FENCED_RE.sub('', text)
+    text = _TOOL_CALL_BARE_RE.sub('\n', text)
+    return text.strip()
 
 
 def _normalize_time(value: str) -> str:

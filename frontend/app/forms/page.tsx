@@ -31,7 +31,8 @@ import {
   mockCreateForm,
   mockDeleteForm,
 } from '@/lib/mockData/formsMockData';
-import { SHIFT_TYPES, DEFAULT_SHIFT_TYPE } from '@/lib/constants/shiftTypes';
+import { DEFAULT_SHIFT_TYPE, getShiftTypeStyle } from '@/lib/constants/shiftTypes';
+import { useShiftTypes } from '@/hooks/useShiftTypes';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -52,6 +53,7 @@ export default function FormsPage() {
   const router = useRouter();
   const { canAccess, isLoading: accessLoading } = usePageAccess();
   const { useMockData, setUseMockData } = useExchangeStore();
+  const { types: SHIFT_TYPES } = useShiftTypes();
 
   useEffect(() => {
     if (!accessLoading && !canAccess('/forms')) {
@@ -477,21 +479,32 @@ export default function FormsPage() {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Shift Type
               </p>
-              <div className="flex gap-2">
-                {Object.entries(SHIFT_TYPES).map(([key, config]) => (
-                  <button
-                    key={key}
-                    onClick={() => setShiftType(key)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-full text-xs font-semibold transition-all border',
-                      shiftType === key
-                        ? `${config.bgClass} text-white ${config.borderClass}`
-                        : `${config.bgLight} ${config.textClass} border-transparent hover:${config.borderClass}`
-                    )}
-                  >
-                    {config.label}
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(SHIFT_TYPES).map(([key, config]) => {
+                  const style = getShiftTypeStyle(config);
+                  const isActive = shiftType === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setShiftType(key)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-semibold transition-all border',
+                        style.bgClass
+                          ? isActive
+                            ? `${style.bgClass} text-white ${style.borderClass}`
+                            : `${style.bgLight} ${style.textClass} border-transparent`
+                          : 'border-transparent',
+                      )}
+                      style={!style.bgClass ? {
+                        backgroundColor: isActive ? config.color : `${config.color}20`,
+                        color: isActive ? '#fff' : config.color,
+                        borderColor: isActive ? config.color : 'transparent',
+                      } : undefined}
+                    >
+                      {config.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -580,10 +593,16 @@ export default function FormsPage() {
 
           {/* Created Form Info */}
           {createdForm && (
-            <Card className={cn(
-              'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
-              `border-l-4 ${SHIFT_TYPES[shiftType]?.borderClass || 'border-blue-500'}`
-            )}>
+            <div
+              className={cn(
+                'p-4 rounded-2xl border border-l-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+                SHIFT_TYPES[shiftType]?.borderClass,
+              )}
+              style={!SHIFT_TYPES[shiftType]?.borderClass
+                ? { borderLeftColor: SHIFT_TYPES[shiftType]?.color }
+                : undefined
+              }
+            >
               <div className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -591,12 +610,17 @@ export default function FormsPage() {
                     <p className="font-medium text-emerald-800 dark:text-emerald-300">
                       Form Created!
                     </p>
-                    <span className={cn(
-                      'px-2 py-0.5 rounded-full text-xs font-semibold',
-                      SHIFT_TYPES[shiftType]?.bgClass || 'bg-blue-500',
-                      'text-white'
-                    )}>
-                      {SHIFT_TYPES[shiftType]?.label || 'ECT'}
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-xs font-semibold text-white',
+                        SHIFT_TYPES[shiftType]?.bgClass,
+                      )}
+                      style={!SHIFT_TYPES[shiftType]?.bgClass
+                        ? { backgroundColor: SHIFT_TYPES[shiftType]?.color }
+                        : undefined
+                      }
+                    >
+                      {SHIFT_TYPES[shiftType]?.label || shiftType}
                     </span>
                   </div>
 
@@ -679,7 +703,7 @@ export default function FormsPage() {
                   </div>
                 </div>
               </div>
-            </Card>
+            </div>
           )}
 
           {/* Form Instructions */}
@@ -750,11 +774,16 @@ export default function FormsPage() {
                     {(() => {
                       const formSt = SHIFT_TYPES[form.shift_type] || SHIFT_TYPES.ect;
                       return (
-                        <span className={cn(
-                          'px-2 py-0.5 rounded-full text-xs font-semibold',
-                          formSt.bgClass,
-                          'text-white'
-                        )}>
+                        <span
+                          className={cn(
+                            'px-2 py-0.5 rounded-full text-xs font-semibold text-white',
+                            formSt.bgClass,
+                          )}
+                          style={!formSt.bgClass
+                            ? { backgroundColor: formSt.color }
+                            : undefined
+                          }
+                        >
                           {formSt.label}
                         </span>
                       );

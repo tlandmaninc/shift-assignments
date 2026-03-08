@@ -10,10 +10,9 @@ export function useShiftTypes(): {
   const { types, loaded, fetchTypes } = useShiftTypeStore();
 
   useEffect(() => {
-    if (!loaded) {
-      fetchTypes();
-    }
-  }, [loaded, fetchTypes]);
+    // Always refetch on mount so newly created types appear after navigation
+    fetchTypes();
+  }, [fetchTypes]);
 
   return { types, loaded, refresh: fetchTypes };
 }

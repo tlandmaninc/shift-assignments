@@ -34,7 +34,7 @@ export const useShiftTypeStore = create<ShiftTypeState>((set, get) => ({
   loading: false,
 
   fetchTypes: async () => {
-    if (get().loading) return;
+    if (get().loading) return;  // Prevent concurrent fetches only
     set({ loading: true });
     try {
       const raw = await shiftTypesApi.list();

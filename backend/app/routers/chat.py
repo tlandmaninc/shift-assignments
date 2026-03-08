@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import re
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -24,13 +23,6 @@ from .auth import get_required_user, require_employee_or_admin
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 limiter = Limiter(key_func=get_remote_address)
-
-_TOOL_CALL_RE = re.compile(r'```tool_call\s*\n?\s*\{.*?\}\s*\n?\s*```', re.DOTALL)
-
-
-def _strip_tool_call_blocks(text: str) -> str:
-    """Remove ```tool_call ... ``` blocks from text before streaming to user."""
-    return _TOOL_CALL_RE.sub('', text).strip()
 
 # Initialize chat service
 chat_service = ChatService(storage)
@@ -209,20 +201,16 @@ async def stream_message(
                 conversation_history=history,
                 user=user,
             ):
-                # Tool events are dicts, text chunks are strings
+                # Tool/thinking events are dicts, text chunks are strings
                 if isinstance(chunk, dict):
-                    tool = chunk.get('tool', '?')
-                    status = chunk.get('status', '?')
-                    thinking_msg = f"Tool: {tool} — {status}"
-                    yield f"data: {json.dumps({'thinking': thinking_msg})}\n\n"
+                    if "thinking" in chunk:
+                        yield f"data: {json.dumps({'thinking': chunk['thinking']})}\n\n"
+                    else:
+                        tool = chunk.get('tool', '?')
+                        status = chunk.get('status', '?')
+                        thinking_msg = f"Tool: {tool} — {status}"
+                        yield f"data: {json.dumps({'thinking': thinking_msg})}\n\n"
                     continue
-
-                # Extract tool_call blocks as thinking before stripping
-                if '```tool_call' in chunk:
-                    yield f"data: {json.dumps({'thinking': chunk})}\n\n"
-                    chunk = _strip_tool_call_blocks(chunk)
-                    if not chunk:
-                        continue
 
                 full_content += chunk
                 # Split large chunks into words for a progressive streaming effect.

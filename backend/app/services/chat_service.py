@@ -20,6 +20,7 @@ from .chat_tools import (
     build_tools_prompt,
     parse_tool_calls,
     execute_tool,
+    strip_tool_call_blocks,
     MAX_TOOL_ITERATIONS,
 )
 
@@ -489,7 +490,7 @@ Assignment rules:
         system_prompt = self._build_system_prompt(context, user)
         messages = self._build_messages(message, conversation_history)
 
-        # Try primary provider, fall back on quota errors
+        # Buffer first response so we can strip tool blocks before streaming
         active_provider = self.provider
         try:
             first_response = ""
@@ -499,7 +500,6 @@ Assignment rules:
                 max_tokens=2048,
             ):
                 first_response += chunk
-                yield chunk
         except RuntimeError as e:
             if "rate-limited" not in str(e).lower() and "429" not in str(e):
                 raise
@@ -514,7 +514,6 @@ Assignment rules:
                         max_tokens=2048,
                     ):
                         first_response += chunk
-                        yield chunk
                     active_provider = fb
                     break
                 except Exception:
@@ -522,10 +521,19 @@ Assignment rules:
             else:
                 raise  # No fallback worked
 
-        # Check if the streamed response contains tool calls
+        # Check if the response contains tool calls
         tool_calls = parse_tool_calls(first_response)
+
+        # Strip tool blocks and yield the clean user-facing text
+        clean_text = strip_tool_call_blocks(first_response) if tool_calls else first_response
+        if clean_text:
+            yield clean_text
+
         if not tool_calls:
             return  # No tools — we're done
+
+        # Send thinking event with the raw tool calls
+        yield {"thinking": first_response}
 
         # Execute tool calls
         messages.append({"role": "assistant", "content": first_response})
@@ -558,7 +566,7 @@ Assignment rules:
             follow_up_calls = parse_tool_calls(content) if result.success else []
 
             if not follow_up_calls:
-                yield content
+                yield strip_tool_call_blocks(content) or content
                 return
 
             messages.append({"role": "assistant", "content": content})

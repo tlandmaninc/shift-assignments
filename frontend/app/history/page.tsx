@@ -49,9 +49,8 @@ import { printCalendarHtml } from '@/lib/printCalendar';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
-import { SHIFT_TYPES, DEFAULT_SHIFT_TYPE, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
-
-const SHIFT_TYPE_KEYS = Object.keys(SHIFT_TYPES);
+import { DEFAULT_SHIFT_TYPE, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
+import { useShiftTypes } from '@/hooks/useShiftTypes';
 
 // Color palette for charts (used for per-employee lines)
 const CHART_COLORS = [
@@ -269,6 +268,8 @@ const getHeatCellStyle = (val: number, maxVal: number, shiftTypeColor?: string) 
 export default function HistoryPage() {
   const router = useRouter();
   const { canAccess, isLoading: accessLoading } = usePageAccess();
+  const { types: dynamicTypes } = useShiftTypes();
+  const SHIFT_TYPE_KEYS = Object.keys(dynamicTypes);
 
   useEffect(() => {
     if (!accessLoading && !canAccess('/history')) {
@@ -455,7 +456,7 @@ export default function HistoryPage() {
         .map((emp: any) => {
           const entry: any = { name: emp.name, total: emp.total_shifts };
           for (const [type, count] of Object.entries(emp.shifts_by_type || {})) {
-            entry[getShiftTypeConfig(type).label] = count as number;
+            entry[getShiftTypeConfig(type, dynamicTypes).label] = count as number;
           }
           return entry;
         });
@@ -641,7 +642,7 @@ export default function HistoryPage() {
           >
             All Types
           </button>
-          {Object.entries(SHIFT_TYPES).map(([key, config]) => (
+          {Object.entries(dynamicTypes).map(([key, config]) => (
             <button
               key={key}
               onClick={() => setSelectedShiftType(key)}
@@ -720,11 +721,11 @@ export default function HistoryPage() {
                   <span
                     className={cn(
                       'ml-1 px-1.5 py-0.5 rounded text-xs font-medium',
-                      SHIFT_TYPES[selectedShiftType].bgLight,
-                      SHIFT_TYPES[selectedShiftType].textClass
+                      dynamicTypes[selectedShiftType].bgLight,
+                      dynamicTypes[selectedShiftType].textClass
                     )}
                   >
-                    {SHIFT_TYPES[selectedShiftType].label}
+                    {dynamicTypes[selectedShiftType].label}
                   </span>
                 )}
                 <UITooltip
@@ -1140,7 +1141,7 @@ export default function HistoryPage() {
           {activeChart === 'trends' && 'Each line represents one employee\'s monthly shift count. Hover to compare across all staff.'}
           {activeChart === 'monthly' && 'Stacked bars show ECT, Internal, and ER shift counts per month. Hover a bar segment to see the exact count.'}
           {activeChart === 'distribution' && (selectedShiftType
-            ? `Inner ring: total ${SHIFT_TYPES[selectedShiftType]?.label} shifts. Outer ring: each employee's share. Hover a segment to inspect.`
+            ? `Inner ring: total ${dynamicTypes[selectedShiftType]?.label} shifts. Outer ring: each employee's share. Hover a segment to inspect.`
             : 'Inner ring shows total shifts per type (ECT / Internal / ER). Outer ring breaks each type into individual employees.')}
           {activeChart === 'heatmap' && 'Darker cells = more shifts that month. Hover a cell to see the exact count. Rows are sorted by total shifts.'}
         </p>
@@ -1222,7 +1223,7 @@ export default function HistoryPage() {
                         />
                         <Tooltip content={<MonthlyShiftsTooltip />} />
                         {selectedShiftType ? (
-                          <Bar dataKey="shifts" name={`${getShiftTypeConfig(selectedShiftType).label} Shifts`} fill={getShiftTypeConfig(selectedShiftType).color} radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="shifts" name={`${getShiftTypeConfig(selectedShiftType, dynamicTypes).label} Shifts`} fill={getShiftTypeConfig(selectedShiftType, dynamicTypes).color} radius={[4, 4, 0, 0]} />
                         ) : (
                           <>
                             <Bar dataKey="ect" name="ECT" stackId="s" fill="#3B82F6" radius={[0, 0, 0, 0]} />
@@ -1267,8 +1268,8 @@ export default function HistoryPage() {
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Shift Types</p>
                   {selectedShiftType ? (
                     <div className="flex items-center gap-2">
-                      <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: getShiftTypeConfig(selectedShiftType).color }} />
-                      <span className="text-xs text-slate-300">{getShiftTypeConfig(selectedShiftType).label}</span>
+                      <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: getShiftTypeConfig(selectedShiftType, dynamicTypes).color }} />
+                      <span className="text-xs text-slate-300">{getShiftTypeConfig(selectedShiftType, dynamicTypes).label}</span>
                     </div>
                   ) : (
                     <>
@@ -1301,8 +1302,8 @@ export default function HistoryPage() {
 
               const employees = (activeFairness?.employees || []).filter((emp: any) => emp.total_shifts > 0);
               const relevantTypes = selectedShiftType
-                ? Object.entries(SHIFT_TYPES).filter(([k]) => k === selectedShiftType)
-                : Object.entries(SHIFT_TYPES);
+                ? Object.entries(dynamicTypes).filter(([k]) => k === selectedShiftType)
+                : Object.entries(dynamicTypes);
 
               // Inner ring data (shift types)
               const typeData = relevantTypes.map(([key, config]: any) => {
@@ -1632,7 +1633,7 @@ export default function HistoryPage() {
         <CardHeader
           title="Employee Distribution"
           description={selectedShiftType
-            ? `Shift distribution for ${SHIFT_TYPES[selectedShiftType].label} type`
+            ? `Shift distribution for ${dynamicTypes[selectedShiftType].label} type`
             : 'Total shifts per employee — color segments show breakdown by type'}
           tooltip={
             <UITooltip
@@ -1753,11 +1754,11 @@ export default function HistoryPage() {
                                   key={key}
                                   className={cn(
                                     'px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                                    SHIFT_TYPES[key].bgLight,
-                                    SHIFT_TYPES[key].textClass
+                                    dynamicTypes[key].bgLight,
+                                    dynamicTypes[key].textClass
                                   )}
                                 >
-                                  {count} {SHIFT_TYPES[key].label}
+                                  {count} {dynamicTypes[key].label}
                                 </span>
                               );
                             })}
@@ -1778,7 +1779,7 @@ export default function HistoryPage() {
                 {!selectedShiftType && emp.shifts_by_type ? (
                   /* Segmented bar: one segment per shift type */
                   <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
-                    {Object.entries(SHIFT_TYPES).map(([key, config]) => {
+                    {Object.entries(dynamicTypes).map(([key, config]) => {
                       const count = emp.shifts_by_type[key] || 0;
                       const segPct = activeFairness.max_shifts > 0
                         ? (count / activeFairness.max_shifts) * 100
@@ -1806,7 +1807,7 @@ export default function HistoryPage() {
                       className={`h-full rounded-full ${
                         isAboveAverage ? 'bg-emerald-500' : 'bg-primary-500'
                       }`}
-                      style={selectedShiftType ? { backgroundColor: getShiftTypeConfig(selectedShiftType).color } : {}}
+                      style={selectedShiftType ? { backgroundColor: getShiftTypeConfig(selectedShiftType, dynamicTypes).color } : {}}
                     />
                   </div>
                 )}
@@ -1979,9 +1980,9 @@ export default function HistoryPage() {
                             <span
                               key={type}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-white"
-                              style={{ backgroundColor: getShiftTypeConfig(type).color }}
+                              style={{ backgroundColor: getShiftTypeConfig(type, dynamicTypes).color }}
                             >
-                              {count} {getShiftTypeConfig(type).label}
+                              {count} {getShiftTypeConfig(type, dynamicTypes).label}
                             </span>
                           ))}
                         </span>

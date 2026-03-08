@@ -21,12 +21,14 @@ import { Card, CardHeader, Button, Badge } from '@/components/ui';
 import { formsApi, assignmentsApi, googleApi } from '@/lib/api';
 import { cn, formatMonthYear } from '@/lib/utils';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
-import { SHIFT_TYPES, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
+import { getShiftTypeConfig } from '@/lib/constants/shiftTypes';
+import { useShiftTypes } from '@/hooks/useShiftTypes';
 import toast from 'react-hot-toast';
 
 export default function AssignmentsPage() {
   const router = useRouter();
   const { canAccess, isLoading: accessLoading } = usePageAccess();
+  const { types: dynamicTypes } = useShiftTypes();
 
   useEffect(() => {
     if (!accessLoading && !canAccess('/assignments')) {
@@ -245,7 +247,7 @@ export default function AssignmentsPage() {
                       {form.title}
                     </p>
                     {(() => {
-                      const stConfig = getShiftTypeConfig(form.shift_type || 'ect');
+                      const stConfig = getShiftTypeConfig(form.shift_type || 'ect', dynamicTypes);
                       return (
                         <span className={cn(
                           'px-2 py-0.5 rounded-full text-xs font-semibold text-white',
@@ -519,7 +521,7 @@ export default function AssignmentsPage() {
                     Assignments Generated Successfully!
                   </h3>
                   {(() => {
-                    const stConfig = getShiftTypeConfig(selectedForm?.shift_type || 'ect');
+                    const stConfig = getShiftTypeConfig(selectedForm?.shift_type || 'ect', dynamicTypes);
                     return (
                       <span className={cn(
                         'px-2 py-0.5 rounded-full text-xs font-semibold text-white',

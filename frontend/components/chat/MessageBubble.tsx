@@ -49,7 +49,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
       <div
         className={cn(
-          'max-w-[80%] p-4 rounded-2xl',
+          'max-w-[80%] p-4 rounded-2xl overflow-hidden break-words',
           isUser
             ? 'bg-primary-500 text-white rounded-tr-sm'
             : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-tl-sm'
@@ -70,7 +70,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {message.content}
           </p>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-base prose-strong:text-inherit">
+          <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:text-base prose-strong:text-inherit prose-code:text-inherit prose-code:bg-black/10 dark:prose-code:bg-white/10 prose-code:px-1 prose-code:rounded prose-pre:bg-black/10 dark:prose-pre:bg-white/10 prose-pre:p-2 prose-pre:rounded-lg [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         )}
