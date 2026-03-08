@@ -71,6 +71,138 @@ const TIME_PRESETS: { id: TimePreset; label: string }[] = [
   { id: 'custom', label: 'Custom' },
 ];
 
+type DateRange = { from: string | null; to: string | null };
+
+/** Compute a DateRange from a preset and a sorted list of available months. */
+function computeDateRange(preset: TimePreset, availableMonths: string[], customRange: DateRange): DateRange {
+  if (preset === 'all' || availableMonths.length === 0) return { from: null, to: null };
+  if (preset === 'custom') return customRange;
+  const latest = availableMonths[availableMonths.length - 1];
+  const [y, m] = latest.split('-').map(Number);
+  const months = preset === '3m' ? 3 : preset === '6m' ? 6 : 12;
+  const fromDate = new Date(y, m - 1 - (months - 1), 1);
+  const fromStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
+  return { from: fromStr, to: null };
+}
+
+/** Generic date range filter for arrays with a month_year-like key. */
+function filterDataByRange<T extends Record<string, any>>(
+  data: T[], range: DateRange, monthKey = 'month_year'
+): T[] {
+  if (!range.from && !range.to) return data;
+  return data.filter(d => {
+    const m = d[monthKey];
+    if (range.from && m < range.from) return false;
+    if (range.to && m > range.to) return false;
+    return true;
+  });
+}
+
+/** Filter a monthly_shifts record by date range. */
+function filterShiftsByRange(monthlyShifts: Record<string, number>, range: DateRange): Record<string, number> {
+  if (!range.from && !range.to) return monthlyShifts;
+  const filtered: Record<string, number> = {};
+  for (const [month, count] of Object.entries(monthlyShifts)) {
+    if (range.from && month < range.from) continue;
+    if (range.to && month > range.to) continue;
+    filtered[month] = count;
+  }
+  return filtered;
+}
+
+/** Per-chart time filter chip strip. Fixed size — Custom opens a popover overlay. */
+const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, onCustomChange }: {
+  preset: TimePreset;
+  onChange: (p: TimePreset) => void;
+  availableMonths: string[];
+  customRange: DateRange;
+  onCustomChange: (r: DateRange) => void;
+}) => {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setPopoverOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative flex items-center gap-1" ref={ref}>
+      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 gap-0.5">
+        {TIME_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => {
+              if (p.id === 'custom') {
+                setPopoverOpen(!popoverOpen);
+                onChange('custom');
+              } else {
+                setPopoverOpen(false);
+                onChange(p.id);
+              }
+            }}
+            className={cn(
+              'px-2 py-1 rounded-md text-[11px] font-semibold transition-all',
+              preset === p.id
+                ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {preset !== 'all' && (
+        <button
+          onClick={() => { onChange('all'); setPopoverOpen(false); }}
+          className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
+          title="Reset"
+        >
+          <RotateCcw className="w-3 h-3" />
+        </button>
+      )}
+      {/* Custom range popover */}
+      <AnimatePresence>
+        {popoverOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.1 }}
+            className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 flex items-center gap-2"
+          >
+            <select
+              value={customRange.from || ''}
+              onChange={(e) => onCustomChange({ ...customRange, from: e.target.value || null })}
+              className="px-2 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">From</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>{formatMonthYear(m)}</option>
+              ))}
+            </select>
+            <span className="text-slate-400 text-xs">–</span>
+            <select
+              value={customRange.to || ''}
+              onChange={(e) => onCustomChange({ ...customRange, to: e.target.value || null })}
+              className="px-2 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Latest</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>{formatMonthYear(m)}</option>
+              ))}
+            </select>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
+ChartTimeFilter.displayName = 'ChartTimeFilter';
+
 // Shared chart tooltip container classes
 const TOOLTIP_BOX = 'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[280px]';
 
@@ -299,10 +431,17 @@ export default function HistoryPage() {
   const [calendarHtml, setCalendarHtml] = useState<string>('');
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [selectedShiftType, setSelectedShiftType] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
-  const [timePreset, setTimePreset] = useState<TimePreset>('all');
-  const [showCustomRange, setShowCustomRange] = useState(false);
   const [sunburstDrill, setSunburstDrill] = useState<string | null>(null); // null = top level, string = drilled type key
+
+  // Per-chart time filter state
+  const [gapPreset, setGapPreset] = useState<TimePreset>('all');
+  const [gapCustom, setGapCustom] = useState<DateRange>({ from: null, to: null });
+  const [fairnessPreset, setFairnessPreset] = useState<TimePreset>('all');
+  const [fairnessCustom, setFairnessCustom] = useState<DateRange>({ from: null, to: null });
+  const [analyticsPreset, setAnalyticsPreset] = useState<TimePreset>('all');
+  const [analyticsCustom, setAnalyticsCustom] = useState<DateRange>({ from: null, to: null });
+  const [distPreset, setDistPreset] = useState<TimePreset>('all');
+  const [distCustom, setDistCustom] = useState<DateRange>({ from: null, to: null });
 
   // Available months for date range picker (sorted)
   const availableMonths = useMemo(() => {
@@ -312,56 +451,18 @@ export default function HistoryPage() {
       .sort();
   }, [monthlyData]);
 
-  // Apply time preset to date range
-  const applyTimePreset = useCallback((preset: TimePreset) => {
-    setTimePreset(preset);
-    if (preset === 'all') {
-      setDateRange({ from: null, to: null });
-      setShowCustomRange(false);
-    } else if (preset === 'custom') {
-      setShowCustomRange(true);
-    } else {
-      setShowCustomRange(false);
-      if (availableMonths.length === 0) return;
-      const latest = availableMonths[availableMonths.length - 1];
-      const [y, m] = latest.split('-').map(Number);
-      const months = preset === '3m' ? 3 : preset === '6m' ? 6 : 12;
-      const fromDate = new Date(y, m - 1 - (months - 1), 1);
-      const fromStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
-      setDateRange({ from: fromStr, to: null });
-    }
-  }, [availableMonths]);
+  // Computed date ranges per chart
+  const gapRange = useMemo(() => computeDateRange(gapPreset, availableMonths, gapCustom), [gapPreset, availableMonths, gapCustom]);
+  const fairnessRange = useMemo(() => computeDateRange(fairnessPreset, availableMonths, fairnessCustom), [fairnessPreset, availableMonths, fairnessCustom]);
+  const analyticsRange = useMemo(() => computeDateRange(analyticsPreset, availableMonths, analyticsCustom), [analyticsPreset, availableMonths, analyticsCustom]);
+  const distRange = useMemo(() => computeDateRange(distPreset, availableMonths, distCustom), [distPreset, availableMonths, distCustom]);
 
-  // Date range filter helper
-  const filterByDateRange = useCallback(<T extends Record<string, any>>(data: T[], monthKey = 'month_year'): T[] => {
-    if (!dateRange.from && !dateRange.to) return data;
-    return data.filter(d => {
-      const m = d[monthKey];
-      if (dateRange.from && m < dateRange.from) return false;
-      if (dateRange.to && m > dateRange.to) return false;
-      return true;
-    });
-  }, [dateRange]);
-
-  // Filter months within employee trend monthly_shifts by date range
-  const filterMonthlyShifts = useCallback((monthlyShifts: Record<string, number>): Record<string, number> => {
-    if (!dateRange.from && !dateRange.to) return monthlyShifts;
-    const filtered: Record<string, number> = {};
-    for (const [month, count] of Object.entries(monthlyShifts)) {
-      if (dateRange.from && month < dateRange.from) continue;
-      if (dateRange.to && month > dateRange.to) continue;
-      filtered[month] = count;
-    }
-    return filtered;
-  }, [dateRange]);
-
-  // Memoized filtered fairness data
-  const activeFairness = useMemo(() => {
+  // Build filtered fairness for a given date range
+  const buildFairness = useCallback((range: DateRange) => {
     if (!fairness) return fairness;
 
     let employees = fairness.employees;
 
-    // Filter by shift type
     if (selectedShiftType) {
       employees = employees.map((emp: any) => ({
         ...emp,
@@ -369,18 +470,16 @@ export default function HistoryPage() {
       }));
     }
 
-    // If date range is set, recalculate totals from trends data
-    if ((dateRange.from || dateRange.to) && employeeTrends?.trends) {
+    if ((range.from || range.to) && employeeTrends?.trends) {
       employees = employees.map((emp: any) => {
         const trend = employeeTrends.trends.find((t: any) => t.employee_name === emp.name);
         if (!trend) return emp;
-        const filteredShifts = filterMonthlyShifts(trend.monthly_shifts || {});
+        const filteredShifts = filterShiftsByRange(trend.monthly_shifts || {}, range);
         const total = Object.values(filteredShifts).reduce((a: number, b: number) => a + b, 0);
         return { ...emp, total_shifts: total };
       });
     }
 
-    // Recalculate fairness metrics
     const shifts = employees.map((e: any) => e.total_shifts).filter((s: number) => s > 0);
     if (shifts.length === 0) return { ...fairness, employees, fairness_score: 100, average_shifts: 0, std_deviation: 0, min_shifts: 0, max_shifts: 0 };
 
@@ -400,7 +499,12 @@ export default function HistoryPage() {
       max_shifts: Math.max(...shifts),
       fairness_score: median > 0 ? Math.max(0, 100 - (mad / median) * 100) : 100,
     };
-  }, [fairness, selectedShiftType, dateRange, employeeTrends, filterMonthlyShifts]);
+  }, [fairness, selectedShiftType, employeeTrends]);
+
+  // Per-chart filtered fairness
+  const activeFairness = useMemo(() => buildFairness({ from: null, to: null }), [buildFairness]);
+  const gapFairness = useMemo(() => buildFairness(gapRange), [buildFairness, gapRange]);
+  const distFairness = useMemo(() => buildFairness(distRange), [buildFairness, distRange]);
 
   useEffect(() => {
     async function loadData() {
@@ -437,12 +541,11 @@ export default function HistoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Memoized chart data: Employee Trends line chart
-  // Backend already filters by shift_type via monthly_shifts.
+  // Memoized chart data: Employee Trends line chart (uses analyticsRange)
   const trendsChartData = useMemo(() => {
     if (!employeeTrends?.trends || !monthlyData?.months) return [];
 
-    const months = filterByDateRange(monthlyData.months)
+    const months = filterDataByRange(monthlyData.months, analyticsRange)
       .map((m: any) => m.month_year)
       .sort();
 
@@ -453,13 +556,13 @@ export default function HistoryPage() {
       });
       return dataPoint;
     });
-  }, [employeeTrends, monthlyData, selectedShiftType, filterByDateRange]);
+  }, [employeeTrends, monthlyData, selectedShiftType, analyticsRange]);
 
-  // Memoized chart data: Monthly stacked bar chart
+  // Memoized chart data: Monthly stacked bar chart (uses analyticsRange)
   const monthlyChartData = useMemo(() => {
     if (!monthlyData?.months) return [];
 
-    return filterByDateRange(monthlyData.months)
+    return filterDataByRange(monthlyData.months, analyticsRange)
       .sort((a: any, b: any) => a.month_year.localeCompare(b.month_year))
       .map((m: any) => ({
         month: formatMonthYear(m.month_year),
@@ -471,7 +574,7 @@ export default function HistoryPage() {
           er: m.by_type.er || 0,
         } : {}),
       }));
-  }, [monthlyData, selectedShiftType, filterByDateRange]);
+  }, [monthlyData, selectedShiftType, analyticsRange]);
 
   // Memoized chart data: Distribution chart
   // When All Types: per-employee stacked bar (ECT / Internal / ER per person)
@@ -507,11 +610,11 @@ export default function HistoryPage() {
     [distributionChartData]
   );
 
-  // Memoized sorted employees
+  // Memoized sorted employees (uses distFairness for Employee Distribution chart)
   const sortedEmployees = useMemo(() => {
-    if (!activeFairness?.employees) return [];
+    if (!distFairness?.employees) return [];
 
-    return [...activeFairness.employees].sort((a: any, b: any) => {
+    return [...distFairness.employees].sort((a: any, b: any) => {
       switch (employeeSort) {
         case 'shifts-desc': return b.total_shifts - a.total_shifts;
         case 'shifts-asc': return a.total_shifts - b.total_shifts;
@@ -520,13 +623,13 @@ export default function HistoryPage() {
         default: return b.total_shifts - a.total_shifts;
       }
     });
-  }, [activeFairness, employeeSort]);
+  }, [distFairness, employeeSort]);
 
-  // Memoized gap analysis data (diverging bar chart)
+  // Memoized gap analysis data (uses gapFairness)
   const gapAnalysisData = useMemo(() => {
-    if (!activeFairness?.employees || !activeFairness.average_shifts) return [];
-    const avg = activeFairness.average_shifts;
-    return [...activeFairness.employees]
+    if (!gapFairness?.employees || !gapFairness.average_shifts) return [];
+    const avg = gapFairness.average_shifts;
+    return [...gapFairness.employees]
       .map((emp: any) => ({
         name: emp.name,
         deviation: +(emp.total_shifts - avg).toFixed(1),
@@ -534,13 +637,13 @@ export default function HistoryPage() {
         isNew: emp.is_new,
       }))
       .sort((a: any, b: any) => b.deviation - a.deviation);
-  }, [activeFairness]);
+  }, [gapFairness]);
 
-  // Memoized fairness over time data (area chart)
+  // Memoized fairness over time data (uses fairnessRange)
   const fairnessTrendData = useMemo(() => {
     if (!employeeTrends?.trends || !monthlyData?.months) return [];
 
-    const months = filterByDateRange(monthlyData.months)
+    const months = filterDataByRange(monthlyData.months, fairnessRange)
       .map((m: any) => m.month_year)
       .sort();
 
@@ -567,13 +670,13 @@ export default function HistoryPage() {
         gap: Math.max(...counts) - Math.min(...counts),
       };
     });
-  }, [employeeTrends, monthlyData, selectedShiftType, filterByDateRange]);
+  }, [employeeTrends, monthlyData, selectedShiftType, fairnessRange]);
 
-  // Memoized heatmap data
+  // Memoized heatmap data (uses analyticsRange)
   const heatmapData = useMemo(() => {
     if (!employeeTrends?.trends || !monthlyData?.months) return { employees: [] as any[], months: [] as string[], maxCount: 0 };
 
-    const months = filterByDateRange(monthlyData.months)
+    const months = filterDataByRange(monthlyData.months, analyticsRange)
       .map((m: any) => m.month_year)
       .sort();
 
@@ -593,13 +696,13 @@ export default function HistoryPage() {
     }).sort((a: any, b: any) => b.total - a.total);
 
     return { employees, months, maxCount };
-  }, [employeeTrends, monthlyData, selectedShiftType, filterByDateRange]);
+  }, [employeeTrends, monthlyData, selectedShiftType, analyticsRange]);
 
-  // Filtered monthly list for Monthly History section
+  // Monthly list for Monthly History section (always shows all months)
   const filteredMonths = useMemo(() => {
     if (!monthlyData?.months) return [];
-    return filterByDateRange(monthlyData.months);
-  }, [monthlyData, filterByDateRange]);
+    return monthlyData.months;
+  }, [monthlyData]);
 
   const handleMonthClick = useCallback(async (monthYear: string) => {
     setSelectedMonth(monthYear);
@@ -698,83 +801,7 @@ export default function HistoryPage() {
           ))}
         </div>
 
-        {/* Time Period Filter */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <CalendarRange className="w-4 h-4 text-slate-400" />
-          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 gap-0.5">
-            {TIME_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => applyTimePreset(preset.id)}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
-                  timePreset === preset.id
-                    ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                )}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          {/* Custom range selects */}
-          <AnimatePresence>
-            {showCustomRange && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.15 }}
-                className="flex items-center gap-2 overflow-hidden"
-              >
-                <select
-                  value={dateRange.from || ''}
-                  onChange={(e) => {
-                    setDateRange(prev => ({ ...prev, from: e.target.value || null }));
-                    setTimePreset('custom');
-                  }}
-                  className="px-2 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="">From</option>
-                  {availableMonths.map((m: string) => (
-                    <option key={m} value={m}>{formatMonthYear(m)}</option>
-                  ))}
-                </select>
-                <span className="text-slate-400 text-xs">to</span>
-                <select
-                  value={dateRange.to || ''}
-                  onChange={(e) => {
-                    setDateRange(prev => ({ ...prev, to: e.target.value || null }));
-                    setTimePreset('custom');
-                  }}
-                  className="px-2 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="">Latest</option>
-                  {availableMonths.map((m: string) => (
-                    <option key={m} value={m}>{formatMonthYear(m)}</option>
-                  ))}
-                </select>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {(dateRange.from || dateRange.to) && (
-            <button
-              onClick={() => applyTimePreset('all')}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
-              title="Reset date range"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
       </div>
-
-      {/* Active filter indicator */}
-      {(dateRange.from || dateRange.to) && (
-        <div className="text-xs text-slate-500 dark:text-slate-400 -mt-3">
-          Showing {dateRange.from ? formatMonthYear(dateRange.from) : 'start'} – {dateRange.to ? formatMonthYear(dateRange.to) : 'latest'}
-        </div>
-      )}
 
       {/* Fairness Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -973,7 +1000,8 @@ export default function HistoryPage() {
         <Card>
           <CardHeader
             title="Shift Gap Analysis"
-            description={`Deviation from team average (${activeFairness?.average_shifts?.toFixed(1) || 0} shifts)`}
+            description={`Deviation from team average (${gapFairness?.average_shifts?.toFixed(1) || 0} shifts)`}
+            action={<ChartTimeFilter preset={gapPreset} onChange={setGapPreset} availableMonths={availableMonths} customRange={gapCustom} onCustomChange={setGapCustom} />}
             tooltip={
               <UITooltip
                 content={
@@ -1058,6 +1086,7 @@ export default function HistoryPage() {
           <CardHeader
             title="Fairness Over Time"
             description="Track fairness score and shift balance progression"
+            action={<ChartTimeFilter preset={fairnessPreset} onChange={setFairnessPreset} availableMonths={availableMonths} customRange={fairnessCustom} onCustomChange={setFairnessCustom} />}
             tooltip={
               <UITooltip
                 content={
@@ -1164,6 +1193,7 @@ export default function HistoryPage() {
         <CardHeader
           title="Analytics Dashboard"
           description="Interactive visualizations of shift data over time"
+          action={<ChartTimeFilter preset={analyticsPreset} onChange={setAnalyticsPreset} availableMonths={availableMonths} customRange={analyticsCustom} onCustomChange={setAnalyticsCustom} />}
           tooltip={
             <UITooltip
               content={
@@ -1722,6 +1752,7 @@ export default function HistoryPage() {
           description={selectedShiftType
             ? `Shift distribution for ${dynamicTypes[selectedShiftType].label} type`
             : 'Total shifts per employee — color segments show breakdown by type'}
+          action={<ChartTimeFilter preset={distPreset} onChange={setDistPreset} availableMonths={availableMonths} customRange={distCustom} onCustomChange={setDistCustom} />}
           tooltip={
             <UITooltip
               content={
@@ -1802,10 +1833,10 @@ export default function HistoryPage() {
         <div className="space-y-4">
           {sortedEmployees.map((emp: any) => {
             const percentage =
-              activeFairness.max_shifts > 0
-                ? (emp.total_shifts / activeFairness.max_shifts) * 100
+              distFairness.max_shifts > 0
+                ? (emp.total_shifts / distFairness.max_shifts) * 100
                 : 0;
-            const isAboveAverage = emp.total_shifts > activeFairness.average_shifts;
+            const isAboveAverage = emp.total_shifts > distFairness.average_shifts;
 
             return (
               <div key={emp.id} className="space-y-2">
@@ -1868,8 +1899,8 @@ export default function HistoryPage() {
                   <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
                     {Object.entries(dynamicTypes).map(([key, config]) => {
                       const count = emp.shifts_by_type[key] || 0;
-                      const segPct = activeFairness.max_shifts > 0
-                        ? (count / activeFairness.max_shifts) * 100
+                      const segPct = distFairness.max_shifts > 0
+                        ? (count / distFairness.max_shifts) * 100
                         : 0;
                       if (segPct === 0) return null;
                       return (
