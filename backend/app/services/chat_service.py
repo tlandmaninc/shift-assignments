@@ -231,7 +231,9 @@ Employees (by shifts):
 Fairness: {fairness['fairness_score']}%, Avg: {fairness['average_shifts']} shifts"""
         return context
 
-    def _build_system_prompt(self, context: str) -> str:
+    def _build_system_prompt(
+        self, context: str, user: Optional[dict] = None
+    ) -> str:
         """Build system prompt with context."""
         return f"""You are a shift scheduling assistant for the Psychiatric Institute. \
 Use the shift data below only when answering questions about shifts, schedules, \
@@ -298,7 +300,7 @@ Assignment rules:
 - Be concise. Use bullet points when helpful.
 - Always include the shift type (ECT/Internal/ER) when discussing specific shifts.
 
-{build_tools_prompt()}"""
+{build_tools_prompt() if user and user.get("role") == "admin" else ""}"""
 
     async def check_health(self) -> dict:
         """Check if the AI provider is available and configured."""
@@ -392,7 +394,7 @@ Assignment rules:
     ) -> dict:
         """Send message to AI provider and get response, with tool-call support."""
         context = self._build_data_context()
-        system_prompt = self._build_system_prompt(context)
+        system_prompt = self._build_system_prompt(context, user)
         messages = self._build_messages(message, conversation_history)
 
         final_text, tool_events = await self._run_tool_loop(
@@ -424,7 +426,7 @@ Assignment rules:
         streaming call on every request.
         """
         context = self._build_data_context()
-        system_prompt = self._build_system_prompt(context)
+        system_prompt = self._build_system_prompt(context, user)
         messages = self._build_messages(message, conversation_history)
 
         # Stream the first response from the provider

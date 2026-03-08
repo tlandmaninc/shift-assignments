@@ -1,15 +1,19 @@
 """Google Gemini AI provider using the free API tier."""
 
 import json
+import logging
 import time
 import httpx
 from collections.abc import AsyncGenerator
 from typing import Optional
 from .base import AIProvider, AIResponse
 
+logger = logging.getLogger(__name__)
+
 # Cooldown in seconds before retrying a model after a 429.
-# Gemini free-tier per-minute limits reset quickly; 60s is enough.
-_DEFAULT_COOLDOWN_SECONDS = 60
+# Gemini free-tier per-minute limits reset quickly; 15s avoids
+# long waits while still reducing retry spam.
+_DEFAULT_COOLDOWN_SECONDS = 15
 
 
 class GeminiProvider(AIProvider):
@@ -289,6 +293,8 @@ class GeminiProvider(AIProvider):
             request_body["systemInstruction"] = system_instruction
 
         models_to_try = self._build_model_sequence()
+        if not models_to_try:
+            logger.warning("All Gemini models on cooldown, cooldowns: %s", self._rate_limited_until)
         last_error = None
 
         for model in models_to_try:
@@ -304,7 +310,8 @@ class GeminiProvider(AIProvider):
                     ) as response:
                         if response.status_code != 200:
                             body = await response.aread()
-                            error_msg = f"Gemini API error ({response.status_code}): {body.decode()[:200]}"
+                            error_msg = f"Gemini API error ({response.status_code}): {body.decode()[:300]}"
+                            logger.warning("Gemini %s returned %d: %s", model, response.status_code, error_msg[:200])
                             if self._is_quota_error(error_msg):
                                 got_429 = True
                                 last_error = error_msg

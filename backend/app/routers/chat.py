@@ -216,7 +216,7 @@ async def stream_message(
             if "rate-limited" in error_msg.lower() or "429" in error_msg:
                 full_content = (
                     "The AI assistant is temporarily rate-limited. "
-                    "Please wait about a minute and try again."
+                    "Please wait a few seconds and try again."
                 )
                 async for event in _stream_words(full_content):
                     yield event
