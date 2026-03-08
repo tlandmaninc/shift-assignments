@@ -48,10 +48,7 @@ jobs:
       - name: Trigger Vercel dev deploy
         run: |
           curl -s "${{ secrets.VERCEL_DEPLOY_HOOK_DEV }}"
-          echo ""
-          echo "🚀 Dev frontend deployment triggered"
-          echo "   App:   https://shift-assignments-frontend-dev.vercel.app"
-          echo "   Login: https://shift-assignments-frontend-dev.vercel.app/login"
+          echo "::notice::Dev frontend → https://shift-assignments-frontend-dev.vercel.app"
 
       - name: Dev deployment summary
         run: |
@@ -78,9 +75,7 @@ jobs:
       - name: Trigger Vercel prod deploy
         run: |
           curl -s "${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}"
-          echo ""
-          echo "🚀 Prod frontend deployment triggered"
-          echo "   App: https://shift-assignments.vercel.app"
+          echo "::notice::Prod frontend → https://shift-assignments.vercel.app"
 
       - name: Deployment summary
         run: |

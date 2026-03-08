@@ -59,10 +59,7 @@ jobs:
       - name: Trigger Render dev deploy
         run: |
           curl -s "${{ secrets.RENDER_DEPLOY_HOOK_DEV }}"
-          echo ""
-          echo "🚀 Dev backend deployment triggered"
-          echo "   Health: https://shift-assignments-backend-dev.onrender.com/health"
-          echo "   Docs:   https://shift-assignments-backend-dev.onrender.com/api/docs"
+          echo "::notice::Dev backend → https://shift-assignments-backend-dev.onrender.com/health"
 
       - name: Dev deployment summary
         run: |
@@ -89,10 +86,7 @@ jobs:
       - name: Trigger Render prod deploy
         run: |
           curl -s "${{ secrets.RENDER_DEPLOY_HOOK_PROD }}"
-          echo ""
-          echo "🚀 Prod backend deployment triggered"
-          echo "   Health: https://shift-assignments-backend-prod.onrender.com/health"
-          echo "   Docs:   https://shift-assignments-backend-prod.onrender.com/api/docs"
+          echo "::notice::Prod backend → https://shift-assignments-backend-prod.onrender.com/health"
 
       - name: Deployment summary
         run: |
