@@ -560,9 +560,14 @@ Assignment rules:
                 system_prompt=system_prompt,
                 max_tokens=2048,
             )
-            content = result.content or "" if result.success else (
-                result.error or "AI error"
-            )
+            if result.success:
+                content = result.content or ""
+            else:
+                err = result.error or "AI error"
+                if "rate" in err.lower() or "429" in err or "limit" in err.lower():
+                    content = ""  # Silently skip — tools already executed
+                else:
+                    content = err
             follow_up_calls = parse_tool_calls(content) if result.success else []
 
             if not follow_up_calls:
