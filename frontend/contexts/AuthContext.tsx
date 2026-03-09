@@ -3,6 +3,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, AuthContextType } from '@/lib/types/auth';
 import { authApi } from '@/lib/api';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
+
+const DEMO_USER: User = {
+  id: 'demo',
+  email: 'demo@example.com',
+  name: 'Demo Admin',
+  role: 'admin',
+  employee_id: 1,
+  is_active: true,
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -13,10 +23,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshAuth = useCallback(async () => {
     try {
       const status = await authApi.getStatus();
-      setUser(status.user);
+      setUser(status.user ?? (isDemoAllowed ? DEMO_USER : null));
     } catch (error) {
       console.error('Failed to fetch auth status:', error);
-      setUser(null);
+      setUser(isDemoAllowed ? DEMO_USER : null);
     } finally {
       setIsLoading(false);
     }
