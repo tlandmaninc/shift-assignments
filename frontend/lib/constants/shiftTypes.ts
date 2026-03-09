@@ -80,8 +80,8 @@ export function getShiftTypeConfig(
   shiftType: string,
   dynamicTypes?: Record<string, ShiftTypeConfig>,
 ): ShiftTypeConfig {
-  const source = dynamicTypes || SHIFT_TYPES;
-  return source[shiftType] || source.ect || SHIFT_TYPES.ect;
+  if (dynamicTypes?.[shiftType]) return dynamicTypes[shiftType];
+  return SHIFT_TYPES[shiftType] || dynamicTypes?.ect || SHIFT_TYPES.ect;
 }
 
 export function getShiftTypeStyle(config: ShiftTypeConfig): {
