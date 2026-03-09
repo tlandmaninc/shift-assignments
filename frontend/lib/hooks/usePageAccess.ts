@@ -14,11 +14,13 @@ export const DEFAULT_PAGE_ACCESS: Record<string, string> = {
 };
 
 export function usePageAccess() {
-  const { isAdmin, isAuthenticated } = useAuth();
+  const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
   const [config, setConfig] = useState<Record<string, string>>(DEFAULT_PAGE_ACCESS);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to resolve before deciding access
+    if (authLoading) return;
     if (!isAuthenticated) {
       setIsLoading(false);
       return;
@@ -28,7 +30,7 @@ export function usePageAccess() {
       .then(setConfig)
       .catch(() => setConfig(DEFAULT_PAGE_ACCESS))
       .finally(() => setIsLoading(false));
-  }, [isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   const canAccess = useCallback(
     (path: string): boolean => {
