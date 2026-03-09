@@ -110,7 +110,9 @@ function filterShiftsByRange(monthlyShifts: Record<string, number>, range: DateR
   return filtered;
 }
 
-/** Per-chart time filter chip strip. Fixed size — Custom opens a popover overlay. */
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Per-chart time filter chip strip with month-picker popover for custom ranges. */
 const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, onCustomChange }: {
   preset: TimePreset;
   onChange: (p: TimePreset) => void;
@@ -121,6 +123,12 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Derive min/max year from available months for navigation bounds
+  const availableSet = useMemo(() => new Set(availableMonths), [availableMonths]);
+  const minYear = availableMonths.length > 0 ? parseInt(availableMonths[0].split('-')[0]) : new Date().getFullYear();
+  const maxYear = availableMonths.length > 0 ? parseInt(availableMonths[availableMonths.length - 1].split('-')[0]) : new Date().getFullYear();
+  const [viewYear, setViewYear] = useState(maxYear);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setPopoverOpen(false);
@@ -128,6 +136,21 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Reset viewYear to maxYear when popover opens
+  useEffect(() => { if (popoverOpen) setViewYear(maxYear); }, [popoverOpen, maxYear]);
+
+  const handleMonthClick = useCallback((m: string) => {
+    if (!customRange.from || (customRange.from && customRange.to)) {
+      onCustomChange({ from: m, to: null });
+    } else if (m < customRange.from) {
+      onCustomChange({ from: m, to: customRange.from });
+    } else if (m === customRange.from) {
+      onCustomChange({ from: m, to: m });
+    } else {
+      onCustomChange({ ...customRange, to: m });
+    }
+  }, [customRange, onCustomChange]);
 
   return (
     <div className="relative flex items-center gap-1" ref={ref}>
@@ -164,94 +187,88 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
           <RotateCcw className="w-3 h-3" />
         </button>
       )}
-      {/* Custom range calendar popover */}
+      {/* Month picker popover */}
       <AnimatePresence>
-        {popoverOpen && (() => {
-          // Group months by year
-          const byYear: Record<string, string[]> = {};
-          for (const m of availableMonths) {
-            const yr = m.split('-')[0];
-            (byYear[yr] ??= []).push(m);
-          }
-          const years = Object.keys(byYear).sort();
-          const isFrom = (m: string) => customRange.from === m;
-          const isTo = (m: string) => customRange.to === m;
-          const inRange = (m: string) => {
-            if (!customRange.from && !customRange.to) return false;
-            if (customRange.from && m < customRange.from) return false;
-            if (customRange.to && m > customRange.to) return false;
-            return true;
-          };
+        {popoverOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 w-[252px]"
+          >
+            {/* Year navigation header */}
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => setViewYear(y => Math.max(minYear, y - 1))}
+                disabled={viewYear <= minYear}
+                className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-slate-500" />
+              </button>
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{viewYear}</span>
+              <button
+                onClick={() => setViewYear(y => Math.min(maxYear, y + 1))}
+                disabled={viewYear >= maxYear}
+                className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            {/* 3×4 month grid */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTH_LABELS.map((label, i) => {
+                const m = `${viewYear}-${String(i + 1).padStart(2, '0')}`;
+                const available = availableSet.has(m);
+                const isEndpoint = m === customRange.from || m === customRange.to;
+                const isStart = m === customRange.from;
+                const isEnd = m === customRange.to;
+                const inRange = available && customRange.from && (
+                  customRange.to
+                    ? m >= customRange.from && m <= customRange.to
+                    : m === customRange.from
+                );
+                const between = inRange && !isEndpoint;
 
-          return (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.1 }}
-              className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 min-w-[240px]"
-            >
-              {/* Header with range display */}
-              <div className="flex items-center justify-between mb-2 px-0.5">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Select range</span>
-                {(customRange.from || customRange.to) && (
+                return (
                   <button
-                    onClick={() => onCustomChange({ from: null, to: null })}
-                    className="text-[10px] text-primary-500 hover:text-primary-400 font-medium"
+                    key={m}
+                    disabled={!available}
+                    onClick={() => handleMonthClick(m)}
+                    className={cn(
+                      'relative py-1.5 rounded-lg text-xs font-medium transition-all',
+                      !available && 'text-slate-300 dark:text-slate-600 cursor-not-allowed',
+                      available && !inRange && 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700',
+                      between && 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400',
+                      isEndpoint && 'bg-primary-500 text-white shadow-sm',
+                    )}
                   >
-                    Clear
+                    {label}
+                    {isStart && !isEnd && (
+                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary-300" />
+                    )}
                   </button>
-                )}
-              </div>
-              {/* Active range indicator */}
+                );
+              })}
+            </div>
+            {/* Range display + clear */}
+            <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                {customRange.from || customRange.to
+                  ? `${customRange.from ? formatMonthYear(customRange.from) : 'Start'} – ${customRange.to ? formatMonthYear(customRange.to) : 'Latest'}`
+                  : 'Click a month to start'}
+              </span>
               {(customRange.from || customRange.to) && (
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 px-0.5">
-                  {customRange.from ? formatMonthYear(customRange.from) : 'Start'} – {customRange.to ? formatMonthYear(customRange.to) : 'Latest'}
-                </div>
+                <button
+                  onClick={() => onCustomChange({ from: null, to: null })}
+                  className="text-[11px] text-primary-500 hover:text-primary-400 font-medium"
+                >
+                  Clear
+                </button>
               )}
-              {/* Month grid by year */}
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {years.map((yr) => (
-                  <div key={yr}>
-                    <div className="text-[10px] font-semibold text-slate-400 mb-1 px-0.5">{yr}</div>
-                    <div className="grid grid-cols-4 gap-1">
-                      {byYear[yr].map((m) => {
-                        const mo = new Date(parseInt(m.split('-')[0]), parseInt(m.split('-')[1]) - 1)
-                          .toLocaleDateString('en-US', { month: 'short' });
-                        const selected = isFrom(m) || isTo(m);
-                        const between = inRange(m) && !selected;
-                        return (
-                          <button
-                            key={m}
-                            onClick={() => {
-                              if (!customRange.from || (customRange.from && customRange.to)) {
-                                onCustomChange({ from: m, to: null });
-                              } else if (m < customRange.from) {
-                                onCustomChange({ from: m, to: customRange.from });
-                              } else {
-                                onCustomChange({ ...customRange, to: m });
-                              }
-                            }}
-                            className={cn(
-                              'px-1.5 py-1 rounded-md text-[11px] font-medium transition-all',
-                              selected
-                                ? 'bg-primary-500 text-white shadow-sm'
-                                : between
-                                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                            )}
-                          >
-                            {mo}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          );
-        })()}
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
