@@ -21,6 +21,10 @@ import { Card, CardHeader, Button, Badge, Input } from '@/components/ui';
 import { employeesApi } from '@/lib/api';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { RegisteredUsers } from '@/components/employees/RegisteredUsers';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
+import { generateMockEmployees } from '@/lib/mockData/historyMockData';
+import { FlaskConical, Radio } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface DuplicatePair {
@@ -48,6 +52,7 @@ export default function EmployeesPage() {
   const { canAccess, isLoading: accessLoading } = usePageAccess();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [useMockData, setUseMockData] = useState(isDemoAllowed);
 
   // Redirect users without access
   useEffect(() => {
@@ -67,12 +72,16 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     loadEmployees();
-  }, []);
+  }, [useMockData]);
 
   const loadEmployees = async () => {
     try {
-      const data = await employeesApi.list(false); // Include inactive
-      setEmployees(data);
+      if (useMockData) {
+        setEmployees(generateMockEmployees());
+      } else {
+        const data = await employeesApi.list(false); // Include inactive
+        setEmployees(data);
+      }
     } catch (error) {
       console.error('Failed to load employees:', error);
     } finally {
@@ -230,6 +239,25 @@ export default function EmployeesPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
+          {isDemoAllowed && (
+            <button
+              onClick={() => setUseMockData(!useMockData)}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors',
+                useMockData
+                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                  : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              )}
+              title={useMockData ? 'Using mock data' : 'Using real API'}
+            >
+              {useMockData ? (
+                <FlaskConical className="w-3.5 h-3.5" />
+              ) : (
+                <Radio className="w-3.5 h-3.5" />
+              )}
+              {useMockData ? 'Mock' : 'Live'}
+            </button>
+          )}
           <Button
             variant="outline"
             size="sm"

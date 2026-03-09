@@ -19,6 +19,8 @@ import {
   RotateCcw,
   Target,
   Users,
+  FlaskConical,
+  Radio,
 } from 'lucide-react';
 import {
   LineChart as RechartsLine,
@@ -51,6 +53,14 @@ import { useRouter } from 'next/navigation';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { DEFAULT_SHIFT_TYPE, getShiftTypeConfig } from '@/lib/constants/shiftTypes';
 import { useShiftTypes } from '@/hooks/useShiftTypes';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
+import {
+  generateMockHistory,
+  generateMockFairness,
+  generateMockMonthlyData,
+  generateMockEmployeeTrends,
+  generateMockCalendarHtml,
+} from '@/lib/mockData/historyMockData';
 
 // Color palette for charts (used for per-employee lines)
 const CHART_COLORS = [
@@ -142,13 +152,13 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
 
   const handleMonthClick = useCallback((m: string) => {
     if (!customRange.from || (customRange.from && customRange.to)) {
+      // First click or restart: set start month
       onCustomChange({ from: m, to: null });
-    } else if (m < customRange.from) {
-      onCustomChange({ from: m, to: customRange.from });
-    } else if (m === customRange.from) {
-      onCustomChange({ from: m, to: m });
     } else {
-      onCustomChange({ ...customRange, to: m });
+      // Second click: complete the range (auto-sort endpoints)
+      const [a, b] = m < customRange.from ? [m, customRange.from] : [customRange.from, m];
+      onCustomChange({ from: a, to: b });
+      setPopoverOpen(false);
     }
   }, [customRange, onCustomChange]);
 
@@ -226,7 +236,7 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
                 const inRange = available && customRange.from && (
                   customRange.to
                     ? m >= customRange.from && m <= customRange.to
-                    : m === customRange.from
+                    : m >= customRange.from
                 );
                 const between = inRange && !isEndpoint;
 
@@ -254,9 +264,11 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
             {/* Range display + clear */}
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
               <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                {customRange.from || customRange.to
-                  ? `${customRange.from ? formatMonthYear(customRange.from) : 'Start'} – ${customRange.to ? formatMonthYear(customRange.to) : 'Latest'}`
-                  : 'Click a month to start'}
+                {customRange.from && customRange.to
+                  ? `${formatMonthYear(customRange.from)} – ${formatMonthYear(customRange.to)}`
+                  : customRange.from
+                    ? `From ${formatMonthYear(customRange.from)} — click end month`
+                    : 'Click a month to start'}
               </span>
               {(customRange.from || customRange.to) && (
                 <button
@@ -495,6 +507,7 @@ export default function HistoryPage() {
   const [monthlyData, setMonthlyData] = useState<any>(null);
   const [employeeTrends, setEmployeeTrends] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [useMockData, setUseMockData] = useState(isDemoAllowed);
   const [activeChart, setActiveChart] = useState<ChartView>('trends');
   const [employeeSort, setEmployeeSort] = useState<SortOption>('shifts-desc');
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
@@ -515,13 +528,21 @@ export default function HistoryPage() {
   const [distPreset, setDistPreset] = useState<TimePreset>('all');
   const [distCustom, setDistCustom] = useState<DateRange>({ from: null, to: null });
 
-  // Available months for date range picker (sorted)
+  // Available months for date range picker (merged from all sources, sorted)
   const availableMonths = useMemo(() => {
-    if (!monthlyData?.months) return [];
-    return monthlyData.months
-      .map((m: any) => m.month_year)
-      .sort();
-  }, [monthlyData]);
+    const set = new Set<string>();
+    if (monthlyData?.months) {
+      monthlyData.months.forEach((m: any) => set.add(m.month_year));
+    }
+    if (employeeTrends?.trends) {
+      employeeTrends.trends.forEach((emp: any) => {
+        if (emp.monthly_shifts) {
+          Object.keys(emp.monthly_shifts).forEach((m: string) => set.add(m));
+        }
+      });
+    }
+    return Array.from(set).sort();
+  }, [monthlyData, employeeTrends]);
 
   // Computed date ranges per chart
   const gapRange = useMemo(() => computeDateRange(gapPreset, availableMonths, gapCustom), [gapPreset, availableMonths, gapCustom]);
@@ -581,17 +602,24 @@ export default function HistoryPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [historyData, fairnessData, monthlyDataResult, trendsData] =
-          await Promise.all([
-            historyApi.get(selectedShiftType),
-            historyApi.getFairness(selectedShiftType),
-            historyApi.getMonthly(selectedShiftType),
-            historyApi.getEmployeeTrends(selectedShiftType),
-          ]);
-        setHistory(historyData);
-        setFairness(fairnessData);
-        setMonthlyData(monthlyDataResult);
-        setEmployeeTrends(trendsData);
+        if (useMockData) {
+          setHistory(generateMockHistory());
+          setFairness(generateMockFairness(selectedShiftType));
+          setMonthlyData(generateMockMonthlyData());
+          setEmployeeTrends(generateMockEmployeeTrends());
+        } else {
+          const [historyData, fairnessData, monthlyDataResult, trendsData] =
+            await Promise.all([
+              historyApi.get(selectedShiftType),
+              historyApi.getFairness(selectedShiftType),
+              historyApi.getMonthly(selectedShiftType),
+              historyApi.getEmployeeTrends(selectedShiftType),
+            ]);
+          setHistory(historyData);
+          setFairness(fairnessData);
+          setMonthlyData(monthlyDataResult);
+          setEmployeeTrends(trendsData);
+        }
       } catch (error) {
         console.error('Failed to load history:', error);
         toast.error('Failed to load history data');
@@ -600,7 +628,7 @@ export default function HistoryPage() {
       }
     }
     loadData();
-  }, [selectedShiftType]);
+  }, [selectedShiftType, useMockData]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -780,7 +808,9 @@ export default function HistoryPage() {
     setSelectedMonth(monthYear);
     setCalendarLoading(true);
     try {
-      const html = await assignmentsApi.getCalendar(monthYear);
+      const html = useMockData
+        ? generateMockCalendarHtml(monthYear)
+        : await assignmentsApi.getCalendar(monthYear);
       setCalendarHtml(html);
     } catch (error) {
       console.error('Failed to load calendar:', error);
@@ -790,7 +820,7 @@ export default function HistoryPage() {
     } finally {
       setCalendarLoading(false);
     }
-  }, []);
+  }, [useMockData]);
 
   const closeCalendarModal = useCallback(() => {
     setSelectedMonth(null);
@@ -831,6 +861,25 @@ export default function HistoryPage() {
             Track shift assignment history and fairness metrics
           </p>
         </div>
+        {isDemoAllowed && (
+          <button
+            onClick={() => setUseMockData(!useMockData)}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors',
+              useMockData
+                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+            )}
+            title={useMockData ? 'Using mock data' : 'Using real API'}
+          >
+            {useMockData ? (
+              <FlaskConical className="w-3.5 h-3.5" />
+            ) : (
+              <Radio className="w-3.5 h-3.5" />
+            )}
+            {useMockData ? 'Mock' : 'Live'}
+          </button>
+        )}
       </motion.div>
 
       {/* Filter Bar: Shift Type + Date Range */}

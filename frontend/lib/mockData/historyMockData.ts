@@ -282,6 +282,20 @@ export function generateMockEmployeeTrends() {
  * Generate mock calendar HTML for a given month.
  * Mirrors the backend CalendarGenerator output so the history modal works in mock mode.
  */
+/** Generate mock employee list for the Employees page. */
+export function generateMockEmployees() {
+  assertNotProduction();
+  const shiftCounts = [8, 6, 7, 5, 9, 4, 7, 6, 8, 3];
+  return EMPLOYEES.map((emp, i) => ({
+    id: emp.id,
+    name: emp.name,
+    email: `${emp.name.split(' ')[0].toLowerCase()}@example.com`,
+    is_new: emp.is_new,
+    is_active: true,
+    total_shifts: shiftCounts[i] || 5,
+  }));
+}
+
 export function generateMockCalendarHtml(monthYear: string): string {
   assertNotProduction();
   const [yearStr, monthStr] = monthYear.split('-');
