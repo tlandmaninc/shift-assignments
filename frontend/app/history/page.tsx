@@ -2215,7 +2215,7 @@ export default function HistoryPage() {
                       {/* Shift type breakdown badges */}
                       {month.by_type && (
                         <span className="flex gap-1.5 mt-1">
-                          {Object.entries(month.by_type).map(([type, count]: [string, any]) => (
+                          {Object.entries(month.by_type).filter(([, count]: [string, any]) => count > 0).map(([type, count]: [string, any]) => (
                             <span
                               key={type}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-white"

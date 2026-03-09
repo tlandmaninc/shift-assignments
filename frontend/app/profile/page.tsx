@@ -9,13 +9,14 @@ import { ShiftAssignment } from '@/lib/types/exchange';
 import { buildShiftCalendarUrl } from '@/lib/utils/googleCalendar';
 import { cn } from '@/lib/utils';
 import { useExchangeStore } from '@/lib/stores/exchangeStore';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
 
 /**
  * Generate mock upcoming shifts for the current and next month.
- * Only used in development — throws in production.
+ * Only used in development/demo — throws in production.
  */
 function generateMockShifts(employeeName: string): ShiftAssignment[] {
-  if (process.env.NODE_ENV === 'production') {
+  if (!isDemoAllowed) {
     throw new Error('Mock data must not be used in production');
   }
   const shifts: ShiftAssignment[] = [];

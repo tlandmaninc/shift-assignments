@@ -20,6 +20,9 @@ import { historyApi, formsApi, settingsApi } from '@/lib/api';
 import { formatMonthYear } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { DEFAULT_PAGE_ACCESS } from '@/lib/hooks/usePageAccess';
+import { isDemoAllowed } from '@/lib/mockData/demoMode';
+import { generateMockHistory, generateMockFairness } from '@/lib/mockData/historyMockData';
+import { mockListForms } from '@/lib/mockData/formsMockData';
 import toast from 'react-hot-toast';
 
 const PAGE_LABELS: Record<string, string> = {
@@ -53,12 +56,17 @@ export default function Dashboard() {
     setLoading(true);
     async function loadData() {
       try {
-        const [statsData, fairnessData] = await Promise.all([
-          historyApi.get(),
-          historyApi.getFairness(),
-        ]);
-        setStats(statsData);
-        setFairness(fairnessData);
+        if (isDemoAllowed) {
+          setStats(generateMockHistory());
+          setFairness(generateMockFairness());
+        } else {
+          const [statsData, fairnessData] = await Promise.all([
+            historyApi.get(),
+            historyApi.getFairness(),
+          ]);
+          setStats(statsData);
+          setFairness(fairnessData);
+        }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
       } finally {
@@ -70,12 +78,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    formsApi.list()
-      .then(data => {
+    const loadForms = async () => {
+      try {
+        const data = isDemoAllowed ? mockListForms() : await formsApi.list();
         setRecentForms(data.slice(0, 3));
         setActiveFormsCount(data.filter((f: any) => f.status === 'active').length);
-      })
-      .catch(error => console.error('Failed to load forms:', error));
+      } catch (error) {
+        console.error('Failed to load forms:', error);
+      }
+    };
+    loadForms();
   }, [isAdmin]);
 
   useEffect(() => {
@@ -110,7 +122,7 @@ export default function Dashboard() {
   const statCards = [
     {
       title: 'Total Employees',
-      value: stats?.employee_stats?.length || 0,
+      value: fairness?.employees?.length || stats?.employee_stats?.length || 0,
       icon: Users,
       color: 'from-blue-400 to-blue-500 dark:from-blue-500 dark:to-blue-600',
       change: '+2 this month',
