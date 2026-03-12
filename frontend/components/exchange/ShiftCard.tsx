@@ -56,7 +56,7 @@ export function ShiftCard({ shift, onRequestSwap, isPast }: ShiftCardProps) {
       </div>
 
       {!isPast && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <a
             href={buildShiftCalendarUrl(shift.date, shift.employee_name, shift.shift_type)}
             target="_blank"

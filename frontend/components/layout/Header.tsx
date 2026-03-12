@@ -74,28 +74,28 @@ export function Header({
     <header className="border-b border-slate-200 dark:border-slate-800">
       {/* Banner */}
       <div
-        className="w-full h-32 relative overflow-hidden"
+        className="w-full h-20 sm:h-32 relative overflow-hidden"
         style={{
-          backgroundImage: 'url(/ect_banner.png)',
-          backgroundSize: '430% 100%',
+          backgroundImage: 'url(/platform_banner.png)',
+          backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#4a90d9',
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/20 to-transparent flex items-center px-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent flex items-center px-6">
           <div className="flex items-center gap-4 w-full">
             <button
               onClick={onToggleSidebar}
-              className="lg:hidden p-2 hover:bg-white/10 rounded-lg text-white"
+              className="lg:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-lg text-white"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-lg sm:text-2xl font-bold text-white">
                 Shift Assignment Platform
               </h1>
-              <p className="text-sm text-slate-200">
+              <p className="text-sm text-slate-200 hidden sm:block">
                 Psychiatry Department - Shift & Employee Management
               </p>
             </div>
@@ -117,7 +117,7 @@ export function Header({
                     markAllRead();
                   }
                 }}
-                className="p-2 hover:bg-white/10 rounded-lg relative"
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-lg relative"
               >
                 <Bell className="w-5 h-5 text-white" />
                 <NotificationBadge count={unreadCount} />
@@ -126,7 +126,7 @@ export function Header({
               {/* Dark mode toggle */}
               <motion.button
                 onClick={onToggleDarkMode}
-                className="p-2 hover:bg-white/10 rounded-lg"
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-lg"
                 whileTap={{ scale: 0.95 }}
               >
                 <motion.div
@@ -196,7 +196,7 @@ export function Header({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               style={{ top: notificationPosition.top, right: notificationPosition.right }}
-              className="fixed w-80 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50"
+              className="fixed w-[calc(100vw-2rem)] sm:w-80 max-w-80 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50"
             >
               <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                 <h3 className="font-medium text-sm text-slate-900 dark:text-white">
@@ -273,7 +273,7 @@ export function Header({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               style={{ top: menuPosition.top, right: menuPosition.right }}
-              className="fixed w-56 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50"
+              className="fixed w-[calc(100vw-2rem)] sm:w-56 max-w-56 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50"
             >
             <div className="p-3 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2">

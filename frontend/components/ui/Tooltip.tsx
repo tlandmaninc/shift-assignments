@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useRef, useCallback } from 'react';
+import { ReactNode, useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,24 @@ const PAD = 8;
 export function Tooltip({ children, content, className, position = 'bottom' }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    setIsTouchDevice('ontouchstart' in window);
+  }, []);
+
+  useEffect(() => {
+    if (!isTouchDevice || !isVisible) return;
+    const handleOutsideTouch = (e: TouchEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsVisible(false);
+        setCoords(null);
+      }
+    };
+    document.addEventListener('touchstart', handleOutsideTouch);
+    return () => document.removeEventListener('touchstart', handleOutsideTouch);
+  }, [isTouchDevice, isVisible]);
 
   const tooltipRef = useCallback(
     (node: HTMLSpanElement | null) => {
@@ -70,6 +87,12 @@ export function Tooltip({ children, content, className, position = 'bottom' }: T
       className="relative inline-flex"
       onMouseEnter={() => { setCoords(null); setIsVisible(true); }}
       onMouseLeave={() => { setIsVisible(false); setCoords(null); }}
+      onClick={() => {
+        if (isTouchDevice) {
+          setCoords(null);
+          setIsVisible((v) => !v);
+        }
+      }}
     >
       {children}
       <AnimatePresence>
@@ -85,7 +108,7 @@ export function Tooltip({ children, content, className, position = 'bottom' }: T
               : { top: -9999, left: -9999 }
             }
             className={cn(
-              'fixed z-50 px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg w-max max-w-[480px] leading-relaxed block whitespace-normal border border-slate-700 dark:border-slate-600',
+              'fixed z-50 px-3 py-2 text-sm text-white bg-slate-800 dark:bg-slate-700 rounded-lg shadow-lg w-max max-w-[min(480px,calc(100vw-1rem))] leading-relaxed block whitespace-normal border border-slate-700 dark:border-slate-600',
               className
             )}
           >

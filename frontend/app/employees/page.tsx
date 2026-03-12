@@ -12,6 +12,7 @@ import {
   X,
   Check,
   UserPlus,
+  UserCheck,
   GitMerge,
   Languages,
   ArrowRight,
@@ -21,6 +22,7 @@ import { Card, CardHeader, Button, Badge, Input } from '@/components/ui';
 import { employeesApi } from '@/lib/api';
 import { usePageAccess } from '@/lib/hooks/usePageAccess';
 import { RegisteredUsers } from '@/components/employees/RegisteredUsers';
+import { EmployeeList } from '@/components/employees/EmployeeList';
 import { isDemoAllowed } from '@/lib/mockData/demoMode';
 import { generateMockEmployees } from '@/lib/mockData/historyMockData';
 import { FlaskConical, Radio } from 'lucide-react';
@@ -434,81 +436,11 @@ export default function EmployeesPage() {
           title={`Active Employees (${activeEmployees.length})`}
           description="Employees available for shift assignments"
         />
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                {['Name', 'Status', 'Total Shifts'].map((h) => (
-                  <th key={h} className="text-left py-3 px-4 text-sm font-medium text-slate-500">{h}</th>
-                ))}
-                <th className="text-right py-3 px-4 text-sm font-medium text-slate-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeEmployees.map((employee) => (
-                <motion.tr
-                  key={employee.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                >
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-medium">
-                        {employee.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {employee.name}
-                        </p>
-                        {employee.email && (
-                          <p className="text-sm text-slate-500">{employee.email}</p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge variant={employee.is_new ? 'info' : 'success'}>
-                      {employee.is_new ? 'New' : 'Experienced'}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="font-medium">{employee.total_shifts || 0}</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          handleUpdateEmployee(employee.id, {
-                            is_new: !employee.is_new,
-                          })
-                        }
-                      >
-                        {employee.is_new ? 'Mark Experienced' : 'Mark New'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteEmployee(employee.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
-              {activeEmployees.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-slate-500">
-                    No active employees. Add one to get started.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <EmployeeList
+          employees={activeEmployees}
+          onUpdateEmployee={handleUpdateEmployee}
+          onDeleteEmployee={handleDeleteEmployee}
+        />
       </Card>
 
       {/* Inactive Employees */}

@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Loader2, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Send, Loader2, AlertCircle, RefreshCw, ShieldCheck, History } from 'lucide-react';
+import { useIsMobile } from '@/lib/hooks/useIsMobile';
 import { Card } from '@/components/ui';
 import { MessageBubble, TypingIndicator, EmptyState, ChatHistoryPanel } from '@/components/chat';
 import { chatApi } from '@/lib/api';
@@ -31,6 +32,8 @@ export default function ChatPage() {
     }
   }, [accessLoading, canAccess, router]);
 
+  const isMobile = useIsMobile();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -414,14 +417,25 @@ export default function ChatPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-4 flex-shrink-0"
+        className="mb-4 flex-shrink-0 flex items-start justify-between gap-3"
       >
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Chat with Your Data
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
-          Ask questions about shifts, employees, and scheduling
-        </p>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+            Chat with Your Data
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Ask questions about shifts, employees, and scheduling
+          </p>
+        </div>
+        {isMobile && (
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex-shrink-0 mt-1"
+            title="Chat History"
+          >
+            <History className="w-5 h-5" />
+          </button>
+        )}
       </motion.div>
 
       {/* Chat Layout: Sidebar + Chat Area */}
@@ -432,6 +446,9 @@ export default function ChatPage() {
           onSelectConversation={handleSelectConversation}
           onNewChat={handleNewChat}
           refreshTrigger={refreshTrigger}
+          isMobile={isMobile}
+          mobileOpen={historyOpen}
+          onMobileClose={() => setHistoryOpen(false)}
         />
 
         {/* Chat Area */}

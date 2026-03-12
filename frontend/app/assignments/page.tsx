@@ -352,7 +352,7 @@ export default function AssignmentsPage() {
                   value={csvData}
                   onChange={(e) => setCsvData(e.target.value)}
                   placeholder="Paste CSV data here..."
-                  className="w-full h-64 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full h-40 sm:h-64 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
 
                 <div className="flex items-center justify-between">
@@ -476,7 +476,7 @@ export default function AssignmentsPage() {
               <h4 className="font-medium mb-2">
                 Employees ({parsedEmployees.length})
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {parsedEmployees.map((emp, i) => (
                   <div
                     key={i}
@@ -564,7 +564,7 @@ export default function AssignmentsPage() {
               srcDoc={assignmentResult.calendar_html}
               sandbox=""
               className="w-full rounded-xl border border-slate-200 dark:border-slate-700"
-              style={{ minHeight: '400px' }}
+              style={{ minHeight: '300px' }}
               title="Calendar Preview"
             />
           </Card>

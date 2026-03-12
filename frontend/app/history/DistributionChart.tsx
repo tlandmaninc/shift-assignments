@@ -24,7 +24,7 @@ const CHART_COLORS = [
 ];
 
 const TOOLTIP_BOX =
-  'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[280px]';
+  'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[200px] sm:min-w-[280px]';
 
 const PieTooltip = memo(({ active, payload, total }: any) => {
   if (active && payload && payload.length) {

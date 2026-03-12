@@ -205,7 +205,7 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 w-[252px]"
+            className="absolute right-0 top-full mt-1.5 z-20 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 w-[252px] max-w-[calc(100vw-2rem)]"
           >
             {/* Year navigation header */}
             <div className="flex items-center justify-between mb-3">
@@ -288,7 +288,7 @@ const ChartTimeFilter = memo(({ preset, onChange, availableMonths, customRange, 
 ChartTimeFilter.displayName = 'ChartTimeFilter';
 
 // Shared chart tooltip container classes
-const TOOLTIP_BOX = 'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[280px]';
+const TOOLTIP_BOX = 'bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 min-w-[200px] sm:min-w-[280px]';
 
 // Memoized custom tooltip for line chart
 const TrendsTooltip = memo(({ active, payload, label }: any) => {

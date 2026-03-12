@@ -19,7 +19,7 @@ export function Card({ children, className, hover = false, glass = false }: Card
       transition={{ duration: 0.3 }}
       whileHover={hover ? { y: -2, boxShadow: '0 20px 40px rgba(0,0,0,0.06)' } : undefined}
       className={cn(
-        'rounded-2xl p-6',
+        'rounded-2xl p-4 sm:p-6',
         glass
           ? 'glass'
           : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm',

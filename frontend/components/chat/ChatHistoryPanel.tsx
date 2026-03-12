@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Loader2,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { chatApi, type ConversationSummary } from '@/lib/api';
@@ -18,6 +19,9 @@ interface ChatHistoryPanelProps {
   onSelectConversation: (id: string) => void;
   onNewChat: () => void;
   refreshTrigger: number;
+  isMobile?: boolean;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 function getDateGroup(dateStr: string): string {
@@ -55,6 +59,9 @@ export function ChatHistoryPanel({
   onSelectConversation,
   onNewChat,
   refreshTrigger,
+  isMobile = false,
+  mobileOpen = false,
+  onMobileClose,
 }: ChatHistoryPanelProps) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +108,99 @@ export function ChatHistoryPanel({
     grouped[group].push(conv);
   }
 
+  // Mobile: hide when not open
+  if (isMobile && !mobileOpen) return null;
+
+  // Mobile: render as fixed overlay
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 flex">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={onMobileClose}
+        />
+        {/* Slide-in panel */}
+        <motion.div
+          initial={{ x: -280 }}
+          animate={{ x: 0 }}
+          exit={{ x: -280 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="relative flex flex-col w-[280px] max-w-[80vw] bg-white dark:bg-slate-900 shadow-xl h-full"
+        >
+          {/* Mobile header */}
+          <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => { onNewChat(); onMobileClose?.(); }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors flex-1 mr-2 justify-center"
+            >
+              <Plus className="w-4 h-4" />
+              New Chat
+            </button>
+            <button
+              onClick={onMobileClose}
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Conversations list */}
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="text-center py-8 px-4">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">No conversations yet</p>
+              </div>
+            ) : (
+              <div className="py-2">
+                {groupOrder.map((group) => {
+                  const items = grouped[group];
+                  if (!items || items.length === 0) return null;
+                  return (
+                    <div key={group} className="mb-1">
+                      <div className="px-3 py-1.5">
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                          {group}
+                        </span>
+                      </div>
+                      {items.map((conv) => (
+                        <div
+                          key={conv.id}
+                          onClick={() => { onSelectConversation(conv.id); onMobileClose?.(); }}
+                          className={cn(
+                            'w-full text-left px-3 py-2.5 mx-1 rounded-lg transition-colors flex items-start gap-2 cursor-pointer',
+                            activeConversationId === conv.id
+                              ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          )}
+                          style={{ width: 'calc(100% - 8px)' }}
+                        >
+                          <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-50" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm truncate font-medium">{conv.title}</p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                              {formatRelativeTime(conv.updated_at)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Desktop: collapsed state
   if (collapsed) {
     return (
       <div className="flex flex-col items-center py-3 px-1 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 w-12 flex-shrink-0">
@@ -122,6 +222,7 @@ export function ChatHistoryPanel({
     );
   }
 
+  // Desktop: expanded state
   return (
     <div className="flex flex-col w-[280px] flex-shrink-0 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
       {/* Header */}
