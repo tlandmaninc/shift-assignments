@@ -250,7 +250,7 @@ function LoginPageInner() {
       <div className="w-full relative overflow-hidden">
         <img
           src="/platform_hero.png"
-          alt="Shift Assignment Management Platform"
+          alt="Shift Management Platform"
           className="w-full h-auto block"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-slate-100 dark:to-slate-950" />
@@ -272,7 +272,7 @@ function LoginPageInner() {
             <CalendarDays className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Shift Assignment
+            Shift Management
           </h1>
           <p className="text-slate-600 dark:text-slate-400">
             Sign in to manage shift assignments

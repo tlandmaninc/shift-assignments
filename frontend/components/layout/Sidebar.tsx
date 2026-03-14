@@ -69,7 +69,7 @@ export function Sidebar({ open, onToggle, isMobile = false }: SidebarProps) {
                 className="flex flex-col whitespace-nowrap overflow-hidden"
               >
                 <span className="text-xl font-bold gradient-text">
-                  Shift Assignment
+                  Shift Management
                 </span>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 -mt-1">
                   Psychiatry
@@ -142,7 +142,7 @@ export function Sidebar({ open, onToggle, isMobile = false }: SidebarProps) {
               exit={{ opacity: 0 }}
               className="text-xs text-slate-400 dark:text-slate-600"
             >
-              Shift Assignment Platform v1.0
+              Shift Management Platform v1.0
             </motion.p>
           )}
         </AnimatePresence>

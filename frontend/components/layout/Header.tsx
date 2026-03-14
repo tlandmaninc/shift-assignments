@@ -76,7 +76,7 @@ export function Header({
       <div className="w-full relative overflow-hidden">
         <img
           src="/platform_banner.png"
-          alt="Shift Assignment Management Platform"
+          alt="Shift Management Platform"
           className="w-full h-auto block"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex items-center px-3 sm:px-6">
@@ -89,7 +89,7 @@ export function Header({
             </button>
             <div className="flex-1">
               <h1 className="text-lg sm:text-2xl font-bold text-white">
-                Shift Assignment Platform
+                Shift Management Platform
               </h1>
               <p className="text-sm text-slate-200 hidden sm:block">
                 Psychiatry Department - Shift & Employee Management
