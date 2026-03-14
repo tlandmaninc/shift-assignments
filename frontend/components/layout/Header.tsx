@@ -72,19 +72,15 @@ export function Header({
 
   return (
     <header className="border-b border-slate-200 dark:border-slate-800">
-      {/* Banner */}
-      <div
-        className="w-full h-20 sm:h-32 relative overflow-hidden"
-        style={{
-          backgroundImage: 'url(/platform_banner.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#4a90d9',
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent flex items-center px-6">
-          <div className="flex items-center gap-4 w-full">
+      {/* Header Banner */}
+      <div className="w-full relative overflow-hidden">
+        <img
+          src="/platform_banner.png"
+          alt="Shift Assignment Management Platform"
+          className="w-full h-auto block"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex items-center px-3 sm:px-6">
+          <div className="flex items-center gap-2 sm:gap-4 w-full">
             <button
               onClick={onToggleSidebar}
               className="lg:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-lg text-white"

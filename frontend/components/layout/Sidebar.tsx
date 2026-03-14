@@ -176,12 +176,12 @@ export function Sidebar({ open, onToggle, isMobile = false }: SidebarProps) {
     );
   }
 
-  // Desktop: inline animated sidebar
+  // Desktop: inline animated sidebar (hidden below lg via CSS to prevent flash)
   return (
     <motion.aside
       initial={false}
       animate={{ width: open ? 256 : 72 }}
-      className="relative flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-full"
+      className="relative hidden lg:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-full"
     >
       {sidebarContent}
     </motion.aside>

@@ -118,7 +118,7 @@ export default function ShiftExchangePage() {
       className="space-y-6"
     >
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             Shift Exchange
@@ -127,7 +127,7 @@ export default function ShiftExchangePage() {
             Swap shifts with your colleagues
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           {isDemoAllowed && (
             <button
               onClick={() => setUseMockData(!useMockData)}

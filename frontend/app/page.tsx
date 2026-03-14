@@ -168,7 +168,7 @@ export default function Dashboard() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
             Psychiatry Department - Shift assignments overview
           </p>

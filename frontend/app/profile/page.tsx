@@ -132,7 +132,7 @@ export default function ProfilePage() {
 
       {/* User Info Card */}
       {user && (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
           <div className="flex items-center gap-4">
             {user.picture ? (
               <img
@@ -167,7 +167,7 @@ export default function ProfilePage() {
       )}
 
       {/* Upcoming Shifts */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
           <Calendar className="w-5 h-5 text-primary-500" />
           Upcoming Shifts

@@ -854,7 +854,7 @@ export default function HistoryPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             History & Analytics
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
@@ -1152,7 +1152,7 @@ export default function HistoryPage() {
               </UITooltip>
             }
           />
-          <div className="h-80">
+          <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={gapAnalysisData} layout="vertical" margin={{ left: 20, right: 64 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" horizontal={false} />
@@ -1233,7 +1233,7 @@ export default function HistoryPage() {
               </UITooltip>
             }
           />
-          <div className="h-64">
+          <div className="h-64 min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={fairnessTrendData} margin={{ top: 10, right: 40, left: 0, bottom: 0 }}>
                 <defs>
@@ -1347,7 +1347,7 @@ export default function HistoryPage() {
         />
 
         {/* Chart Navigation Tabs */}
-        <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="flex gap-2 mb-4 overflow-x-auto sm:flex-wrap pb-1 sm:pb-0">
           {[
             { id: 'trends' as ChartView, label: 'Employee Trends', icon: TrendingUp, desc: 'Line chart: monthly shift count per employee. Hover to compare all staff on a given month.' },
             { id: 'monthly' as ChartView, label: 'Monthly Overview', icon: BarChart3, desc: 'Stacked bar: total shifts by type each month. Right axis shows active employee count.' },
@@ -1358,7 +1358,7 @@ export default function HistoryPage() {
               key={tab.id}
               onClick={() => setActiveChart(tab.id)}
               title={tab.desc}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap text-sm ${
                 activeChart === tab.id
                   ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'

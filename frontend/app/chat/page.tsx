@@ -332,7 +332,7 @@ export default function ChatPage() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             Chat with Your Data
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
@@ -390,7 +390,7 @@ export default function ChatPage() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             Chat with Your Data
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
@@ -420,7 +420,7 @@ export default function ChatPage() {
         className="mb-4 flex-shrink-0 flex items-start justify-between gap-3"
       >
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             Chat with Your Data
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">

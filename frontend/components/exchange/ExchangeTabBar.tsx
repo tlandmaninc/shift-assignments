@@ -17,7 +17,7 @@ interface ExchangeTabBarProps {
 
 export function ExchangeTabBar({ tabs, activeTab, onTabChange }: ExchangeTabBarProps) {
   return (
-    <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+    <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTab;
         return (
@@ -25,7 +25,7 @@ export function ExchangeTabBar({ tabs, activeTab, onTabChange }: ExchangeTabBarP
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              'relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+              'relative flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
               isActive
                 ? 'text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
