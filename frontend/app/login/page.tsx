@@ -245,26 +245,27 @@ function LoginPageInner() {
   const direction = step === 'choose' ? -1 : 1;
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center relative"
-      style={{
-        backgroundImage: 'url(/platform_banner.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundColor: '#4a90d9',
-      }}
-    >
-      {/* Dark overlay for readability */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
-      {/* Hidden reCAPTCHA container */}
-      <div id="recaptcha-container" />
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950">
+      {/* Hero image */}
+      <div className="w-full relative overflow-hidden">
+        <img
+          src="/platform_hero.png"
+          alt="Shift Assignment Management Platform"
+          className="w-full h-auto block"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-slate-100 dark:to-slate-950" />
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-2xl shadow-2xl p-5 sm:p-8 w-full max-w-md overflow-hidden"
-      >
+      {/* Login card */}
+      <div className="flex-1 flex items-start justify-center px-4 -mt-12 sm:-mt-16 relative z-10 pb-8">
+        {/* Hidden reCAPTCHA container */}
+        <div id="recaptcha-container" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-5 sm:p-8 w-full max-w-md overflow-hidden"
+        >
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/30">
@@ -519,6 +520,7 @@ function LoginPageInner() {
           Psychiatry Department - Shift Management System
         </p>
       </motion.div>
+      </div>
     </div>
   );
 }
